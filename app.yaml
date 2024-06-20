@@ -1,0 +1,9 @@
+runtime: go115
+env: flex
+
+manual_scaling:
+  instances: 1
+
+handlers:
+- url: /.*
+  script: auto
