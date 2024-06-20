@@ -418,7 +418,6 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
         log.Printf("Rows error: %v", err)
         return nil, nil, err
     }
-
     log.Printf("Report types: %v", reportTypes)
     log.Printf("Report counts: %v", counts)
 
