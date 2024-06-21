@@ -86,7 +86,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 	report.RewardPoint = reportPoints
 	reportResponse := &models.IncidentReport{
 		ID:                report.ID,
-		UserFullname:      report.UserFullname,
 		DateOfIncidence:   report.DateOfIncidence,
 		Description:       report.Description,
 		FeedURLs:          report.FeedURLs,
@@ -95,8 +94,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		Latitude:          lat,
 		Longitude:         lng,
 		UserIsAnonymous:   false,
-		UserUsername:      report.UserUsername,
-		Telephone:         report.Telephone,
 		IsVerified:        false,
 		UserID:            report.UserID,
 		Landmark:          report.Landmark,
@@ -110,6 +107,16 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		ReportTypeID:      report.ReportTypeID,
 		LGAName: report.LGAName,
 		StateName: report.StateName,
+		Rating: report.Rating,
+		HospitalName: report.HospitalName,
+		Department: report.Department,
+		DepartmentHeadName: report.DepartmentHeadName,
+		AccidentCause: report.AccidentCause,
+		SchoolName: report.SchoolName,
+		VicePrincipal: report.VicePrincipal,
+		OutageLength: report.OutageLength,
+		NoWater: report.NoWater,
+		Address: report.Address,
 	}
 
 	// Save the report to the database

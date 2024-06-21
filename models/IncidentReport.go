@@ -37,6 +37,16 @@ type IncidentReport struct {
 	RewardAccountNumber string    `json:"reward_account_number" gorm:"foreignKey:AccountNumber"`
 	ActionTypeID        string    `json:"action_type" gorm:"foreignKey:ID"`
 	ReportTypeID        string    `json:"report_type_id" gorm:"foreignKey:ID"`
+	IsState        bool   `json:"is_state"`
+	Rating        string   `json:"rating"`
+	HospitalName  string   `json:"hospital_name"`
+	Department  string   `json:"department"` 
+	DepartmentHeadName  string   `json:"department_head_name"`
+	AccidentCause  string   `json:"accident_cause"`
+	SchoolName  string   `json:"school_name"`
+	VicePrincipal  string   `json:"vice_principal"`
+	OutageLength  string   `json:"outage_length"`
+	NoWater  bool   `json:"no_water"`
 }
 
 type Actions struct {
