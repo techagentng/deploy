@@ -56,7 +56,7 @@ func (s *Server) setupRouter() *gin.Engine {
 
     allowedOrigins := []string{"http://localhost:3001"}
     if os.Getenv("GIN_MODE") == "release" {
-        allowedOrigins = []string{"https://citizenx-8tb0.onrender.com/api/v1"} // Use specific domains in production for security
+        allowedOrigins = []string{"https://citizenx-dashboard.onrender.com/"} // Use specific domains in production for security
     }
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
