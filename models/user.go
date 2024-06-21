@@ -109,6 +109,7 @@ type LoginRequest struct {
 }
 
 type LoginRequestMacAddress struct {
+	Model
 	MacAddress string `json:"mac_address" binding:"required"`
 }
 type ForgotPassword struct {
