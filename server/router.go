@@ -101,7 +101,6 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	// authorized.DELETE("/users", s.handleDeleteUserByEmail())
 	authorized.PUT("/me/updateUserProfile", s.handleEditUserProfile())
 	authorized.GET("/me", s.handleShowProfile())
-	authorized.PUT("/upload", s.handleUpdateUserImageUrl())
 	authorized.PUT("/user/:reportID/like", s.handleLikeReport())
 	authorized.GET("/user/:reportID/bookmark", s.SaveBookmarkReport())
 	authorized.GET("/approve/:reportID/:userID/report", s.handleApproveReportPoints())
@@ -122,7 +121,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.GET("/lgas/lat/lng", s.IncidentMarkersHandler())
 	apirouter.DELETE("/incident-report/:id", s.DeleteIncidentReportHandler())
 	apirouter.GET("/incident-report/state/count", s.HandleGetStateReportCounts())
-	
+	apirouter.PUT("/upload", s.handleUpdateUserImageUrl())
 	// authorized.DELETE("/delete/:folder/:fileName", s.handleDeleteDocument())
 	// authorized.POST("/user/medications", s.handleCreateMedication())
 	// authorized.GET("/user/medications/:id", s.handleGetMedDetail())
