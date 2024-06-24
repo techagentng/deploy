@@ -83,10 +83,10 @@ func (s *Server) Authorize() gin.HandlerFunc {
 		}
 
 		// Check if user's email is active
-		if !user.IsEmailActive {
-			respondAndAbort(c, "user needs to be verified", http.StatusUnauthorized, nil, errs.New("User needs to be verified", http.StatusUnauthorized))
-			return
-		}
+		// if !user.IsEmailActive {
+		// 	respondAndAbort(c, "user needs to be verified", http.StatusUnauthorized, nil, errs.New("User needs to be verified", http.StatusUnauthorized))
+		// 	return
+		// }
 
 		// Set the retrieved user in the context for downstream handlers to access
 		c.Set("user", user)

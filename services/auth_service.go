@@ -53,56 +53,55 @@ func NewAuthService(authRepo db.AuthRepository, conf *config.Config) AuthService
 }
 
 func (s *authService) SignupUser(user *models.User) (*models.User, error) {
-    if user == nil {
-        log.Println("SignupUser error: user is nil")
-        return nil, errors.New("user is nil")
-    }
+	if user == nil {
+		log.Println("SignupUser error: user is nil")
+		return nil, errors.New("user is nil")
+	}
 
-    if user.Email == "" {
-        log.Println("SignupUser error: email is empty")
-        return nil, errors.New("email is empty")
-    }
+	if user.Email == "" {
+		log.Println("SignupUser error: email is empty")
+		return nil, errors.New("email is empty")
+	}
 
-    // Check if the email already exists
-    err := s.authRepo.IsEmailExist(user.Email)
-    if err != nil {
-        log.Printf("SignupUser error: %v", err)
-        return nil, apiError.GetUniqueContraintError(err)
-    }
+	// Check if the email already exists
+	err := s.authRepo.IsEmailExist(user.Email)
+	if err != nil {
+		log.Printf("SignupUser error: %v", err)
+		return nil, apiError.GetUniqueContraintError(err)
+	}
 
-    // Check if the phone number already exists
-    err = s.authRepo.IsPhoneExist(user.Telephone)
-    if err != nil {
-        log.Printf("SignupUser error: %v", err)
-        return nil, apiError.GetUniqueContraintError(err)
-    }
+	// Check if the phone number already exists
+	err = s.authRepo.IsPhoneExist(user.Telephone)
+	if err != nil {
+		log.Printf("SignupUser error: %v", err)
+		return nil, apiError.GetUniqueContraintError(err)
+	}
 
-    // Hash the password
-    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-    if err != nil {
-        log.Printf("SignupUser error hashing password: %v", err)
-        return nil, apiError.ErrInternalServerError
-    }
-    user.HashedPassword = string(hashedPassword)
-    user.Password = "" // Clear the plain password
+	// Hash the password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("SignupUser error hashing password: %v", err)
+		return nil, apiError.ErrInternalServerError
+	}
+	user.HashedPassword = string(hashedPassword)
+	user.Password = "" // Clear the plain password
 
-    // Create the user in the database
-    user, err = s.authRepo.CreateUser(user)
-    if err != nil {
-        log.Printf("SignupUser error creating user: %v", err)
-        return nil, apiError.ErrInternalServerError
-    }
+	// Create the user in the database
+	user, err = s.authRepo.CreateUser(user)
+	if err != nil {
+		log.Printf("SignupUser error creating user: %v", err)
+		return nil, apiError.ErrInternalServerError
+	}
 
-    // Fetch the created user
-    createdUser, err := s.authRepo.FindUserByEmail(user.Email)
-    if err != nil {
-        log.Printf("SignupUser error fetching created user: %v", err)
-        return nil, apiError.ErrInternalServerError
-    }
+	// Fetch the created user
+	createdUser, err := s.authRepo.FindUserByEmail(user.Email)
+	if err != nil {
+		log.Printf("SignupUser error fetching created user: %v", err)
+		return nil, apiError.ErrInternalServerError
+	}
 
-    return createdUser, nil
+	return createdUser, nil
 }
-
 
 func GenerateHashPassword(password string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -182,21 +181,20 @@ func (a *authService) VerifyEmail(token string) error {
 // }
 
 func (a *authService) UpdateUserImageUrl(imagePath string) *apiError.Error {
-    // Update user's profile with the image URL
-    var user models.User
-    user.ThumbNailURL = imagePath
+	// Update user's profile with the image URL
+	var user models.User
+	user.ThumbNailURL = imagePath
 
-    err := a.authRepo.UpdateUserImage(&user)
-    if err != nil {
-        log.Printf("Error updating user image in database: %v", err)
-        return &apiError.Error{
-            Message: "Failed to update user profile",
-            Status:  0,
-        }
-    }
-    return nil
+	err := a.authRepo.UpdateUserImage(&user)
+	if err != nil {
+		log.Printf("Error updating user image in database: %v", err)
+		return &apiError.Error{
+			Message: "Failed to update user profile",
+			Status:  0,
+		}
+	}
+	return nil
 }
-
 
 func GenerateRandomString() (string, error) {
 	n := 5

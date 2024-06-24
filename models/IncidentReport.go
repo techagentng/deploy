@@ -25,18 +25,18 @@ type IncidentReport struct {
 	View                int       `json:"view"`
 	IsVerified          bool      `json:"is_verified"`
 	UserID              uint      `json:"user_id" gorm:"foreignKey:ID"`
+	ReportTypeID   string      `json:"report_type_id" gorm:"foreignKey:ID"`
 	AdminID             uint      `json:"is_admin" gorm:"foreignKey:Status"` // admin
 	Landmark            string    `json:"landmark"`
 	LikeCount           int       `json:"like_count" gorm:"foreignKey:Count"`
 	BookmarkedReports   []*User   `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
 	IsResponse          bool      `json:"is_response"`
 	TimeofIncidence     time.Time `json:"time_of_incidence"`
-	ImageURL            string    `json:"image_url"`
 	ReportStatus        string    `json:"report_status"`
 	RewardPoint         int       `json:"reward_point" gorm:"foreignKey:Point"`
 	RewardAccountNumber string    `json:"reward_account_number" gorm:"foreignKey:AccountNumber"`
-	ActionTypeID        string    `json:"action_type" gorm:"foreignKey:ID"`
-	ReportTypeID        string    `json:"report_type_id" gorm:"foreignKey:ID"`
+	ActionTypeName      string    `json:"action_type_name" gorm:"foreignKey:Name"`
+	ReportTypeName      string    `json:"report_type_name" gorm:"foreignKey:Name"`
 	IsState             bool      `json:"is_state"`
 	Rating              string    `json:"rating"`
 	HospitalName        string    `json:"hospital_name"`

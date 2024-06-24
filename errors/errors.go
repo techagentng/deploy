@@ -51,19 +51,18 @@ var ErrDuplicateRequest = New("entity already exist", http.StatusBadRequest)
 var ErrInvalidPassword = New("invalid email or password", http.StatusUnauthorized)
 
 func GetUniqueContraintError(err error) *Error {
-    fields := strings.Split(err.Error(), "UNIQUE constraint failed: ")
-    if len(fields) < 2 {
-        return &Error{
-            Message: "email or telephone already exist",
-            Status:  http.StatusBadRequest,
-        }
-    }
-    return &Error{
-        Message: fmt.Sprintf("%s must be unique", strings.Split(fields[1], ".")[1]),
-        Status:  http.StatusBadRequest,
-    }
+	fields := strings.Split(err.Error(), "UNIQUE constraint failed: ")
+	if len(fields) < 2 {
+		return &Error{
+			Message: "email or telephone already exist",
+			Status:  http.StatusBadRequest,
+		}
+	}
+	return &Error{
+		Message: fmt.Sprintf("%s must be unique", strings.Split(fields[1], ".")[1]),
+		Status:  http.StatusBadRequest,
+	}
 }
-
 
 func GetValidationError(err ValidationError) *Error {
 	return &Error{

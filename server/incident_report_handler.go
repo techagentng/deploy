@@ -230,7 +230,7 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 	lga := &models.LGA{
 		ID:       generateIDx(),
 		Name:     locality,
-		ReportID: reportID,
+		ReportTypeID: reportID,
 	}
 
 	stateStruct := &models.State{
@@ -247,12 +247,12 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 	userId := userI.(*models.User).ID
 
 	reportType := &models.ReportType{
-		ID:         generateIDx(),
-		UserID:     userId,
-		ReportID:   reportID,
-		StateName:  state,
-		LGAName:    locality,
-		Type: c.PostForm("type"),
+		ID:        generateIDx(),
+		UserID:    userId,
+		ReportID:  reportID,
+		StateName: state,
+		LGAName:   locality,
+		Category:      c.PostForm("category"),
 	}
 
 	return lga, stateStruct, reportType, locality, state, nil
@@ -411,7 +411,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
-		lga, stateStruct, reportType, lgastring, statestring, err := fetchGeocodingData(lat, lng, c, reportID)
+		lga, stateStruct, category, lgastring, statestring, err := fetchGeocodingData(lat, lng, c, reportID)
 		if err != nil {
 			log.Printf("Error fetching geocoding data: %v\n", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -420,20 +420,32 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 
 		incidentReport := &models.IncidentReport{
 			ID:                 reportID,
-			UserID:             userId,
+			CreatedAt:          0,
+			DateOfIncidence:    dateOfIncidence,
+			Description:        c.PostForm("description"),
+			FeedURLs:           feedURL,
+			FullSizeURLs:       fullsizeURL,
+			ProductName:        c.PostForm("product_name"),
+			StateName:          c.PostForm("state_name"),
+			LGAName:            c.PostForm("lga_name"),
 			Latitude:           lat,
 			Longitude:          lng,
-			LGAName:            lgastring,
-			StateName:          statestring,
-			Description:        c.PostForm("description"),
-			DateOfIncidence:    dateOfIncidence,
-			TimeofIncidence:    time.Now(),
+			UserIsAnonymous:    false,
+			Address:            c.PostForm("address"),
+			UserUsername:       c.PostForm("user_name"),
+			View:               0,
+			IsVerified:         false,
+			UserID:             userId,
+			AdminID:            0,
 			Landmark:           c.PostForm("landmark"),
-			FeedURLs:           feedURL,
-			ThumbnailURLs:      thumbnailURL,
-			FullSizeURLs:       fullsizeURL,
+			LikeCount:          0,
+			BookmarkedReports:  []*models.User{},
+			IsResponse:         false,
+			TimeofIncidence:    time.Now(),
 			ReportStatus:       "Pending",
-			ReportTypeID:       c.PostForm("report_type"),
+			RewardPoint:        0,
+			ActionTypeName:     "",
+			ReportTypeName:     c.PostForm("report_type"),
 			IsState:            false,
 			Rating:             c.PostForm("rating"),
 			HospitalName:       c.PostForm("hospital_name"),
@@ -451,8 +463,14 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			Name: c.PostForm("sub_report_type"),
 		}
 
+		// Check if stateName and lgaName are empty, replace with statestring and lgastring if so
+		if c.PostForm("state_name") == "" && c.PostForm("lga_name") == "" {
+			incidentReport.StateName = statestring
+			incidentReport.LGAName = lgastring
+		}
+
 		// bad naming
-		err = s.IncidentReportRepository.SaveStateLgaTime(lga, stateStruct, reportType, sub)
+		err = s.IncidentReportRepository.SaveStateLgaTime(lga, stateStruct, category, sub)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"message": "Unable to save report",
@@ -1052,22 +1070,21 @@ func (s *Server) HandleGetStateReportCounts() gin.HandlerFunc {
 
 func (s *Server) HandleGetVariadicBarChart() gin.HandlerFunc {
 	return func(c *gin.Context) {
-	  // Parse request body into ReportCriteria struct
-	  var criteria models.ReportCriteria
-	  if err := c.BindJSON(&criteria); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
-		return
-	  }
-  
-	  // Call function to get report counts
-	  stateReportCounts, err := s.IncidentReportRepository.GetVariadicStateReportCounts(criteria.ReportType, criteria.States...)
-	  if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	  }
-  
-	  // Respond with report counts (assuming suitable format for bar chart)
-	  c.JSON(http.StatusOK, stateReportCounts)
+		// Parse request body into ReportCriteria struct
+		var criteria models.ReportCriteria
+		if err := c.BindJSON(&criteria); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		// Call function to get report counts
+		stateReportCounts, err := s.IncidentReportRepository.GetVariadicStateReportCounts(criteria.ReportType, criteria.States...)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Respond with report counts (assuming suitable format for bar chart)
+		c.JSON(http.StatusOK, stateReportCounts)
 	}
-  }
-  
+}

@@ -6,13 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/go-playground/validator/v10"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
-"github.com/go-playground/validator/v10"
-	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -28,72 +28,71 @@ import (
 )
 
 func init() {
-    if _, err := os.Stat("uploads"); os.IsNotExist(err) {
-        err = os.Mkdir("uploads", os.ModePerm)
-        if err != nil {
-            log.Fatalf("Error creating uploads directory: %v", err)
-        }
-    }
+	if _, err := os.Stat("uploads"); os.IsNotExist(err) {
+		err = os.Mkdir("uploads", os.ModePerm)
+		if err != nil {
+			log.Fatalf("Error creating uploads directory: %v", err)
+		}
+	}
 }
 
 func (s *Server) handleSignup() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Parse multipart form data
-        if err := c.Request.ParseMultipartForm(10 << 20); err != nil { // 10 MB max size
-            response.JSON(c, "", http.StatusBadRequest, nil, err)
-            return
-        }
+	return func(c *gin.Context) {
+		// Parse multipart form data
+		if err := c.Request.ParseMultipartForm(10 << 20); err != nil { // 10 MB max size
+			response.JSON(c, "", http.StatusBadRequest, nil, err)
+			return
+		}
 
-        // Get the profile image from the form
-        file, handler, err := c.Request.FormFile("profile_image")
-        if err != nil {
-            response.JSON(c, "", http.StatusBadRequest, nil, err)
-            return
-        }
-        defer file.Close()
+		// Get the profile image from the form
+		file, handler, err := c.Request.FormFile("profile_image")
+		if err != nil {
+			response.JSON(c, "", http.StatusBadRequest, nil, err)
+			return
+		}
+		defer file.Close()
 
-        // Save the image to the specified directory
-        filePath := fmt.Sprintf("uploads/%s", handler.Filename)
-        out, err := os.Create(filePath)
-        if err != nil {
-            response.JSON(c, "", http.StatusInternalServerError, nil, err)
-            return
-        }
-        defer out.Close()
+		// Save the image to the specified directory
+		filePath := fmt.Sprintf("uploads/%s", handler.Filename)
+		out, err := os.Create(filePath)
+		if err != nil {
+			response.JSON(c, "", http.StatusInternalServerError, nil, err)
+			return
+		}
+		defer out.Close()
 
-        _, err = io.Copy(out, file)
-        if err != nil {
-            response.JSON(c, "", http.StatusInternalServerError, nil, err)
-            return
-        }
+		_, err = io.Copy(out, file)
+		if err != nil {
+			response.JSON(c, "", http.StatusInternalServerError, nil, err)
+			return
+		}
 
-        // Decode the other form data into the user struct
-        var user models.User
-        user.Fullname = c.PostForm("fullname")
-        user.Username = c.PostForm("username")
-        user.Telephone = c.PostForm("telephone")
-        user.Email = c.PostForm("email")
-        user.Password = c.PostForm("password")
-        user.ThumbNailURL = filePath // Set the file path in the user struct
+		// Decode the other form data into the user struct
+		var user models.User
+		user.Fullname = c.PostForm("fullname")
+		user.Username = c.PostForm("username")
+		user.Telephone = c.PostForm("telephone")
+		user.Email = c.PostForm("email")
+		user.Password = c.PostForm("password")
+		user.ThumbNailURL = filePath // Set the file path in the user struct
 
-        // Validate the user data using the validator package
-        validate := validator.New()
-        if err := validate.Struct(user); err != nil {
-            response.JSON(c, "", http.StatusBadRequest, nil, err)
-            return
-        }
+		// Validate the user data using the validator package
+		validate := validator.New()
+		if err := validate.Struct(user); err != nil {
+			response.JSON(c, "", http.StatusBadRequest, nil, err)
+			return
+		}
 
-        // Signup the user using the service
+		// Signup the user using the service
 		userResponse, err := s.AuthService.SignupUser(&user)
 		if err != nil {
 			response.HandleErrors(c, err) // Use HandleErrors to handle different error types
 			return
 		}
 
-        response.JSON(c, "Signup successful, check your email for verification", http.StatusCreated, userResponse, nil)
-    }
+		response.JSON(c, "Signup successful, check your email for verification", http.StatusCreated, userResponse, nil)
+	}
 }
-
 
 // Function to extract MAC address from a token
 func extractMACAddressFromToken(macAddressToken string) (string, error) {

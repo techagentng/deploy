@@ -52,18 +52,18 @@ type CreateSocialUserParams struct {
 	Name     string `json:"name"`
 }
 
-	// func ValidateStruct(req interface{}) []error {
-	// 	validate := validator.New()
-	// 	// english := en.New()
-	// 	// uni := ut.New(english, english)
-	// 	// trans, _ := uni.GetTranslator("en")
-	// 	// _ = enTranslations.RegisterTranslationsFunc(validattrans)
-	// 	err := validateWhiteSpaces(req)
-	// 	errs := translateError(err, trans)
-	// 	err = validate.Struct(req)
-	// 	errs = translateError(err, trans)
-	// 	return errs
-	// }
+// func ValidateStruct(req interface{}) []error {
+// 	validate := validator.New()
+// 	// english := en.New()
+// 	// uni := ut.New(english, english)
+// 	// trans, _ := uni.GetTranslator("en")
+// 	// _ = enTranslations.RegisterTranslationsFunc(validattrans)
+// 	err := validateWhiteSpaces(req)
+// 	errs := translateError(err, trans)
+// 	err = validate.Struct(req)
+// 	errs = translateError(err, trans)
+// 	return errs
+// }
 func ValidatePassword(password string) error {
 	passwordValidator := goval.New(goval.MinLength(6, errors.New("password cant be less than 6 characters")),
 		goval.MaxLength(15, errors.New("password cant be more than 15 characters")))

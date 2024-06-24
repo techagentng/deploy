@@ -46,19 +46,19 @@ func NewAuthRepo(db *GormDB) AuthRepository {
 }
 
 func (a *authRepo) CreateUser(user *models.User) (*models.User, error) {
-    if user == nil {
-        log.Println("CreateUser error: user is nil")
-        return nil, errors.New("user is nil")
-    }
+	if user == nil {
+		log.Println("CreateUser error: user is nil")
+		return nil, errors.New("user is nil")
+	}
 
-    // Create the user in the database
-    err := a.DB.Create(user).Error
-    if err != nil {
-        log.Printf("CreateUser error: %v", err)
-        return nil, err
-    }
+	// Create the user in the database
+	err := a.DB.Create(user).Error
+	if err != nil {
+		log.Printf("CreateUser error: %v", err)
+		return nil, err
+	}
 
-    return user, nil
+	return user, nil
 }
 
 // CreateUserWithMacAddress updates the MAC address field for an existing user or creates a new user with the provided MAC address
@@ -102,23 +102,22 @@ func (a *authRepo) FindUserByUsername(username string) (*models.User, error) {
 }
 
 func (a *authRepo) IsEmailExist(email string) error {
-    var count int64
-    err := a.DB.Model(&models.User{}).Where("email = ?", email).Count(&count).Error
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            // No user found with this email, return nil
-            return nil
-        }
-        // Return wrapped error for other errors
-        return errors.Wrap(err, "gorm count error")
-    }
-    if count > 0 {
-        // Email already exists, return specific error
-        return errors.New("email already in use")
-    }
-    return nil
+	var count int64
+	err := a.DB.Model(&models.User{}).Where("email = ?", email).Count(&count).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// No user found with this email, return nil
+			return nil
+		}
+		// Return wrapped error for other errors
+		return errors.Wrap(err, "gorm count error")
+	}
+	if count > 0 {
+		// Email already exists, return specific error
+		return errors.New("email already in use")
+	}
+	return nil
 }
-
 
 func (a *authRepo) IsPhoneExist(phone string) error {
 	var count int64
@@ -215,20 +214,18 @@ func (a *authRepo) FindUserByMacAddress(macAddress string) (*models.LoginRequest
 	return &user, nil
 }
 
-func (a *authRepo) UpdateUserImage(user *models.User) error {  
-    result := a.DB.Model(&models.User{}).Where("id = ?", user.ID).Update("thumb_nail_url", user.ThumbNailURL)
-    if result.Error != nil {
-        log.Printf("Error updating user image in database: %v", result.Error)
-        return result.Error
-    }
-    if result.RowsAffected == 0 {
-        log.Println("No rows affected when updating user image")
-        return errors.New("failed to update user profile")
-    }
-    return nil
+func (a *authRepo) UpdateUserImage(user *models.User) error {
+	result := a.DB.Model(&models.User{}).Where("id = ?", user.ID).Update("thumb_nail_url", user.ThumbNailURL)
+	if result.Error != nil {
+		log.Printf("Error updating user image in database: %v", result.Error)
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		log.Println("No rows affected when updating user image")
+		return errors.New("failed to update user profile")
+	}
+	return nil
 }
-
-    
 
 func (a *authRepo) EditUserProfile(userID uint, userDetails *models.EditProfileResponse) error {
 	// Fetch the user from the database
