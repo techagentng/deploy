@@ -252,7 +252,7 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 		ReportID:   reportID,
 		StateName:  state,
 		LGAName:    locality,
-		ReportType: c.PostForm("report_type"),
+		Type: c.PostForm("type"),
 	}
 
 	return lga, stateStruct, reportType, locality, state, nil
@@ -419,31 +419,31 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		}
 
 		incidentReport := &models.IncidentReport{
-			ID:              reportID,
-			UserID:          userId,
-			Latitude:        lat,
-			Longitude:       lng,
-			LGAName: lgastring,
-			StateName: statestring,
-			Description:     c.PostForm("description"),
-			DateOfIncidence: dateOfIncidence,
-			TimeofIncidence: time.Now(),
-			Landmark:        c.PostForm("landmark"),
-			FeedURLs:        feedURL,
-			ThumbnailURLs:   thumbnailURL,
-			FullSizeURLs:    fullsizeURL,
-			ReportStatus:    "Pending",
-			ReportTypeID:    c.PostForm("report_type"),
-			IsState:    false,
-			Rating: c.PostForm("rating"),
-			HospitalName: c.PostForm("hospital_name"),
-			Department: c.PostForm("department"),
+			ID:                 reportID,
+			UserID:             userId,
+			Latitude:           lat,
+			Longitude:          lng,
+			LGAName:            lgastring,
+			StateName:          statestring,
+			Description:        c.PostForm("description"),
+			DateOfIncidence:    dateOfIncidence,
+			TimeofIncidence:    time.Now(),
+			Landmark:           c.PostForm("landmark"),
+			FeedURLs:           feedURL,
+			ThumbnailURLs:      thumbnailURL,
+			FullSizeURLs:       fullsizeURL,
+			ReportStatus:       "Pending",
+			ReportTypeID:       c.PostForm("report_type"),
+			IsState:            false,
+			Rating:             c.PostForm("rating"),
+			HospitalName:       c.PostForm("hospital_name"),
+			Department:         c.PostForm("department"),
 			DepartmentHeadName: c.PostForm("department_head_name"),
-			AccidentCause: c.PostForm("accident_cause"),
-			SchoolName: c.PostForm("school_name"),
-			VicePrincipal: c.PostForm("vice_principal"),
-			OutageLength: c.PostForm("outage_length"),
-			NoWater: true,
+			AccidentCause:      c.PostForm("accident_cause"),
+			SchoolName:         c.PostForm("school_name"),
+			VicePrincipal:      c.PostForm("vice_principal"),
+			OutageLength:       c.PostForm("outage_length"),
+			NoWater:            true,
 		}
 
 		sub := &models.SubReport{
@@ -1009,16 +1009,16 @@ type PlacesResponse struct {
 	Status string `json:"status"`
 }
 
-func (s *Server) IncidentMarkersHandler()gin.HandlerFunc {
-	return func(c *gin.Context) { 
-    markers, err := s.IncidentReportRepository.GetIncidentMarkers()
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+func (s *Server) IncidentMarkersHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		markers, err := s.IncidentReportRepository.GetIncidentMarkers()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-    c.JSON(http.StatusOK, markers)
-}
+		c.JSON(http.StatusOK, markers)
+	}
 }
 func (s *Server) DeleteIncidentReportHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -1049,3 +1049,25 @@ func (s *Server) HandleGetStateReportCounts() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"data": reportCounts})
 	}
 }
+
+func (s *Server) HandleGetVariadicBarChart() gin.HandlerFunc {
+	return func(c *gin.Context) {
+	  // Parse request body into ReportCriteria struct
+	  var criteria models.ReportCriteria
+	  if err := c.BindJSON(&criteria); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	  }
+  
+	  // Call function to get report counts
+	  stateReportCounts, err := s.IncidentReportRepository.GetVariadicStateReportCounts(criteria.ReportType, criteria.States...)
+	  if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	  }
+  
+	  // Respond with report counts (assuming suitable format for bar chart)
+	  c.JSON(http.StatusOK, stateReportCounts)
+	}
+  }
+  

@@ -42,6 +42,7 @@ type IncidentReportRepository interface {
 	GetIncidentMarkers() ([]Marker, error)
 	DeleteByID(id string) error
 	GetStateReportCounts() ([]models.StateReportCount, error)
+	GetVariadicStateReportCounts(reportType string, states ...string) ([]models.StateReportCount, error)
 }
 
 type incidentReportRepo struct {
@@ -365,63 +366,63 @@ func (repo *incidentReportRepo) GetReportsByTypeAndLGA(reportType string, lga st
 
 // GetReportTypeCounts gets the report types and their corresponding incident report counts
 func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, error) {
-    var reportTypes []string
-    var counts []int
+	var reportTypes []string
+	var counts []int
 
-    // Define the query
-    query := `
+	// Define the query
+	query := `
         SELECT rt.report_type, COUNT(*) AS count
         FROM report_types rt
         INNER JOIN incident_reports ir ON rt.report_id = ir.id
         WHERE rt.state_name = ? AND rt.lga_name = ?
     `
-    // Append date filtering if provided
-    if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
-        query += ` AND rt.date_of_incidence BETWEEN ? AND ? `
-    }
+	// Append date filtering if provided
+	if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
+		query += ` AND rt.date_of_incidence BETWEEN ? AND ? `
+	}
 
-    query += ` GROUP BY rt.report_type `
+	query += ` GROUP BY rt.report_type `
 
-    // Execute the query
-    var rows *sql.Rows
-    var err error
-    if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
-        rows, err = repo.DB.Raw(query, state, lga, *startDate, *endDate).Rows()
-    } else {
-        rows, err = repo.DB.Raw(query, state, lga).Rows()
-    }
+	// Execute the query
+	var rows *sql.Rows
+	var err error
+	if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
+		rows, err = repo.DB.Raw(query, state, lga, *startDate, *endDate).Rows()
+	} else {
+		rows, err = repo.DB.Raw(query, state, lga).Rows()
+	}
 
-    if err != nil {
-        log.Printf("Error executing query: %v", err)
-        return nil, nil, err
-    }
-    defer func() {
-        if rows != nil {
-            rows.Close()
-        }
-    }()
+	if err != nil {
+		log.Printf("Error executing query: %v", err)
+		return nil, nil, err
+	}
+	defer func() {
+		if rows != nil {
+			rows.Close()
+		}
+	}()
 
-    log.Println("Query executed successfully, processing rows...")
+	log.Println("Query executed successfully, processing rows...")
 
-    for rows.Next() {
-        var reportType string
-        var count int
-        if err := rows.Scan(&reportType, &count); err != nil {
-            log.Printf("Error scanning row: %v", err)
-            return nil, nil, err
-        }
-        reportTypes = append(reportTypes, reportType)
-        counts = append(counts, count)
-    }
+	for rows.Next() {
+		var reportType string
+		var count int
+		if err := rows.Scan(&reportType, &count); err != nil {
+			log.Printf("Error scanning row: %v", err)
+			return nil, nil, err
+		}
+		reportTypes = append(reportTypes, reportType)
+		counts = append(counts, count)
+	}
 
-    if err := rows.Err(); err != nil {
-        log.Printf("Rows error: %v", err)
-        return nil, nil, err
-    }
-    log.Printf("Report types: %v", reportTypes)
-    log.Printf("Report counts: %v", counts)
+	if err := rows.Err(); err != nil {
+		log.Printf("Rows error: %v", err)
+		return nil, nil, err
+	}
+	log.Printf("Report types: %v", reportTypes)
+	log.Printf("Report counts: %v", counts)
 
-    return reportTypes, counts, nil
+	return reportTypes, counts, nil
 }
 
 // SaveReportTypeAndSubReport saves both ReportType and SubReport in a transaction
@@ -453,16 +454,17 @@ func (repo *incidentReportRepo) SaveStateLgaTime(lga *models.LGA, state *models.
 	// Commit the transaction
 	return tx.Commit().Error
 }
+
 type Marker struct {
-    Lat   float64 `json:"lat"`
-    Lng   float64 `json:"lng"`
-    Popup string  `json:"popup"`
+	Lat   float64 `json:"lat"`
+	Lng   float64 `json:"lng"`
+	Popup string  `json:"popup"`
 }
 
 func (repo *incidentReportRepo) GetIncidentMarkers() ([]Marker, error) {
-    var markers []Marker
+	var markers []Marker
 
-    query := `
+	query := `
         SELECT
             latitude AS lat,
             longitude AS lng,
@@ -483,11 +485,11 @@ func (repo *incidentReportRepo) GetIncidentMarkers() ([]Marker, error) {
             incident_reports.state_name, latitude, longitude, report_counts.count
     `
 
-    if err := repo.DB.Raw(query).Scan(&markers).Error; err != nil {
-        return nil, err
-    }
+	if err := repo.DB.Raw(query).Scan(&markers).Error; err != nil {
+		return nil, err
+	}
 
-    return markers, nil
+	return markers, nil
 }
 
 func (repo *incidentReportRepo) DeleteByID(id string) error {
@@ -505,15 +507,47 @@ func (repo *incidentReportRepo) DeleteByID(id string) error {
 
 func (repo *incidentReportRepo) GetStateReportCounts() ([]models.StateReportCount, error) {
 	var stateReportCounts []models.StateReportCount
-	
+
 	err := repo.DB.Table("report_types").
 		Select("state_name, COUNT(id) as report_count").
 		Group("state_name").
 		Scan(&stateReportCounts).Error
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return stateReportCounts, nil
 }
+
+func (repo *incidentReportRepo) GetVariadicStateReportCounts(reportType string, states ...string) ([]models.StateReportCount, error) {
+	var stateReportCounts []models.StateReportCount
+  
+	db := repo.DB.Model(&models.IncidentReport{})
+  
+	// Join with ReportType table
+	query := db.Joins("JOIN ReportType ON ReportType.ID = IncidentReport.type_id") // Assuming foreign key is type_id
+  
+	// Build query conditions
+	query = query.Select("state_name, COUNT(id) as report_count").Group("state_name")
+  
+	// Add report type filter (if provided)
+	if reportType != "" {
+	  query = query.Where("ReportType.type = ?", reportType)
+	}
+  
+	// Add state filters
+	if len(states) > 0 {
+	  query = query.Where("state_name IN (?)", states)
+	}
+  
+	// Execute query and scan results
+	err := query.Scan(&stateReportCounts).Error
+	if err != nil {
+	  return nil, err
+	}
+  
+	return stateReportCounts, nil
+  }
+  
+  

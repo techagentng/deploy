@@ -32,7 +32,7 @@ func isAccessTokenEmpty(token string) bool {
 
 func ValidateToken(token string, secret string) (*jwt.Token, error) {
 	tk, err := verifyToken(token, secret)
-	if err != nil {                            // TODO: remove
+	if err != nil { // TODO: remove
 		return nil, fmt.Errorf("invalid token1: %v", err) // TODO: probably need to errors.NEw
 	}
 	if !tk.Valid {

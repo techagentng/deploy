@@ -54,10 +54,10 @@ func (s *Server) setupRouter() *gin.Engine {
 	}))
 	r.Use(gin.Recovery())
 
-    allowedOrigins := []string{"http://localhost:3001"}
-    if os.Getenv("GIN_MODE") == "release" {
-        allowedOrigins = []string{"https://citizenx-dashboard.onrender.com"} // Use specific domains in production for security
-    }
+	allowedOrigins := []string{"http://localhost:3001"}
+	if os.Getenv("GIN_MODE") == "release" {
+		allowedOrigins = []string{"https://citizenx-dashboard.onrender.com"} // Use specific domains in production for security
+	}
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
@@ -91,6 +91,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	// apirouter.GET("/verifyEmail/:token", s.HandleVerifyEmail())
 	apirouter.POST("/password/forgot", s.HandleForgotPassword())
 	apirouter.POST("/password/reset/:token", s.ResetPassword())
+	apirouter.POST("/report-type/states", s.HandleGetVariadicBarChart())
 
 	authorized := apirouter.Group("/")
 	authorized.Use(s.Authorize())

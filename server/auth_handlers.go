@@ -11,7 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
+"github.com/go-playground/validator/v10"
 	"net/http"
 	"time"
 
@@ -27,21 +27,73 @@ import (
 	jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
 
+func init() {
+    if _, err := os.Stat("uploads"); os.IsNotExist(err) {
+        err = os.Mkdir("uploads", os.ModePerm)
+        if err != nil {
+            log.Fatalf("Error creating uploads directory: %v", err)
+        }
+    }
+}
+
 func (s *Server) handleSignup() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var user models.User
-		if err := decode(c, &user); err != nil {
-			response.JSON(c, "", http.StatusBadRequest, nil, err)
-			return
-		}
+    return func(c *gin.Context) {
+        // Parse multipart form data
+        if err := c.Request.ParseMultipartForm(10 << 20); err != nil { // 10 MB max size
+            response.JSON(c, "", http.StatusBadRequest, nil, err)
+            return
+        }
+
+        // Get the profile image from the form
+        file, handler, err := c.Request.FormFile("profile_image")
+        if err != nil {
+            response.JSON(c, "", http.StatusBadRequest, nil, err)
+            return
+        }
+        defer file.Close()
+
+        // Save the image to the specified directory
+        filePath := fmt.Sprintf("uploads/%s", handler.Filename)
+        out, err := os.Create(filePath)
+        if err != nil {
+            response.JSON(c, "", http.StatusInternalServerError, nil, err)
+            return
+        }
+        defer out.Close()
+
+        _, err = io.Copy(out, file)
+        if err != nil {
+            response.JSON(c, "", http.StatusInternalServerError, nil, err)
+            return
+        }
+
+        // Decode the other form data into the user struct
+        var user models.User
+        user.Fullname = c.PostForm("fullname")
+        user.Username = c.PostForm("username")
+        user.Telephone = c.PostForm("telephone")
+        user.Email = c.PostForm("email")
+        user.Password = c.PostForm("password")
+        user.ThumbNailURL = filePath // Set the file path in the user struct
+
+        // Validate the user data using the validator package
+        validate := validator.New()
+        if err := validate.Struct(user); err != nil {
+            response.JSON(c, "", http.StatusBadRequest, nil, err)
+            return
+        }
+
+        // Signup the user using the service
 		userResponse, err := s.AuthService.SignupUser(&user)
 		if err != nil {
-			err.Respond(c)
+			response.HandleErrors(c, err) // Use HandleErrors to handle different error types
 			return
 		}
-		response.JSON(c, "Signup successful, check your email for verification", http.StatusCreated, userResponse, nil)
-	}
+
+        response.JSON(c, "Signup successful, check your email for verification", http.StatusCreated, userResponse, nil)
+    }
 }
+
 
 // Function to extract MAC address from a token
 func extractMACAddressFromToken(macAddressToken string) (string, error) {
@@ -137,10 +189,10 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 		}
 
 		url := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
-        c.Header("Access-Control-Allow-Origin", "http://localhost:3001")
-        c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
-        c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
-        c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Allow-Origin", "http://localhost:3001")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
+		c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
+		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Redirect(http.StatusTemporaryRedirect, url)
 
 	}
@@ -189,9 +241,9 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 			return
 		}
 		c.Header("Access-Control-Allow-Origin", "http://localhost:3001")
-        c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
-        c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
-        c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
+		c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
+		c.Header("Access-Control-Allow-Credentials", "true")
 		log.Println("authpay data", authPayload.Data)
 		response.JSON(c, "google sign in successful", http.StatusOK, authPayload, err)
 	}
@@ -333,65 +385,64 @@ func (srv *Server) getUserInfoFromGoogle(token string) (*GoogleUser, error) {
 
 // GetGoogleSignInToken returns the signin access token and refresh token pair to the social user
 func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleUser) (*AuthPayload, error) {
-    // Validate Google user details
-    if googleUserDetails == nil {
-        return nil, fmt.Errorf("error: google user details can't be empty")
-    }
-    if googleUserDetails.Email == "" {
-        return nil, fmt.Errorf("error: email can't be empty")
-    }
-    if googleUserDetails.Name == "" {
-        return nil, fmt.Errorf("error: name can't be empty")
-    }
+	// Validate Google user details
+	if googleUserDetails == nil {
+		return nil, fmt.Errorf("error: google user details can't be empty")
+	}
+	if googleUserDetails.Email == "" {
+		return nil, fmt.Errorf("error: email can't be empty")
+	}
+	if googleUserDetails.Name == "" {
+		return nil, fmt.Errorf("error: name can't be empty")
+	}
 
-    // Check if the email already exists
-    user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
-    if err != nil {
-        return nil, fmt.Errorf("error checking if email exists: %v", err)
-    }
+	// Check if the email already exists
+	user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
+	if err != nil {
+		return nil, fmt.Errorf("error checking if email exists: %v", err)
+	}
 
-    if user == nil {
-        // If user does not exist, create a new user
-        newUser := &models.User{
-            Email:    googleUserDetails.Email,
-            IsSocial: true,
-            Fullname: googleUserDetails.Name,
-            // Add other fields as necessary
-        }
-        _, err := s.AuthRepository.CreateUser(newUser)
-        if err != nil {
-            log.Printf("error creating user: %v\n", err)
-            return nil, fmt.Errorf("error creating user: %v", err)
-        }
+	if user == nil {
+		// If user does not exist, create a new user
+		newUser := &models.User{
+			Email:    googleUserDetails.Email,
+			IsSocial: true,
+			Fullname: googleUserDetails.Name,
+			// Add other fields as necessary
+		}
+		_, err := s.AuthRepository.CreateUser(newUser)
+		if err != nil {
+			log.Printf("error creating user: %v\n", err)
+			return nil, fmt.Errorf("error creating user: %v", err)
+		}
 
-        // Find the newly created user
-        user, err = s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
-        if err != nil {
-            log.Printf("error finding user: %v\n", err)
-            return nil, fmt.Errorf("error finding user: %v", err)
-        }
-    }
+		// Find the newly created user
+		user, err = s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
+		if err != nil {
+			log.Printf("error finding user: %v\n", err)
+			return nil, fmt.Errorf("error finding user: %v", err)
+		}
+	}
 
-    // Generate tokens for the user
-    log.Println("Generating token pair for user:", googleUserDetails.Email)
-    accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(user.Email, s.Config.JWTSecret, user.AdminStatus, user.ID)
-    if err != nil {
-        log.Printf("error generating token pair: %v\n", err)
-        return nil, fmt.Errorf("error generating token pair: %v", err)
-    }
+	// Generate tokens for the user
+	log.Println("Generating token pair for user:", googleUserDetails.Email)
+	accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(user.Email, s.Config.JWTSecret, user.AdminStatus, user.ID)
+	if err != nil {
+		log.Printf("error generating token pair: %v\n", err)
+		return nil, fmt.Errorf("error generating token pair: %v", err)
+	}
 
-    // Construct and return the authentication payload
-    payload := &AuthPayload{
-        AccessToken:  accessToken,
-        RefreshToken: refreshToken,
-        TokenType:    "Bearer",
-        ExpiresIn:    int(AccessTokenDuration.Seconds()), // Assuming AccessTokenDuration is defined
-    }
-    log.Println("Auth payload:", payload)
-    return payload, nil
+	// Construct and return the authentication payload
+	payload := &AuthPayload{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    int(AccessTokenDuration.Seconds()), // Assuming AccessTokenDuration is defined
+	}
+	log.Println("Auth payload:", payload)
+	return payload, nil
 }
 
-  
 func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption func(*AuthPayload), c *gin.Context) (*AuthPayload, error) {
 	// Get the user ID from the context
 	userID, ok := c.Get("userID")
@@ -684,14 +735,14 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
 		}
 
 		// Retrieve user from service
-		user, err := s.AuthRepository.FindUserByID(userID)
+		_, err = s.AuthRepository.FindUserByID(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
 			return
 		}
 
 		// Update user's profile with the image URL
-		if err := s.AuthService.UpdateUserImageUrl(user, filepath); err != nil {
+		if err := s.AuthService.UpdateUserImageUrl(filepath); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
 			return
 		}
