@@ -188,7 +188,7 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 		}
 
 		url := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
-		c.Header("Access-Control-Allow-Origin", "http://localhost:3001")
+		c.Header("Access-Control-Allow-Origin", os.Getenv("AccessControlAllowOrigin"))
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 		c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
 		c.Header("Access-Control-Allow-Credentials", "true")
