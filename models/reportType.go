@@ -7,15 +7,17 @@ type ReportType struct {
 	ID              string    `json:"id" gorm:"primaryKey"`
 	UserID          uint      `json:"user_id" gorm:"foreignKey:ID"`
 	ReportID        string    `json:"report_id" gorm:"foreignKey:ID"`
-	Category            string    `json:"type"`
-	StateName       string    `json:"state_name" gorm:"foreignKey:Name"`
+	Category            string    `json:"category" binding:"required"`
+	StateName       string    `json:"state_name" gorm:"foreignKey:Name" binding:"required"`
 	LGAName         string    `json:"lga_name" gorm:"foreignKey:Name"`
 	DateOfIncidence time.Time `json:"date_of_incidence" gorm:"column:date_of_incidence;foreignKey:DateOfIncidence"`
 }
 
 type ReportCriteria struct {
-	ReportType string   `json:"reportType" binding:"required"` // Make reportType mandatory
-	States     []string `json:"states"`
+    ReportTypeCategory string     `json:"report_type_category"`
+    States             []string   `json:"states"`
+    StartDate          *time.Time `json:"start_date"`
+    EndDate            *time.Time `json:"end_date"`
 }
 
 // SubReport represents subtypes of incident reports

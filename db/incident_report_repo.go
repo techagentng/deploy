@@ -1,7 +1,6 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -38,11 +37,11 @@ type IncidentReportRepository interface {
 	GetAllReportsByStateByTime(state string, startTime, endTime time.Time, page int) ([]models.IncidentReport, error)
 	GetReportsByTypeAndLGA(reportType string, lga string) ([]models.SubReport, error)
 	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, error)
-	SaveStateLgaTime(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error
+	SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error
 	GetIncidentMarkers() ([]Marker, error)
 	DeleteByID(id string) error
 	GetStateReportCounts() ([]models.StateReportCount, error)
-	GetVariadicStateReportCounts(reportType string, states ...string) ([]models.StateReportCount, error)
+	GetVariadicStateReportCounts(reportType string, states []string, startDate, endDate *time.Time) ([]models.StateReportCount, error)
 }
 
 type incidentReportRepo struct {
@@ -365,45 +364,65 @@ func (repo *incidentReportRepo) GetReportsByTypeAndLGA(reportType string, lga st
 }
 
 // GetReportTypeCounts gets the report types and their corresponding incident report counts
+
 func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, error) {
 	var reportTypes []string
 	var counts []int
 
-	// Define the query
+	// Base query with state and LGA conditions
 	query := `
-        SELECT rt.report_type, COUNT(*) AS count
-        FROM report_types rt
-        INNER JOIN incident_reports ir ON rt.report_id = ir.id
-        WHERE rt.state_name = ? AND rt.lga_name = ?
-    `
-	// Append date filtering if provided
-	if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
-		query += ` AND rt.date_of_incidence BETWEEN ? AND ? `
-	}
+		SELECT rt.category, COUNT(*) AS count
+		FROM report_types rt
+		WHERE rt.state_name = ? AND rt.lga_name = ?
+	`
 
-	query += ` GROUP BY rt.report_type `
+	// Log the base query and parameters
+	log.Printf("Base query: %s", query)
+	log.Printf("State: %s, LGA: %s", state, lga)
 
-	// Execute the query
-	var rows *sql.Rows
-	var err error
+	// Optional date filter
+	var args []interface{}
+	args = append(args, state, lga)
+
 	if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
-		rows, err = repo.DB.Raw(query, state, lga, *startDate, *endDate).Rows()
+		var defaultStartDate, defaultEndDate time.Time
+		var err error
+
+		// Parse start date
+		defaultStartDate, err = time.Parse("2006-01-02", *startDate) // Adjust format if needed
+		if err != nil {
+			return nil, nil, errors.New("failed to parse start date: " + err.Error())
+		}
+
+		// Parse end date
+		defaultEndDate, err = time.Parse("2006-01-02", *endDate) // Adjust format if needed
+		if err != nil {
+			return nil, nil, errors.New("failed to parse end date: " + err.Error())
+		}
+
+		query += ` AND rt.date_of_incidence BETWEEN ? AND ?`
+		args = append(args, defaultStartDate, defaultEndDate)
+		log.Printf("Start Date (optional): %s, End Date (optional): %s", *startDate, *endDate)
 	} else {
-		rows, err = repo.DB.Raw(query, state, lga).Rows()
+		log.Println("Date filter not provided, using full data for LGA and state")
 	}
 
+	query += ` GROUP BY rt.category`
+
+	// Log the final query
+	log.Printf("Final query: %s", query)
+
+	// Execute the query with parameters
+	rows, err := repo.DB.Raw(query, args...).Rows()
 	if err != nil {
 		log.Printf("Error executing query: %v", err)
 		return nil, nil, err
 	}
-	defer func() {
-		if rows != nil {
-			rows.Close()
-		}
-	}()
+	defer rows.Close()
 
 	log.Println("Query executed successfully, processing rows...")
 
+	// Process the result rows
 	for rows.Next() {
 		var reportType string
 		var count int
@@ -419,14 +438,20 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
 		log.Printf("Rows error: %v", err)
 		return nil, nil, err
 	}
+
+	// Log the results
 	log.Printf("Report types: %v", reportTypes)
 	log.Printf("Report counts: %v", counts)
 
+	// Return the results
 	return reportTypes, counts, nil
 }
 
+
+  
+
 // SaveReportTypeAndSubReport saves both ReportType and SubReport in a transaction
-func (repo *incidentReportRepo) SaveStateLgaTime(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error {
+func (repo *incidentReportRepo) SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error {
 	// Start a transaction
 	tx := repo.DB.Begin()
 
@@ -520,34 +545,55 @@ func (repo *incidentReportRepo) GetStateReportCounts() ([]models.StateReportCoun
 	return stateReportCounts, nil
 }
 
-func (repo *incidentReportRepo) GetVariadicStateReportCounts(reportType string, states ...string) ([]models.StateReportCount, error) {
+func (repo *incidentReportRepo) GetVariadicStateReportCounts(reportType string, states []string, startDate, endDate *time.Time) ([]models.StateReportCount, error) {
 	var stateReportCounts []models.StateReportCount
-  
-	db := repo.DB.Model(&models.IncidentReport{})
-  
-	// Join with ReportType table
-	query := db.Joins("JOIN ReportType ON ReportType.ID = IncidentReport.type_id") // Assuming foreign key is type_id
-  
-	// Build query conditions
-	query = query.Select("state_name, COUNT(id) as report_count").Group("state_name")
-  
-	// Add report type filter (if provided)
+
+	// Initialize the query on ReportType model
+	db := repo.DB.Model(&models.ReportType{})
+
+	// Select state_name and count the reports, grouping by state_name
+	query := db.Select("state_name, COUNT(id) as report_count").Group("state_name")
+
+	// Add report type filter if provided
 	if reportType != "" {
-	  query = query.Where("ReportType.type = ?", reportType)
+		query = query.Where("category = ?", reportType)
 	}
-  
-	// Add state filters
+
+	// Add state filters if provided
 	if len(states) > 0 {
-	  query = query.Where("state_name IN (?)", states)
+		query = query.Where("state_name IN (?)", states)
 	}
-  
-	// Execute query and scan results
+
+	// Add date range filter if both dates are provided
+	if startDate != nil && endDate != nil {
+		query = query.Where("date_of_incidence BETWEEN ? AND ?", startDate, endDate)
+	} else if startDate != nil {
+		query = query.Where("date_of_incidence >= ?", startDate)
+	} else if endDate != nil {
+		query = query.Where("date_of_incidence <= ?", endDate)
+	}
+
+	// Add filter to exclude empty state names
+	query = query.Where("state_name <> ''")
+
+	// Debugging: Log the final query
+	sql, args := query.Statement.SQL.String(), query.Statement.Vars
+	log.Printf("Final query: %s with args: %v", sql, args)
+
+	// Execute the query and scan the results into stateReportCounts
 	err := query.Scan(&stateReportCounts).Error
 	if err != nil {
-	  return nil, err
+		return nil, err
 	}
-  
+
 	return stateReportCounts, nil
-  }
+}
+
+
+
+
+
+
+
   
   

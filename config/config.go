@@ -31,6 +31,7 @@ type Config struct {
 	FacebookAppSecret            string `envconfig:"facebook_app_secret"`
 	FacebookRedirectURL          string `envconfig:"facebook_redirect_url"`
 	GoogleMapsApiKey             string `envconfig:"google_maps_api_key"`
+	AccessControlAllowOrigin	string `envconfig:"accessc_control_allow_origin"`
 }
 
 func Load() (*Config, error) {
