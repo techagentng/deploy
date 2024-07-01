@@ -14,10 +14,10 @@ type ReportType struct {
 }
 
 type ReportCriteria struct {
-    ReportTypeCategory string     `json:"report_type_category"`
-    States             []string   `json:"states"`
-    StartDate          *time.Time `json:"start_date"`
-    EndDate            *time.Time `json:"end_date"`
+    ReportTypes []string  `json:"report_types"`
+    States      []string  `json:"states"`
+    StartDate   *time.Time `json:"start_date"`
+    EndDate     *time.Time `json:"end_date"`
 }
 
 // SubReport represents subtypes of incident reports
@@ -30,6 +30,7 @@ type SubReport struct {
 }
 
 type StateReportCount struct {
-	StateName   string `json:"state_name"`
-	ReportCount int    `json:"report_count"`
+    StateName   string `json:"state_name"`
+    Category    string `json:"category"`
+    ReportCount int    `json:"report_count"`
 }

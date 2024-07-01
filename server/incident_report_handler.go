@@ -1061,29 +1061,50 @@ func (s *Server) HandleGetStateReportCounts() gin.HandlerFunc {
 }
 
 func (s *Server) HandleGetVariadicBarChart() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Parse request body into ReportCriteria struct
-		var criteria models.ReportCriteria
-		if err := c.BindJSON(&criteria); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
-			return
-		}
+    return func(c *gin.Context) {
+        // Parse request body into ReportCriteria struct
+        var criteria models.ReportCriteria
+        if err := c.BindJSON(&criteria); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+            return
+        }
 
-		// Call function to get report counts
-		stateReportCounts, err := s.IncidentReportRepository.GetVariadicStateReportCounts(
-			criteria.ReportTypeCategory,
-			criteria.States,
-			criteria.StartDate,
-			criteria.EndDate,
-		)
+        // Call function to get report counts
+        stateReportCounts, err := s.IncidentReportRepository.GetVariadicStateReportCounts(
+            criteria.ReportTypes, // Include report types
+            criteria.States,
+            criteria.StartDate,
+            criteria.EndDate,
+        )
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        // Respond with report counts (assuming suitable format for bar chart)
+        c.JSON(http.StatusOK, stateReportCounts)
+    }
+}
+
+
+func (s *Server) handleGetAllCategories() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		categories, err := s.IncidentReportRepository.GetAllCategories()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-
-		// Respond with report counts (assuming suitable format for bar chart)
-		c.JSON(http.StatusOK, stateReportCounts)
+		c.JSON(http.StatusOK, gin.H{"categories": categories})
 	}
 }
 
-
+func (s *Server) handleGetAllStates() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		states, err := s.IncidentReportRepository.GetAllStates()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"states": states})
+	}
+}

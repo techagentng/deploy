@@ -436,7 +436,7 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		TokenType:    "Bearer",
-		ExpiresIn:    int(AccessTokenDuration.Seconds()), // Assuming AccessTokenDuration is defined
+		ExpiresIn:    int(AccessTokenDuration.Seconds()), 
 	}
 	log.Println("Auth payload:", payload)
 	return payload, nil
@@ -457,7 +457,7 @@ func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption 
 	}
 	// Get email, isAdmin, and id from authRequest or other sources
 	email := authRequest.email
-	isAdmin := false // Example value, retrieve isAdmin from appropriate source
+	isAdmin := false 
 
 	// Call GenerateTokenPair with the obtained values
 	accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(email, s.Config.GoogleClientSecret, isAdmin, userIDString)

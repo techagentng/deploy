@@ -41,7 +41,9 @@ type IncidentReportRepository interface {
 	GetIncidentMarkers() ([]Marker, error)
 	DeleteByID(id string) error
 	GetStateReportCounts() ([]models.StateReportCount, error)
-	GetVariadicStateReportCounts(reportType string, states []string, startDate, endDate *time.Time) ([]models.StateReportCount, error)
+	GetVariadicStateReportCounts(reportTypes []string, states []string, startDate, endDate *time.Time) ([]models.StateReportCount, error)
+	GetAllCategories() ([]string, error)
+	GetAllStates() ([]string, error)
 }
 
 type incidentReportRepo struct {
@@ -545,50 +547,65 @@ func (repo *incidentReportRepo) GetStateReportCounts() ([]models.StateReportCoun
 	return stateReportCounts, nil
 }
 
-func (repo *incidentReportRepo) GetVariadicStateReportCounts(reportType string, states []string, startDate, endDate *time.Time) ([]models.StateReportCount, error) {
-	var stateReportCounts []models.StateReportCount
+func (repo *incidentReportRepo) GetVariadicStateReportCounts(reportTypes []string, states []string, startDate, endDate *time.Time) ([]models.StateReportCount, error) {
+    var stateReportCounts []models.StateReportCount
 
-	// Initialize the query on ReportType model
-	db := repo.DB.Model(&models.ReportType{})
+    // Initialize the query on ReportType model
+    db := repo.DB.Model(&models.ReportType{})
 
-	// Select state_name and count the reports, grouping by state_name
-	query := db.Select("state_name, COUNT(id) as report_count").Group("state_name")
+    // Select state_name, category, and count the reports, grouping by state_name and category
+    query := db.Select("state_name, category, COUNT(id) as report_count").Group("state_name, category")
 
-	// Add report type filter if provided
-	if reportType != "" {
-		query = query.Where("category = ?", reportType)
-	}
+    // Add report type filter if provided
+    if len(reportTypes) > 0 {
+        query = query.Where("category IN (?)", reportTypes)
+    }
 
-	// Add state filters if provided
-	if len(states) > 0 {
-		query = query.Where("state_name IN (?)", states)
-	}
+    // Add state filters if provided
+    if len(states) > 0 {
+        query = query.Where("state_name IN (?)", states)
+    }
 
-	// Add date range filter if both dates are provided
-	if startDate != nil && endDate != nil {
-		query = query.Where("date_of_incidence BETWEEN ? AND ?", startDate, endDate)
-	} else if startDate != nil {
-		query = query.Where("date_of_incidence >= ?", startDate)
-	} else if endDate != nil {
-		query = query.Where("date_of_incidence <= ?", endDate)
-	}
+    // Add date range filter if both dates are provided
+    if startDate != nil && endDate != nil {
+        query = query.Where("date_of_incidence BETWEEN ? AND ?", startDate, endDate)
+    } else if startDate != nil {
+        query = query.Where("date_of_incidence >= ?", startDate)
+    } else if endDate != nil {
+        query = query.Where("date_of_incidence <= ?", endDate)
+    }
 
-	// Add filter to exclude empty state names
-	query = query.Where("state_name <> ''")
+    // Add filter to exclude empty state names
+    query = query.Where("state_name <> ''")
 
-	// Debugging: Log the final query
-	sql, args := query.Statement.SQL.String(), query.Statement.Vars
-	log.Printf("Final query: %s with args: %v", sql, args)
+    // Debugging: Log the final query
+    sql, args := query.Statement.SQL.String(), query.Statement.Vars
+    log.Printf("Final query: %s with args: %v", sql, args)
 
-	// Execute the query and scan the results into stateReportCounts
-	err := query.Scan(&stateReportCounts).Error
-	if err != nil {
-		return nil, err
-	}
+    // Execute the query and scan the results into stateReportCounts
+    err := query.Scan(&stateReportCounts).Error
+    if err != nil {
+        return nil, err
+    }
 
-	return stateReportCounts, nil
+    return stateReportCounts, nil
 }
 
+func (i *incidentReportRepo) GetAllCategories() ([]string, error) {
+	var categories []string
+	if err := i.DB.Model(&models.ReportType{}).Distinct().Pluck("category", &categories).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch categories: %v", err)
+	}
+	return categories, nil
+}
+
+func (i *incidentReportRepo) GetAllStates() ([]string, error) {
+	var states []string
+	if err := i.DB.Model(&models.ReportType{}).Distinct().Pluck("state_name", &states).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch categories: %v", err)
+	}
+	return states, nil
+}
 
 
 
