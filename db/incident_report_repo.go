@@ -44,6 +44,7 @@ type IncidentReportRepository interface {
 	GetVariadicStateReportCounts(reportTypes []string, states []string, startDate, endDate *time.Time) ([]models.StateReportCount, error)
 	GetAllCategories() ([]string, error)
 	GetAllStates() ([]string, error)
+	GetRatingPercentages(reportType, state string) (*models.RatingPercentage, error)
 }
 
 type incidentReportRepo struct {
@@ -449,9 +450,6 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
 	return reportTypes, counts, nil
 }
 
-
-  
-
 // SaveReportTypeAndSubReport saves both ReportType and SubReport in a transaction
 func (repo *incidentReportRepo) SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error {
 	// Start a transaction
@@ -548,47 +546,47 @@ func (repo *incidentReportRepo) GetStateReportCounts() ([]models.StateReportCoun
 }
 
 func (repo *incidentReportRepo) GetVariadicStateReportCounts(reportTypes []string, states []string, startDate, endDate *time.Time) ([]models.StateReportCount, error) {
-    var stateReportCounts []models.StateReportCount
+	var stateReportCounts []models.StateReportCount
 
-    // Initialize the query on ReportType model
-    db := repo.DB.Model(&models.ReportType{})
+	// Initialize the query on ReportType model
+	db := repo.DB.Model(&models.ReportType{})
 
-    // Select state_name, category, and count the reports, grouping by state_name and category
-    query := db.Select("state_name, category, COUNT(id) as report_count").Group("state_name, category")
+	// Select state_name, category, and count the reports, grouping by state_name and category
+	query := db.Select("state_name, category, COUNT(id) as report_count").Group("state_name, category")
 
-    // Add report type filter if provided
-    if len(reportTypes) > 0 {
-        query = query.Where("category IN (?)", reportTypes)
-    }
+	// Add report type filter if provided
+	if len(reportTypes) > 0 {
+		query = query.Where("category IN (?)", reportTypes)
+	}
 
-    // Add state filters if provided
-    if len(states) > 0 {
-        query = query.Where("state_name IN (?)", states)
-    }
+	// Add state filters if provided
+	if len(states) > 0 {
+		query = query.Where("state_name IN (?)", states)
+	}
 
-    // Add date range filter if both dates are provided
-    if startDate != nil && endDate != nil {
-        query = query.Where("date_of_incidence BETWEEN ? AND ?", startDate, endDate)
-    } else if startDate != nil {
-        query = query.Where("date_of_incidence >= ?", startDate)
-    } else if endDate != nil {
-        query = query.Where("date_of_incidence <= ?", endDate)
-    }
+	// Add date range filter if both dates are provided
+	if startDate != nil && endDate != nil {
+		query = query.Where("date_of_incidence BETWEEN ? AND ?", startDate, endDate)
+	} else if startDate != nil {
+		query = query.Where("date_of_incidence >= ?", startDate)
+	} else if endDate != nil {
+		query = query.Where("date_of_incidence <= ?", endDate)
+	}
 
-    // Add filter to exclude empty state names
-    query = query.Where("state_name <> ''")
+	// Add filter to exclude empty state names
+	query = query.Where("state_name <> ''")
 
-    // Debugging: Log the final query
-    sql, args := query.Statement.SQL.String(), query.Statement.Vars
-    log.Printf("Final query: %s with args: %v", sql, args)
+	// Debugging: Log the final query
+	sql, args := query.Statement.SQL.String(), query.Statement.Vars
+	log.Printf("Final query: %s with args: %v", sql, args)
 
-    // Execute the query and scan the results into stateReportCounts
-    err := query.Scan(&stateReportCounts).Error
-    if err != nil {
-        return nil, err
-    }
+	// Execute the query and scan the results into stateReportCounts
+	err := query.Scan(&stateReportCounts).Error
+	if err != nil {
+		return nil, err
+	}
 
-    return stateReportCounts, nil
+	return stateReportCounts, nil
 }
 
 func (i *incidentReportRepo) GetAllCategories() ([]string, error) {
@@ -607,10 +605,38 @@ func (i *incidentReportRepo) GetAllStates() ([]string, error) {
 	return states, nil
 }
 
+func (i *incidentReportRepo) GetRatingPercentages(reportType, state string) (*models.RatingPercentage, error) {
+	var totalCount int64
+	var goodCount int64
+	var badCount int64
 
+	// Count total reports
+	if err := i.DB.Model(&models.ReportType{}).
+		Where("category = ? AND state_name = ?", reportType, state).
+		Count(&totalCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch total count: %v", err)
+	}
 
+	// Count good ratings
+	if err := i.DB.Model(&models.ReportType{}).
+		Where("category = ? AND state_name = ? AND incident_report_rating = ?", reportType, state, "good").
+		Count(&goodCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch good count: %v", err)
+	}
 
+	// Count bad ratings
+	if err := i.DB.Model(&models.ReportType{}).
+		Where("category = ? AND state_name = ? AND incident_report_rating = ?", reportType, state, "bad").
+		Count(&badCount).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch bad count: %v", err)
+	}
 
+	// Calculate percentages
+	goodPercentage := float64(goodCount) / float64(totalCount) * 100
+	badPercentage := float64(badCount) / float64(totalCount) * 100
 
-  
-  
+	return &models.RatingPercentage{
+		GoodPercentage: goodPercentage,
+		BadPercentage:  badPercentage,
+	}, nil
+}

@@ -4,20 +4,25 @@ import "time"
 
 // LGA struct
 type ReportType struct {
-	ID              string    `json:"id" gorm:"primaryKey"`
-	UserID          uint      `json:"user_id" gorm:"foreignKey:ID"`
-	ReportID        string    `json:"report_id" gorm:"foreignKey:ID"`
-	Category            string    `json:"category" binding:"required"`
-	StateName       string    `json:"state_name" gorm:"foreignKey:Name" binding:"required"`
-	LGAName         string    `json:"lga_name" gorm:"foreignKey:Name"`
-	DateOfIncidence time.Time `json:"date_of_incidence" gorm:"column:date_of_incidence;foreignKey:DateOfIncidence"`
+	ID                   string    `json:"id" gorm:"primaryKey"`
+	UserID               uint      `json:"user_id" gorm:"foreignKey:ID"`
+	ReportID             string    `json:"report_id" gorm:"foreignKey:ID"`
+	Category             string    `json:"category" binding:"required"`
+	StateName            string    `json:"state_name" gorm:"foreignKey:Name" binding:"required"`
+	LGAName              string    `json:"lga_name" gorm:"foreignKey:Name"`
+	IncidentReportRating string    `json:"incident_report" gorm:"foreignKey:Rating"`
+	DateOfIncidence      time.Time `json:"date_of_incidence" gorm:"column:date_of_incidence;foreignKey:DateOfIncidence"`
 }
 
+type RatingPercentage struct {
+	GoodPercentage float64 `json:"good_percentage"`
+	BadPercentage  float64 `json:"bad_percentage"`
+}
 type ReportCriteria struct {
-    ReportTypes []string  `json:"report_types"`
-    States      []string  `json:"states"`
-    StartDate   *time.Time `json:"start_date"`
-    EndDate     *time.Time `json:"end_date"`
+	ReportTypes []string   `json:"report_types"`
+	States      []string   `json:"states"`
+	StartDate   *time.Time `json:"start_date"`
+	EndDate     *time.Time `json:"end_date"`
 }
 
 // SubReport represents subtypes of incident reports
@@ -30,7 +35,7 @@ type SubReport struct {
 }
 
 type StateReportCount struct {
-    StateName   string `json:"state_name"`
-    Category    string `json:"category"`
-    ReportCount int    `json:"report_count"`
+	StateName   string `json:"state_name"`
+	Category    string `json:"category"`
+	ReportCount int    `json:"report_count"`
 }
