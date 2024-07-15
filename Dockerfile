@@ -13,7 +13,10 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN go build -o ./dist 
+RUN go build -o dist
+
+# Debugging: List files in /app directory
+RUN ls -al /app
 
 # Stage 2: Create a lightweight production image
 FROM alpine:latest
@@ -21,7 +24,13 @@ FROM alpine:latest
 WORKDIR /app
 
 # Copy the built executable from the builder stage
-COPY --from=builder /app/dist .
+COPY --from=builder /app/dist /app/dist
+
+# Debugging: List files in /app directory to verify the copy
+RUN ls -al /app
+
+# Ensure executable permissions (if needed)
+RUN chmod +x /app/dist
 
 # Create a non-root user
 RUN adduser -D -g '' appuser
@@ -36,4 +45,4 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Command to run the application
-CMD ["/app/dist"] 
+CMD ["/app/dist"]
