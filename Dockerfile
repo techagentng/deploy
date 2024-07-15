@@ -21,7 +21,7 @@ FROM alpine:latest
 WORKDIR /app
 
 # Copy the built executable from the builder stage
-COPY --from=builder /app/dist .
+COPY --from=builder /dist .
 
 # Create a non-root user
 RUN adduser -D -g '' appuser
@@ -36,4 +36,4 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Command to run the application
-CMD ["/app/dist"] 
+CMD ["/app"] 
