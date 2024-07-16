@@ -1,18 +1,39 @@
-FROM golang:1.22-alpine as builder
-RUN apk --update add build-base
+# Stage 1: Build the application
+FROM golang:1.20.5 AS builder
 
-WORKDIR /src/app
-ADD go.mod .
+WORKDIR /app
+
+COPY go.mod .
+COPY go.sum .
+
+# Download dependencies
 RUN go mod download
 
-ADD . .
-RUN go run ./cmd/build
+# Copy the source code
+COPY . .
 
-FROM alpine
-RUN apk add --no-cache tzdata ca-certificates
-WORKDIR /bin/
+# Build the application
+RUN go build -o ./dist 
 
-# Copying binaries
-COPY --from=builder /src/app/bin/app .
+# Stage 2: Create a lightweight production image
+FROM alpine:latest
 
-CMD /bin/app
+WORKDIR /app
+
+# Copy the built executable from the builder stage
+COPY --from=builder /app/dist .
+
+# Create a non-root user
+RUN adduser -D -g '' appuser
+
+# Change to the non-root user
+USER appuser
+
+# Set environment variables
+ENV PORT=8080
+
+# Expose the port
+EXPOSE 8080
+
+# Command to run the application
+CMD ["/app/dist"] 
