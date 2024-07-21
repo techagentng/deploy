@@ -271,7 +271,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		const MaxFileSize = 32 << 20 // 32 MB
 
 		buf := new(bytes.Buffer)
-		_, err := io.CopyN(buf, c.Request.Body, MaxFileSize)
+		_, err := io.CopyN(buf, c.Request.Body, int64(MaxFileSize))
 		if err != nil && err != io.EOF {
 			log.Printf("Error reading request body: %v\n", err)
 			response.JSON(c, "unable to read media", http.StatusInternalServerError, nil, errors.ErrInternalServerError)
@@ -405,13 +405,6 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			}
 		}
 
-		dateStr := c.PostForm("date_of_incidence")
-		dateOfIncidence, err := time.Parse("2006-01-02", dateStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date_of_incidence format"})
-			return
-		}
-
 		lga, stateStruct, reportType, locality, state, err := fetchGeocodingData(lat, lng, c, reportID)
 		if err != nil {
 			log.Printf("Error fetching geocoding data: %v\n", err)
@@ -423,7 +416,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 
 		incidentReport := &models.IncidentReport{
 			ID:                 reportID,
-			DateOfIncidence:    dateOfIncidence,
+			DateOfIncidence:    c.PostForm("date_of_incidence"),
 			StateName:          c.PostForm("state_name"),
 			LGAName:            c.PostForm("lga_name"),
 			Latitude:           lat,
@@ -448,11 +441,11 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			VicePrincipal:      c.PostForm("vice_principal"),
 			OutageLength:       c.PostForm("outage_length"),
 			Rating:             c.PostForm("rating"),
-			AirportName:             c.PostForm("airport_name"),
-			Country:             c.PostForm("country"),
-			HospitalAddress:             c.PostForm("hospital_address"),
-			RoadName:             c.PostForm("road_name"),
-			AirlineName:             c.PostForm("airline_name"),
+			AirportName:        c.PostForm("airport_name"),
+			Country:            c.PostForm("country"),
+			HospitalAddress:    c.PostForm("hospital_address"),
+			RoadName:           c.PostForm("road_name"),
+			AirlineName:        c.PostForm("airline_name"),
 			NoWater:            true,
 		}
 

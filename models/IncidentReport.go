@@ -7,7 +7,7 @@ type IncidentReport struct {
 	ID                   string    `json:"id" gorm:"primaryKey;index"`
 	CreatedAt            int64     `json:"created_at"`
 	UserFullname         string    `json:"fullname" gorm:"foreignKey:Fullname"`
-	DateOfIncidence      time.Time `json:"date_of_incidence"`
+	DateOfIncidence      string `json:"date_of_incidence"`
 	Description          string    `json:"description" gorm:"type:varchar(1000)"`
 	FeedURLs             string    `json:"feed_urls"`
 	ThumbnailURLs        string    `json:"thumbnail_urls"`
@@ -52,8 +52,8 @@ type IncidentReport struct {
 	NoWater              bool      `json:"no_water"`
 	AmbassedorsName      string    `json:"ambassedors_name"`
 	HospitalAddress      string    `json:"hospital_address"`
-	RoadName      string    `json:"road_name"`
-	AirlineName      string    `json:"airline_name"`
+	RoadName             string    `json:"road_name"`
+	AirlineName          string    `json:"airline_name"`
 }
 
 type Actions struct {
