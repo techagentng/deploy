@@ -54,13 +54,13 @@ func (s *Server) setupRouter() *gin.Engine {
 	}))
 	r.Use(gin.Recovery())
 
-	allowedOrigins := []string{"https://citizenx-dashboard-sbqx.onrender.com/"}
+	allowedOrigins := []string{"http://localhost:3001"}
 	if os.Getenv("GIN_MODE") == "release" {
-		allowedOrigins = []string{"https://citizenx-dashboard-sbqx.onrender.com/"} 
+		allowedOrigins = []string{"https://citizenx-dashboard-sbqx.onrender.com"} 
 	}
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     allowedOrigins,
+		AllowAllOrigins: true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		AllowCredentials: true,
