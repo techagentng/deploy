@@ -448,6 +448,8 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			AirlineName:        c.PostForm("airline_name"),
 			NoWater:            true,
 			Category:             c.PostForm("category"),
+			Terminal: c.PostForm("terminal"),
+			QueueTime: c.PostForm("queue_time"),
 		}
 
 		sub := &models.SubReport{

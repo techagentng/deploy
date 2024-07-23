@@ -55,6 +55,8 @@ type IncidentReport struct {
 	RoadName             string    `json:"road_name"`
 	AirlineName          string    `json:"airline_name"`
 	Category            string    `json:"category"`
+	Terminal            string    `json:"terminal"`
+	QueueTime           string    `json:"queue_time"`
 }
 
 type ReportCount struct {
