@@ -1130,3 +1130,15 @@ func (s *Server) handleGetRatingPercentages() gin.HandlerFunc {
 		c.JSON(http.StatusOK, percentages)
 	}
 }
+
+func (s *Server) handleGetAllReportsByStateAndLGA() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		reportCounts, err := s.IncidentReportRepository.GetReportCountsByStateAndLGA()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"report_counts": reportCounts})
+	}
+}

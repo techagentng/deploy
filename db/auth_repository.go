@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/models"
@@ -24,7 +25,7 @@ type AuthRepository interface {
 	IsTokenInBlacklist(token string) bool
 	UpdatePassword(password string, email string) error
 	FindUserByID(id uint) (*models.User, error)
-	UpdateUserImage(user *models.User) error
+	// UpdateUserImage(user *models.User) error
 	EditUserProfile(userID uint, userDetails *models.EditProfileResponse) error
 	FindUserByMacAddress(macAddress string) (*models.LoginRequestMacAddress, error)
 	ResetPassword(userID, NewPassword string) error
@@ -34,7 +35,7 @@ type AuthRepository interface {
 	SetUserOffline(user *models.User) error
 	GetOnlineUserCount() (int64, error)
 	GetAllUsers() ([]models.User, error)
-	// DeleteUserByEmail(email string) error
+	CreateUserImage(user *models.User) error
 }
 
 type authRepo struct {
@@ -214,18 +215,28 @@ func (a *authRepo) FindUserByMacAddress(macAddress string) (*models.LoginRequest
 	return &user, nil
 }
 
-func (a *authRepo) UpdateUserImage(user *models.User) error {
-	result := a.DB.Model(&models.User{}).Where("id = ?", user.ID).Update("thumb_nail_url", user.ThumbNailURL)
-	if result.Error != nil {
-		log.Printf("Error updating user image in database: %v", result.Error)
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		log.Println("No rows affected when updating user image")
-		return errors.New("failed to update user profile")
-	}
-	return nil
+func (a *authRepo) CreateUserImage(user *models.User) error {
+    // Assuming you have a UserImage model or similar
+    newUserImage := models.UserImage{
+        UserID:      user.ID,
+        ThumbNailURL: user.ThumbNailURL,
+        CreatedAt:   time.Now(),
+    }
+
+    result := a.DB.Create(&newUserImage)
+    if result.Error != nil {
+        log.Printf("Error creating user image in database: %v", result.Error)
+        return result.Error
+    }
+
+    if result.RowsAffected == 0 {
+        log.Println("No rows affected when creating user image")
+        return errors.New("failed to create user image")
+    }
+
+    return nil
 }
+
 
 func (a *authRepo) EditUserProfile(userID uint, userDetails *models.EditProfileResponse) error {
 	// Fetch the user from the database

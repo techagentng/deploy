@@ -45,6 +45,7 @@ type IncidentReportRepository interface {
 	GetAllCategories() ([]string, error)
 	GetAllStates() ([]string, error)
 	GetRatingPercentages(reportType, state string) (*models.RatingPercentage, error)
+	GetReportCountsByStateAndLGA() ([]models.ReportCount, error)
 }
 
 type incidentReportRepo struct {
@@ -639,4 +640,19 @@ func (i *incidentReportRepo) GetRatingPercentages(reportType, state string) (*mo
 		GoodPercentage: goodPercentage,
 		BadPercentage:  badPercentage,
 	}, nil
+}
+
+func (i *incidentReportRepo) GetReportCountsByStateAndLGA() ([]models.ReportCount, error) {
+    var results []models.ReportCount
+
+    err := i.DB.Model(&models.ReportType{}).
+        Select("state_name, lga_name, COUNT(*) as count").
+        Group("state_name, lga_name").
+        Scan(&results).Error
+
+    if err != nil {
+        return nil, err
+    }
+
+    return results, nil
 }

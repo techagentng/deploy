@@ -4,6 +4,8 @@ package models
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	goval "github.com/go-passwd/validator"
 	"golang.org/x/crypto/bcrypt"
 
@@ -93,6 +95,13 @@ type UserResponse struct {
 	Telephone string `json:"telephone"`
 	Email     string `json:"email"`
 	LGA       string `json:"LGA" gorm:"foreignkey:LGA(id)"`
+}
+
+type UserImage struct {
+    ID           uint `gorm:"primaryKey"`
+    UserID       uint
+    ThumbNailURL string
+    CreatedAt    time.Time
 }
 
 type EditProfileResponse struct {

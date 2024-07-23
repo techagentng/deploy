@@ -56,6 +56,12 @@ type IncidentReport struct {
 	AirlineName          string    `json:"airline_name"`
 }
 
+type ReportCount struct {
+    StateName string
+    LGAName   string
+    Count     int
+}
+
 type Actions struct {
 	Model
 	ActionType string `json:"action_type"`

@@ -27,7 +27,7 @@ type AuthService interface {
 	LoginUser(request *models.LoginRequest) (*models.LoginResponse, *apiError.Error)
 	LoginMacAddressUser(loginRequest *models.LoginRequestMacAddress) (*models.LoginRequestMacAddress, *apiError.Error)
 	SignupUser(request *models.User) (*models.User, error)
-	UpdateUserImageUrl(imagePath string) *apiError.Error
+	// UpdateUserImageUrl(imagePath string) *apiError.Error
 	GetUserProfile(userID uint) (*models.User, error)
 	EditUserProfile(userID uint, userDetails *models.EditProfileResponse) error
 	// FacebookSignInUser(token string) (*string, *apiError.Error)
@@ -180,21 +180,21 @@ func (a *authService) VerifyEmail(token string) error {
 //     return user, nil
 // }
 
-func (a *authService) UpdateUserImageUrl(imagePath string) *apiError.Error {
-	// Update user's profile with the image URL
-	var user models.User
-	user.ThumbNailURL = imagePath
+// func (a *authService) UpdateUserImageUrl(imagePath string) *apiError.Error {
+// 	// Update user's profile with the image URL
+// 	var user models.User
+// 	user.ThumbNailURL = imagePath
 
-	err := a.authRepo.UpdateUserImage(&user)
-	if err != nil {
-		log.Printf("Error updating user image in database: %v", err)
-		return &apiError.Error{
-			Message: "Failed to update user profile",
-			Status:  0,
-		}
-	}
-	return nil
-}
+// 	err := a.authRepo.UpdateUserImage(&user)
+// 	if err != nil {
+// 		log.Printf("Error updating user image in database: %v", err)
+// 		return &apiError.Error{
+// 			Message: "Failed to update user profilxxe",
+// 			Status:  0,
+// 		}
+// 	}
+// 	return nil
+// }
 
 func GenerateRandomString() (string, error) {
 	n := 5

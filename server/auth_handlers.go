@@ -1,24 +1,30 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/go-playground/validator/v10"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-playground/validator/v10"
+
 	"github.com/golang-jwt/jwt"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/techagentng/citizenx/errors"
 	errs "github.com/techagentng/citizenx/errors"
@@ -26,6 +32,111 @@ import (
 	"github.com/techagentng/citizenx/server/response"
 	jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
+
+func createS3Client() (*s3.Client, error) {
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("your-region"))
+    if err != nil {
+        return nil, fmt.Errorf("unable to load SDK config, %v", err)
+    }
+
+    return s3.NewFromConfig(cfg), nil
+}
+
+func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key string) (string, error) {
+    defer file.Close()
+
+    // Read the file content
+    fileContent, err := io.ReadAll(file)
+    if err != nil {
+        return "", fmt.Errorf("failed to read file content: %v", err)
+    }
+
+    // Upload the file to S3
+    _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
+        Bucket: aws.String(bucketName),
+        Key:    aws.String(key),
+        Body:   bytes.NewReader(fileContent),
+        ContentType: aws.String("image/jpeg"), // or the appropriate content type
+    })
+    if err != nil {
+        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+    }
+
+    // Return the S3 URL of the uploaded file
+    fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, "your-region", key)
+    return fileURL, nil
+}
+
+func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Handle file upload
+        file, fileHeader, err := c.Request.FormFile("profileImage")
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid file"})
+            return
+        }
+
+        // Get the access token from the authorization header
+        accessToken := getTokenFromHeader(c)
+        if accessToken == "" {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+            return
+        }
+
+        // Validate and decode the access token to get the userID
+        secret := s.Config.JWTSecret // Adjust this based on your application's configuration
+        accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
+        fmt.Println("was here")
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+            return
+        }
+
+        var userID uint
+        switch userIDValue := accessClaims["id"].(type) {
+        case float64:
+            userID = uint(userIDValue)
+        default:
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
+            return
+        }
+
+        // Create S3 client
+        s3Client, err := createS3Client()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create S3 client"})
+            return
+        }
+
+        userIDString := strconv.FormatUint(uint64(userID), 10)
+
+        // Generate unique filename
+        filename := userIDString + "_" + fileHeader.Filename
+
+        // Upload file to S3
+        filepath, err := uploadFileToS3(s3Client, file, "your-s3-bucket-name", filename)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3"})
+            return
+        }
+
+        // Retrieve user from service
+        user, err := s.AuthRepository.FindUserByID(userID)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+            return
+        }
+
+        // Create new image record for the user
+        user.ThumbNailURL = filepath
+        if err := s.AuthRepository.CreateUserImage(user); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
+            return
+        }
+
+        response.JSON(c, "File uploaded and user profile updated successfully", http.StatusOK, nil, nil)
+    }
+}
 
 func init() {
 	if _, err := os.Stat("uploads"); os.IsNotExist(err) {
@@ -666,87 +777,6 @@ func (s *Server) handleShowProfile() gin.HandlerFunc {
 
 		// Return the response
 		response.JSON(c, "User profile retrieved successfully", http.StatusOK, responseData, nil)
-	}
-}
-
-func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Handle file upload
-		file, fileHeader, err := c.Request.FormFile("profileImage")
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid file"})
-			return
-		}
-
-		// Get the access token from the authorization header
-		accessToken := getTokenFromHeader(c)
-		if accessToken == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			return
-		}
-
-		// Validate and decode the access token to get the userID
-		secret := s.Config.JWTSecret // Adjust this based on your application's configuration
-		accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
-		fmt.Println("was here")
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-			return
-		}
-
-		var userID uint
-		switch userIDValue := accessClaims["id"].(type) {
-		case float64:
-			userID = uint(userIDValue)
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID formatxxx"})
-			return
-		}
-
-		// Ensure that the upload directory exists, create it if it doesn't
-		uploadDir := "./uploadImage"
-		if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
-			if err := os.Mkdir(uploadDir, 0755); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
-				return
-			}
-		}
-
-		userIDString := strconv.FormatUint(uint64(userID), 10)
-
-		// Generate unique filename
-		filename := userIDString + "_" + fileHeader.Filename
-		filepath := "./uploadImage/" + filename
-
-		// Create the file in the upload directory
-		newFile, err := os.Create(filepath)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create file"})
-			return
-		}
-		defer newFile.Close()
-
-		// Copy the contents of the uploaded file to the new file
-		_, err = io.Copy(newFile, file)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
-			return
-		}
-
-		// Retrieve user from service
-		_, err = s.AuthRepository.FindUserByID(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
-			return
-		}
-
-		// Update user's profile with the image URL
-		if err := s.AuthService.UpdateUserImageUrl(filepath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
-			return
-		}
-
-		response.JSON(c, "File uploaded and user profile updated successfully", http.StatusOK, nil, nil)
 	}
 }
 

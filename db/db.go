@@ -67,6 +67,8 @@ func migrate(db *gorm.DB) error {
 		&models.StateReportPercentage{},
 		&models.MediaCount{},
 		&models.LoginRequestMacAddress{},
+		&models.UserImage{},
+		&models.ReportCount{},
 	)
 	if err != nil {
 		return fmt.Errorf("migrations error: %v", err)
