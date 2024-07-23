@@ -54,7 +54,7 @@ func (s *Server) setupRouter() *gin.Engine {
 	}))
 	r.Use(gin.Recovery())
 
-	allowedOrigins := []string{"http://localhost:3001"}
+	allowedOrigins := []string{"https://citizenx-dashboard-sbqx.onrender.com/"}
 	if os.Getenv("GIN_MODE") == "release" {
 		allowedOrigins = []string{"https://citizenx-dashboard-sbqx.onrender.com/"} 
 	}
