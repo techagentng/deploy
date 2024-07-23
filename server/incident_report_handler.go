@@ -447,6 +447,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			RoadName:           c.PostForm("road_name"),
 			AirlineName:        c.PostForm("airline_name"),
 			NoWater:            true,
+			Category:             c.PostForm("category"),
 		}
 
 		sub := &models.SubReport{

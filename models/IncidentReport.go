@@ -54,6 +54,7 @@ type IncidentReport struct {
 	HospitalAddress      string    `json:"hospital_address"`
 	RoadName             string    `json:"road_name"`
 	AirlineName          string    `json:"airline_name"`
+	Category            string    `json:"category"`
 }
 
 type ReportCount struct {
