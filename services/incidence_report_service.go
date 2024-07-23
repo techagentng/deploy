@@ -135,6 +135,7 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		HospitalAddress:      report.HospitalAddress,
 		RoadName:             report.RoadName,
 		AirlineName:          report.AirlineName,
+		Category: report.Category,
 	}
 
 	// Save the report to the database
