@@ -360,7 +360,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 			})
 			return
 		}
-		c.Header("Access-Control-Allow-Origin", "http://localhost:3001")
+		c.Header("Access-Control-Allow-Origin", "https://citizenx-dashboard-sbqx.onrender.com")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 		c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
 		c.Header("Access-Control-Allow-Credentials", "true")
