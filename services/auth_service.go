@@ -109,18 +109,20 @@ func GenerateHashPassword(password string) (string, error) {
 }
 
 func (a *authService) LoginMacAddressUser(loginRequest *models.LoginRequestMacAddress) (*models.LoginRequestMacAddress, *apiError.Error) {
-	// Generate MAC address token
-	macAddressToken, err := jwt.GenerateMacAddressToken(loginRequest.MacAddress, a.Config.JWTSecret)
-	if err != nil {
-		log.Printf("error generating MAC address token: %v", err)
-		return nil, apiError.ErrInternalServerError
-	}
+    // Generate MAC address token
+    macAddressToken, err := jwt.GenerateMacAddressToken(loginRequest.MacAddress, a.Config.JWTSecret)
+    if err != nil {
+        log.Printf("error generating MAC address token: %v", err)
+        return nil, apiError.ErrInternalServerError
+    }
 
-	// Return the MAC address token in the login response
-	return &models.LoginRequestMacAddress{
-		MacAddress: macAddressToken,
-	}, nil
+    // Return the MAC address token in the login response
+    return &models.LoginRequestMacAddress{
+        MacAddress: loginRequest.MacAddress, // Original MAC address
+        Token:      macAddressToken,        // Include the token
+    }, nil
 }
+
 
 // LoginUser logs in a user and returns the login response
 func (a *authService) LoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error) {

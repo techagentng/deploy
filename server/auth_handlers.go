@@ -523,24 +523,10 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
 	}
 
 	if user == nil {
-		// If user does not exist, create a new user
-		newUser := &models.User{
-			Email:    googleUserDetails.Email,
-			IsSocial: true,
-			Fullname: googleUserDetails.Name,
-			// Add other fields as necessary
-		}
-		_, err := s.AuthRepository.CreateUser(newUser)
+		// Handle the sign-up flow
+		user, err = s.signUpAndCreateUser(c, googleUserDetails)
 		if err != nil {
-			log.Printf("error creating user: %v\n", err)
-			return nil, fmt.Errorf("error creating user: %v", err)
-		}
-
-		// Find the newly created user
-		user, err = s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
-		if err != nil {
-			log.Printf("error finding user: %v\n", err)
-			return nil, fmt.Errorf("error finding user: %v", err)
+			return nil, fmt.Errorf("error signing up user: %v", err)
 		}
 	}
 
@@ -561,6 +547,26 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
 	}
 	log.Println("Auth payload:", payload)
 	return payload, nil
+}
+
+func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUser) (*models.User, error) {
+	// Create a new user
+	newUser := &models.User{
+		Email:    googleUserDetails.Email,
+		IsSocial: true,
+		Fullname: googleUserDetails.Name,
+		// Add other fields as necessary
+	}
+
+	// Save the new user to the database
+	createdUser, err := s.AuthRepository.CreateUser(newUser)
+	if err != nil {
+		log.Printf("error creating user: %v\n", err)
+		return nil, fmt.Errorf("error creating user: %v", err)
+	}
+
+	// Return the newly created user
+	return createdUser, nil
 }
 
 func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption func(*AuthPayload), c *gin.Context) (*AuthPayload, error) {
