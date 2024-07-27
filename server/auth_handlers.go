@@ -566,8 +566,10 @@ func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUs
 	}
 
 	// Return the newly created user
+	log.Printf("User created: %+v\n", createdUser)
 	return createdUser, nil
 }
+
 
 func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption func(*AuthPayload), c *gin.Context) (*AuthPayload, error) {
 	// Get the user ID from the context
