@@ -523,16 +523,17 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
 	log.Printf("Looking for existing user with email: %s", googleUserDetails.Email)
 	user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
 	if err != nil {
-		log.Printf("Error occurred while checking if email exists: %v", err)
-		return nil, fmt.Errorf("error checking if email exists: %v", err)
-	}
-
-	if user == nil {
-		log.Printf("No existing user found with email: %s. Proceeding to sign-up.", googleUserDetails.Email)
-		user, err = s.signUpAndCreateUser(c, googleUserDetails)
-		if err != nil {
-			log.Printf("Error during sign-up for email %s: %v", googleUserDetails.Email, err)
-			return nil, fmt.Errorf("error signing up user: %v", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// User not found, proceed with sign-up
+			log.Printf("No existing user found with email: %s. Proceeding to sign-up.", googleUserDetails.Email)
+			user, err = s.signUpAndCreateUser(c, googleUserDetails)
+			if err != nil {
+				log.Printf("Error during sign-up for email %s: %v", googleUserDetails.Email, err)
+				return nil, fmt.Errorf("error signing up user: %v", err)
+			}
+		} else {
+			log.Printf("Error occurred while checking if email exists: %v", err)
+			return nil, fmt.Errorf("error checking if email exists: %v", err)
 		}
 	} else {
 		log.Printf("Existing user found: %+v", user)
@@ -554,7 +555,6 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
 	log.Printf("Auth payload generated for user %s: %+v", googleUserDetails.Email, payload)
 	return payload, nil
 }
-
 
 func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUser) (*models.User, error) {
 	log.Printf("Attempting to sign up user with email: %s", googleUserDetails.Email)
