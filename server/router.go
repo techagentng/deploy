@@ -118,7 +118,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/count/all/rewards", s.handleSumAllRewardsBalance())
 	authorized.GET("/users/lga/:lga/report-type/:reportType", s.handleGetReportsByTypeAndLGA())
 	authorized.GET("/rewards/list", s.handleGetAllRewardsList())
-	authorized.GET("/report/type/count", s.handleGetReportTypeCounts()) //MAP  endpoint
+	authorized.GET("/report/type/count", s.handleGetReportTypeCounts()) 
 	apirouter.GET("/lgas", s.handleGetLGAs())
 	apirouter.GET("/lgas/lat/lng", s.IncidentMarkersHandler())
 	apirouter.DELETE("/incident-report/:id", s.DeleteIncidentReportHandler())

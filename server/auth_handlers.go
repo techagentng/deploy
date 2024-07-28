@@ -573,7 +573,6 @@ func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUs
 	return createdUser, nil
 }
 
-
 func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption func(*AuthPayload), c *gin.Context) (*AuthPayload, error) {
 	// Get the user ID from the context
 	userID, ok := c.Get("userID")
