@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
 	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
 
@@ -506,55 +505,54 @@ func (srv *Server) getUserInfoFromGoogle(token string) (*GoogleUser, error) {
 
 // GetGoogleSignInToken returns the signin access token and refresh token pair to the social user
 func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleUser) (*AuthPayload, error) {
-	log.Println("Starting Google sign-in process")
+    log.Println("Starting Google sign-in process")
 
-	if googleUserDetails == nil {
-		log.Println("Google user details are nil")
-		return nil, fmt.Errorf("error: google user details can't be empty")
-	}
-	if googleUserDetails.Email == "" {
-		log.Println("Google user email is empty")
-		return nil, fmt.Errorf("error: email can't be empty")
-	}
-	if googleUserDetails.Name == "" {
-		log.Println("Google user name is empty")
-		return nil, fmt.Errorf("error: name can't be empty")
-	}
+    if googleUserDetails == nil {
+        log.Println("Google user details are nil")
+        return nil, fmt.Errorf("error: google user details can't be empty")
+    }
+    if googleUserDetails.Email == "" {
+        log.Println("Google user email is empty")
+        return nil, fmt.Errorf("error: email can't be empty")
+    }
+    if googleUserDetails.Name == "" {
+        log.Println("Google user name is empty")
+        return nil, fmt.Errorf("error: name can't be empty")
+    }
 
-	log.Printf("Looking for existing user with email: %s", googleUserDetails.Email)
-	user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// User not found, proceed with sign-up
-			log.Printf("No existing user found with email: %s. Proceeding to sign-up.", googleUserDetails.Email)
-			user, err = s.signUpAndCreateUser(c, googleUserDetails)
-			if err != nil {
-				log.Printf("Error during sign-up for email %s: %v", googleUserDetails.Email, err)
-				return nil, fmt.Errorf("error signing up user: %v", err)
-			}
-		} else {
-			log.Printf("Error occurred while checking if email exists: %v", err)
-			return nil, fmt.Errorf("error checking if email exists: %v", err)
-		}
-	} else {
-		log.Printf("Existing user found: %+v", user)
-	}
+    log.Printf("Looking for existing user with email: %s", googleUserDetails.Email)
+    user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
+    if err != nil {
+        if err == gorm.ErrRecordNotFound { // Fallback direct comparison
+            log.Printf("No existing user found with email: %s. Proceeding to sign-up.", googleUserDetails.Email)
+            user, err = s.signUpAndCreateUser(c, googleUserDetails)
+            if err != nil {
+                log.Printf("Error during sign-up for email %s: %v", googleUserDetails.Email, err)
+                return nil, fmt.Errorf("error signing up user: %v", err)
+            }
+        } else {
+            log.Printf("Error occurred while checking if email exists: %v", err)
+            return nil, fmt.Errorf("error checking if email exists: %v", err)
+        }
+    } else {
+        log.Printf("Existing user found: %+v", user)
+    }
 
-	log.Printf("Generating token pair for user: %s", googleUserDetails.Email)
-	accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(user.Email, s.Config.JWTSecret, user.AdminStatus, user.ID)
-	if err != nil {
-		log.Printf("Error generating token pair for email %s: %v", googleUserDetails.Email, err)
-		return nil, fmt.Errorf("error generating token pair: %v", err)
-	}
+    log.Printf("Generating token pair for user: %s", googleUserDetails.Email)
+    accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(user.Email, s.Config.JWTSecret, user.AdminStatus, user.ID)
+    if err != nil {
+        log.Printf("Error generating token pair for email %s: %v", googleUserDetails.Email, err)
+        return nil, fmt.Errorf("error generating token pair: %v", err)
+    }
 
-	payload := &AuthPayload{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		TokenType:    "Bearer",
-		ExpiresIn:    int(AccessTokenDuration.Seconds()),
-	}
-	log.Printf("Auth payload generated for user %s: %+v", googleUserDetails.Email, payload)
-	return payload, nil
+    payload := &AuthPayload{
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+        TokenType:    "Bearer",
+        ExpiresIn:    int(AccessTokenDuration.Seconds()),
+    }
+    log.Printf("Auth payload generated for user %s: %+v", googleUserDetails.Email, payload)
+    return payload, nil
 }
 
 func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUser) (*models.User, error) {
