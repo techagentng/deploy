@@ -16,8 +16,6 @@ import (
 	"strings"
 	"time"
 	"github.com/go-playground/validator/v10"
-	"gorm.io/gorm"
-
 	"github.com/golang-jwt/jwt"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
