@@ -384,60 +384,40 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
 		WHERE rt.state_name = ? AND rt.lga_name = ?
 	`
 
-	// Log the base query and parameters
-	log.Printf("Base query: %s", query)
-	log.Printf("State: %s, LGA: %s", state, lga)
-
-	// Optional date filter
+	// Prepare query arguments
 	var args []interface{}
 	args = append(args, state, lga, state, lga, state, lga)
 
+	// Optional date filter
 	if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
-		var defaultStartDate, defaultEndDate time.Time
-		var err error
-
-		// Parse start date
-		defaultStartDate, err = time.Parse("2006-01-02", *startDate) // Adjust format if needed
+		defaultStartDate, err := time.Parse("2006-01-02", *startDate)
 		if err != nil {
 			return nil, nil, 0, 0, errors.New("failed to parse start date: " + err.Error())
 		}
 
-		// Parse end date
-		defaultEndDate, err = time.Parse("2006-01-02", *endDate) // Adjust format if needed
+		defaultEndDate, err := time.Parse("2006-01-02", *endDate)
 		if err != nil {
 			return nil, nil, 0, 0, errors.New("failed to parse end date: " + err.Error())
 		}
 
 		query += ` AND rt.date_of_incidence BETWEEN ? AND ?`
 		args = append(args, defaultStartDate, defaultEndDate)
-		log.Printf("Start Date (optional): %s, End Date (optional): %s", *startDate, *endDate)
-	} else {
-		log.Println("Date filter not provided, using full data for LGA and state")
 	}
 
 	query += ` GROUP BY rt.category`
 
-	// Log the final query
-	log.Printf("Final query: %s", query)
-
 	// Execute the query with parameters
 	rows, err := repo.DB.Raw(query, args...).Rows()
 	if err != nil {
-		log.Printf("Error executing query: %v", err)
 		return nil, nil, 0, 0, err
 	}
 	defer rows.Close()
 
-	log.Println("Query executed successfully, processing rows...")
-
 	// Process the result rows
 	for rows.Next() {
 		var reportType string
-		var count int
-		var users int
-		var reports int
+		var count, users, reports int
 		if err := rows.Scan(&reportType, &count, &users, &reports); err != nil {
-			log.Printf("Error scanning row: %v", err)
 			return nil, nil, 0, 0, err
 		}
 		reportTypes = append(reportTypes, reportType)
@@ -447,19 +427,13 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
 	}
 
 	if err := rows.Err(); err != nil {
-		log.Printf("Rows error: %v", err)
 		return nil, nil, 0, 0, err
 	}
-
-	// Log the results
-	log.Printf("Report types: %v", reportTypes)
-	log.Printf("Report counts: %v", counts)
-	log.Printf("Total users: %d", totalUsers)
-	log.Printf("Total reports: %d", totalReports)
 
 	// Return the results
 	return reportTypes, counts, totalUsers, totalReports, nil
 }
+
 
 // SaveReportTypeAndSubReport saves both ReportType and SubReport in a transaction
 func (repo *incidentReportRepo) SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error {

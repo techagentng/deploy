@@ -889,8 +889,9 @@ func (s *Server) handleGetReportTypeCounts() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		state := strings.TrimSpace(c.Query("state"))
 		lga := strings.TrimSpace(c.Query("lga"))
-		startDate := strings.TrimSpace(c.Query("start_date")) //time
-		endDate := strings.TrimSpace(c.Query("end_date"))     // time
+		startDate := strings.TrimSpace(c.Query("start_date"))
+		endDate := strings.TrimSpace(c.Query("end_date"))
+
 		log.Printf("State: %s, LGA: %s, Start Date: %s, End Date: %s\n", state, lga, startDate, endDate)
 
 		if state == "" || lga == "" {
@@ -898,18 +899,21 @@ func (s *Server) handleGetReportTypeCounts() gin.HandlerFunc {
 			return
 		}
 
-		reportTypes, reportCounts, _, _, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
+		reportTypes, reportCounts, totalUsers, totalReports, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
-		}		
+		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"report_types":  reportTypes,
-			"report_counts": reportCounts,
+			"report_types":   reportTypes,
+			"report_counts":  reportCounts,
+			"total_users":    totalUsers,
+			"total_reports":  totalReports,
 		})
 	}
 }
+
 
 // Handler function to get LGAs in a state
 func (s *Server) handleGetLGAs() gin.HandlerFunc {
