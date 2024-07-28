@@ -898,11 +898,11 @@ func (s *Server) handleGetReportTypeCounts() gin.HandlerFunc {
 			return
 		}
 
-		reportTypes, reportCounts, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
+		reportTypes, reportCounts, _, _, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
-		}
+		}		
 
 		c.JSON(http.StatusOK, gin.H{
 			"report_types":  reportTypes,

@@ -21,7 +21,7 @@ type IncidentReportService interface {
 	GetTotalUserCount() (int64, error)
 	GetRegisteredUsersCountByLGA(lga string) (int64, error)
 	GetReportsByTypeAndLGA(reportType string, lga string) ([]models.SubReport, error)
-	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, error)
+	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, error)
 	// GetStateReportCounts() ([]models.StateReportCount, error)
 }
 
@@ -200,6 +200,6 @@ func (s *IncidentService) GetReportsByTypeAndLGA(reportType string, lga string) 
 	return reports, nil
 }
 
-func (s *IncidentService) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, error) {
+func (s *IncidentService) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, error) {
 	return s.incidentRepo.GetReportTypeCounts(state, lga, startDate, endDate)
 }

@@ -36,7 +36,7 @@ type IncidentReportRepository interface {
 	GetRegisteredUsersCountByLGA(lga string) (int64, error)
 	GetAllReportsByStateByTime(state string, startTime, endTime time.Time, page int) ([]models.IncidentReport, error)
 	GetReportsByTypeAndLGA(reportType string, lga string) ([]models.SubReport, error)
-	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, error)
+	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, error)
 	SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error
 	GetIncidentMarkers() ([]Marker, error)
 	DeleteByID(id string) error
