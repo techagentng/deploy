@@ -137,12 +137,13 @@ func (a *authRepo) FindUserByEmail(email string) (*models.User, error) {
 	err := a.DB.Where("email = ?", email).First(&user).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("user not found") // Return error if user not found
+			return nil, fmt.Errorf("user not found: %w", gorm.ErrRecordNotFound)
 		}
-		return nil, err // Return the original error otherwise
+		return nil, fmt.Errorf("error finding user by email: %w", err)
 	}
 	return &user, nil
 }
+
 
 func (a *authRepo) UpdateUser(user *models.User) error {
 	return nil
