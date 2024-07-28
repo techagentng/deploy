@@ -556,6 +556,7 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
 }
 
 
+
 func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUser) (*models.User, error) {
 	log.Printf("Attempting to sign up user with email: %s", googleUserDetails.Email)
 
