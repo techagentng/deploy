@@ -523,8 +523,7 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
     log.Printf("Looking for existing user with email: %s", googleUserDetails.Email)
     user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
     if err != nil {
-        // Ensure that you're using `errors.Is` to check the error type correctly.
-        if errors.Is(err, gorm.ErrRecordNotFound) {
+        if err.Error() == "user not found" || err == gorm.ErrRecordNotFound {
             log.Printf("No existing user found with email: %s. Proceeding to sign-up.", googleUserDetails.Email)
             user, err = s.signUpAndCreateUser(c, googleUserDetails)
             if err != nil {
