@@ -434,7 +434,6 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
 	return reportTypes, counts, totalUsers, totalReports, nil
 }
 
-
 // SaveReportTypeAndSubReport saves both ReportType and SubReport in a transaction
 func (repo *incidentReportRepo) SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error {
 	// Start a transaction
