@@ -73,10 +73,12 @@ func (s *Server) Authorize() gin.HandlerFunc {
         c.Set("access_token", accessToken)
         c.Set("fullName", user.Fullname)
         c.Set("username", user.Username)
+		c.Set("profile_image", user.ThumbNailURL)
 
-		        // Log to check if values are set
-				log.Printf("Username in middleware: %v", c.Value("username"))
-				log.Printf("FullName in middleware: %v", c.Value("fullName"))
+		// Log to check if values are set
+		log.Printf("Username in middleware: %v", c.Value("username"))
+		log.Printf("FullName in middleware: %v", c.Value("fullName"))
+		log.Printf("Profile image in middleware: %v", c.Value("profileImage"))
         c.Next()
     }
 }

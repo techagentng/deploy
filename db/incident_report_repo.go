@@ -1,10 +1,17 @@
 package db
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"mime/multipart"
+	"net/http"
+	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
@@ -48,6 +55,7 @@ type IncidentReportRepository interface {
 	GetReportCountsByStateAndLGA() ([]models.ReportCount, error)
 	ListAllStatesWithReportCounts() ([]models.StateReportCount, error)
 	GetTotalReportCount() (int64, error)
+	UploadFileToS3(s *session.Session, file multipart.File, fileName string, size int64) (string, error)
 }
 
 type incidentReportRepo struct {
@@ -710,4 +718,27 @@ func (i *incidentReportRepo) GetTotalReportCount() (int64, error) {
     }
 
     return count, nil
+}
+
+func (i *incidentReportRepo) UploadFileToS3(s *session.Session, file multipart.File, fileName string, size int64) (string, error) {
+	// get the file size and read
+	// the file content into a buffer
+	buffer := make([]byte, size)
+	file.Read(buffer)
+	// config settings: this is where you choose the bucket,
+	// filename, content-type and storage class of the file
+	// you're uploading
+	url := "https://s3-eu-west-3.amazonaws.com/arp-rental/" + fileName
+	_, err := s3.New(s).PutObject(&s3.PutObjectInput{
+		Bucket:               aws.String(os.Getenv("S3_BUCKET_NAME")),
+		Key:                  aws.String(fileName),
+		ACL:                  aws.String("public-read"),
+		Body:                 bytes.NewReader(buffer),
+		ContentLength:        aws.Int64(int64(size)),
+		ContentType:          aws.String(http.DetectContentType(buffer)),
+		ContentDisposition:   aws.String("attachment"),
+		ServerSideEncryption: aws.String("AES256"),
+		StorageClass:         aws.String("INTELLIGENT_TIERING"),
+	})
+	return url, err
 }
