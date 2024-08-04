@@ -269,10 +269,10 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		userId := userI.(*models.User).ID
         fullNameI, _ := c.Get("fullName")
         usernameI, _ := c.Get("username")
-		profileImageURLI, _ := c.Get("profile_image")
-		if !exists {
-			profileImageURLI = "default-profile-image-url" // Fallback if profile image URL is not set
-		}
+		// profileImageURLI, _ := c.Get("profile_image")
+		// if !exists {
+		// 	profileImageURLI = "default-profile-image-url" // Fallback if profile image URL is not set
+		// }
 		
         fullName, ok := fullNameI.(string)
         if !ok {
@@ -281,12 +281,12 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
             return
         }
 
-		profileImage, ok := profileImageURLI.(string)
-        if !ok {
-            log.Println("image assertion failed")
-            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
-            return
-        }
+		// profileImage, ok := profileImageURLI.(string)
+        // if !ok {
+        //     log.Println("image assertion failed")
+        //     response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
+        //     return
+        // }
 
         usernameString, ok := usernameI.(string)
         if !ok {
@@ -446,7 +446,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			ID:                 reportID,
 			UserUsername: usernameString,
 			UserFullname: fullName,
-			ThumbnailURLs: profileImage,
+			ThumbnailURLs: "",
 			DateOfIncidence:    c.PostForm("date_of_incidence"),
 			StateName:          c.PostForm("state_name"),
 			LGAName:            c.PostForm("lga_name"),
