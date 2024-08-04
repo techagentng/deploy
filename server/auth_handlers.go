@@ -791,6 +791,7 @@ func (s *Server) handleShowProfile() gin.HandlerFunc {
 		// Prepare response data
 		responseData := gin.H{
 			"name":         user.Fullname,
+			"username":     user.Username,
 			"email":        user.Email,
 			"profileImage": user.ThumbNailURL,
 		}
