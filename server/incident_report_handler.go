@@ -468,6 +468,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			Category:             c.PostForm("category"),
 			Terminal: c.PostForm("terminal"),
 			QueueTime: c.PostForm("queue_time"),
+			Description: c.PostForm("description"),
 		}
 
 		sub := &models.SubReport{
