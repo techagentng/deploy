@@ -267,6 +267,22 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 		userId := userI.(*models.User).ID
+        fullNameI, _ := c.Get("fullName")
+        usernameI, _ := c.Get("username")
+		
+        fullName, ok := fullNameI.(string)
+        if !ok {
+            log.Println("Full name type assertion failed")
+            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
+            return
+        }
+
+        usernameString, ok := usernameI.(string)
+        if !ok {
+            log.Println("Username type assertion failed")
+            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
+            return
+        }
 
 		const MaxFileSize = 32 << 20 // 32 MB
 
@@ -416,6 +432,8 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 
 		incidentReport := &models.IncidentReport{
 			ID:                 reportID,
+			UserUsername: usernameString,
+			UserFullname: fullName,
 			DateOfIncidence:    c.PostForm("date_of_incidence"),
 			StateName:          c.PostForm("state_name"),
 			LGAName:            c.PostForm("lga_name"),
@@ -886,33 +904,39 @@ func (s *Server) handleGetReportsByTypeAndLGA() gin.HandlerFunc {
 }
 
 func (s *Server) handleGetReportTypeCounts() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		state := strings.TrimSpace(c.Query("state"))
-		lga := strings.TrimSpace(c.Query("lga"))
-		startDate := strings.TrimSpace(c.Query("start_date"))
-		endDate := strings.TrimSpace(c.Query("end_date"))
+    return func(c *gin.Context) {
+        state := strings.TrimSpace(c.Query("state"))
+        lga := strings.TrimSpace(c.Query("lga"))
+        startDate := strings.TrimSpace(c.Query("start_date"))
+        endDate := strings.TrimSpace(c.Query("end_date"))
 
-		log.Printf("State: %s, LGA: %s, Start Date: %s, End Date: %s\n", state, lga, startDate, endDate)
+        if state == "" || lga == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "State and LGA are required"})
+            return
+        }
 
-		if state == "" || lga == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "State and LGA are required"})
-			return
-		}
+        reportTypes, reportCounts, totalUsers, totalReports, topStates, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
 
-		reportTypes, reportCounts, totalUsers, totalReports, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+        // Convert the slice of StateReportCount to a map
+        topStatesMap := make(map[string]int)
+        for _, stateReport := range topStates {
+            topStatesMap[stateReport.StateName] = stateReport.ReportCount
+        }
 
-		c.JSON(http.StatusOK, gin.H{
-			"report_types":   reportTypes,
-			"report_counts":  reportCounts,
-			"total_users":    totalUsers,
-			"total_reports":  totalReports,
-		})
-	}
+        c.JSON(http.StatusOK, gin.H{
+            "report_types":   reportTypes,
+            "report_counts":  reportCounts,
+            "total_users":    totalUsers,
+            "total_reports":  totalReports,
+            "top_states":     topStatesMap,
+        })
+    }
 }
+
 
 
 // Handler function to get LGAs in a state
@@ -1148,4 +1172,35 @@ func (s *Server) handleGetAllReportsByStateAndLGA() gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, gin.H{"report_counts": reportCounts})
 	}
+}
+
+func (s *Server) handleListAllStatesWithReportCounts() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        statesWithReports, err := s.IncidentReportService.ListAllStatesWithReportCounts()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "top_states": statesWithReports,
+        })
+    }
+}
+
+// Define the handler function
+func (s *Server) handleGetTotalReportCount() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Call the service to get the total report count
+        totalCount, err := s.IncidentReportService.GetTotalReportCount()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        // Return the total count as JSON
+        c.JSON(http.StatusOK, gin.H{
+            "total_report_count": totalCount,
+        })
+    }
 }

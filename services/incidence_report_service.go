@@ -21,7 +21,9 @@ type IncidentReportService interface {
 	GetTotalUserCount() (int64, error)
 	GetRegisteredUsersCountByLGA(lga string) (int64, error)
 	GetReportsByTypeAndLGA(reportType string, lga string) ([]models.SubReport, error)
-	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, error)
+	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, []models.StateReportCount, error)
+	ListAllStatesWithReportCounts() ([]models.StateReportCount, error)
+	GetTotalReportCount() (int64, error)
 	// GetStateReportCounts() ([]models.StateReportCount, error)
 }
 
@@ -86,8 +88,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 	report.RewardPoint = reportPoints
 	reportResponse := &models.IncidentReport{
 		ID:                   report.ID,
-		CreatedAt:            0,
-		UserFullname:         "",
 		DateOfIncidence:      report.DateOfIncidence,
 		Description:          report.Description,
 		FeedURLs:             report.FeedURLs,
@@ -100,10 +100,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		Longitude:            lng,
 		UserIsAnonymous:      false,
 		Address:              report.Address,
-		UserUsername:         "",
-		Telephone:            "",
-		Email:                "",
-		View:                 0,
 		IsVerified:           false,
 		UserID:               report.UserID,
 		ReportTypeID:         reportID,
@@ -136,6 +132,8 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		RoadName:             report.RoadName,
 		AirlineName:          report.AirlineName,
 		Category: report.Category,
+		UserFullname: report.UserFullname,
+		UserUsername: report.UserUsername,
 	}
 
 	// Save the report to the database
@@ -200,6 +198,18 @@ func (s *IncidentService) GetReportsByTypeAndLGA(reportType string, lga string) 
 	return reports, nil
 }
 
-func (s *IncidentService) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, error) {
-	return s.incidentRepo.GetReportTypeCounts(state, lga, startDate, endDate)
+func (s *IncidentService) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, []models.StateReportCount, error) {
+    reportTypes, counts, totalUsers, totalReports, topStates, err := s.incidentRepo.GetReportTypeCounts(state, lga, startDate, endDate)
+    if err != nil {
+        return nil, nil, 0, 0, nil, err
+    }
+    return reportTypes, counts, totalUsers, totalReports, topStates, nil
+}
+
+func (s *IncidentService) ListAllStatesWithReportCounts() ([]models.StateReportCount, error) {
+    return s.incidentRepo.ListAllStatesWithReportCounts()
+}
+
+func (s *IncidentService) GetTotalReportCount() (int64, error) {
+    return s.incidentRepo.GetTotalReportCount()
 }

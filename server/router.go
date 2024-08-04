@@ -126,7 +126,8 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.PUT("/upload", s.handleUpdateUserImageUrl())
 	apirouter.GET("/report/rating", s.handleGetRatingPercentages())
 	apirouter.GET("/report/lga/count", s.handleGetAllReportsByState())
-	
+	apirouter.GET("/state/report/count", s.handleListAllStatesWithReportCounts())
+	apirouter.GET("/report/total/count", s.handleGetTotalReportCount())
 	// authorized.DELETE("/delete/:folder/:fileName", s.handleDeleteDocument())
 	// authorized.POST("/user/medications", s.handleCreateMedication())
 	// authorized.GET("/user/medications/:id", s.handleGetMedDetail())

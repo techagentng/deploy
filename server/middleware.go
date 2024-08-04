@@ -24,78 +24,63 @@ import (
 )
 
 func (s *Server) Authorize() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Extract access token from header
-		accessToken := getTokenFromHeader(c)
-		if accessToken == "" {
-			respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
-			return
-		}
+    return func(c *gin.Context) {
+        accessToken := getTokenFromHeader(c)
+        if accessToken == "" {
+            respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
+            return
+        }
 
-		// Check if the access token is present in the blacklist
-		if s.AuthRepository.IsTokenInBlacklist(accessToken) {
-			respondAndAbort(c, "Access token is blacklisted", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
-			return
-		}
+        if s.AuthRepository.IsTokenInBlacklist(accessToken) {
+            respondAndAbort(c, "Access token is blacklisted", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
+            return
+        }
 
-		// Validate and decode the access token to get the claims
-		secret := s.Config.JWTSecret
-		accessClaims, err := jwt.ValidateAndGetClaims(accessToken, secret)
-		if err != nil {
-			respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
-			return
-		}
+        secret := s.Config.JWTSecret
+        accessClaims, err := jwt.ValidateAndGetClaims(accessToken, secret)
+        if err != nil {
+            respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
+            return
+        }
 
-		// Extract MAC address from claims
-		_, isMACAddressUser := accessClaims["mac_address"]
-		if isMACAddressUser {
-			// Handle the case for MAC address user
-			response.JSON(c, "", http.StatusForbidden, nil, errs.New("Forbidden: Access restricted for MAC address users", http.StatusForbidden))
-			c.Abort()
-			return
-		}
+        userIDValue := accessClaims["id"]
+        var userID uint
+        switch v := userIDValue.(type) {
+        case float64:
+            userID = uint(v)
+        default:
+            respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("Invalid userID format", http.StatusBadRequest))
+            return
+        }
 
-		// Extract userID from claims
-		userIDValue := accessClaims["id"]
-		var userID uint
-		switch v := userIDValue.(type) {
-		case float64:
-			userID = uint(v)
-		default:
-			respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("Invalid userID format", http.StatusBadRequest))
-			return
-		}
+        user, err := s.AuthRepository.FindUserByID(userID)
+        if err != nil {
+            switch {
+            case errors.Is(err, errs.InActiveUserError):
+                respondAndAbort(c, "inactive user", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
+                return
+            case errors.Is(err, gorm.ErrRecordNotFound):
+                respondAndAbort(c, "user not found", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
+                return
+            default:
+                respondAndAbort(c, "unable to find entity", http.StatusInternalServerError, nil, errs.New("internal server error", http.StatusInternalServerError))
+                return
+            }
+        }
 
-		// Retrieve user from service using userID
-		user, err := s.AuthRepository.FindUserByID(userID)
-		if err != nil {
-			switch {
-			case errors.Is(err, errs.InActiveUserError):
-				respondAndAbort(c, "inactive user", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
-				return
-			case errors.Is(err, gorm.ErrRecordNotFound):
-				respondAndAbort(c, "user not found", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
-				return
-			default:
-				respondAndAbort(c, "unable to find entity", http.StatusInternalServerError, nil, errs.New("internal server error", http.StatusInternalServerError))
-				return
-			}
-		}
+        c.Set("user", user)
+        c.Set("userID", userID)
+        c.Set("access_token", accessToken)
+        c.Set("fullName", user.Fullname)
+        c.Set("username", user.Username)
 
-		// Check if user's email is active
-		// if !user.IsEmailActive {
-		// 	respondAndAbort(c, "user needs to be verified", http.StatusUnauthorized, nil, errs.New("User needs to be verified", http.StatusUnauthorized))
-		// 	return
-		// }
-
-		// Set the retrieved user in the context for downstream handlers to access
-		c.Set("user", user)
-		c.Set("userID", userID)
-		c.Set("access_token", accessToken)
-		// Continue handling the request
-		c.Next()
-	}
+		        // Log to check if values are set
+				log.Printf("Username in middleware: %v", c.Value("username"))
+				log.Printf("FullName in middleware: %v", c.Value("fullName"))
+        c.Next()
+    }
 }
+
 
 func limitRateForPasswordReset(store ratelimit.Store) gin.HandlerFunc {
 	// Initialize rate limiter using the provided store

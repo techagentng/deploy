@@ -36,7 +36,7 @@ type IncidentReportRepository interface {
 	GetRegisteredUsersCountByLGA(lga string) (int64, error)
 	GetAllReportsByStateByTime(state string, startTime, endTime time.Time, page int) ([]models.IncidentReport, error)
 	GetReportsByTypeAndLGA(reportType string, lga string) ([]models.SubReport, error)
-	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, error)
+	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, []models.StateReportCount, error)
 	SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error
 	GetIncidentMarkers() ([]Marker, error)
 	DeleteByID(id string) error
@@ -46,6 +46,8 @@ type IncidentReportRepository interface {
 	GetAllStates() ([]string, error)
 	GetRatingPercentages(reportType, state string) (*models.RatingPercentage, error)
 	GetReportCountsByStateAndLGA() ([]models.ReportCount, error)
+	ListAllStatesWithReportCounts() ([]models.StateReportCount, error)
+	GetTotalReportCount() (int64, error)
 }
 
 type incidentReportRepo struct {
@@ -369,69 +371,105 @@ func (repo *incidentReportRepo) GetReportsByTypeAndLGA(reportType string, lga st
 
 // GetReportTypeCounts gets the report types and their corresponding incident report counts
 
-func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, error) {
-	var reportTypes []string
-	var counts []int
-	var totalUsers int
-	var totalReports int
+func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, []models.StateReportCount, error) {
+    var reportTypes []string
+    var counts []int
+    var totalUsers int
+    var totalReports int
+    var topStates []models.StateReportCount
 
-	// Base query with state and LGA conditions
-	query := `
-		SELECT rt.category, COUNT(*) AS count,
-		       (SELECT COUNT(DISTINCT rt.user_id) FROM report_types rt WHERE rt.state_name = ? AND rt.lga_name = ?) AS total_users,
-		       (SELECT COUNT(*) FROM report_types rt WHERE rt.state_name = ? AND rt.lga_name = ?) AS total_reports
-		FROM report_types rt
-		WHERE rt.state_name = ? AND rt.lga_name = ?
-	`
+    // Base query for report types and counts
+    query := `
+        SELECT rt.category, COUNT(*) AS count,
+               (SELECT COUNT(DISTINCT rt.user_id) FROM report_types rt WHERE rt.state_name = ? AND rt.lga_name = ?) AS total_users,
+               (SELECT COUNT(*) FROM report_types rt WHERE rt.state_name = ? AND rt.lga_name = ?) AS total_reports
+        FROM report_types rt
+        WHERE rt.state_name = ? AND rt.lga_name = ?
+    `
 
-	// Prepare query arguments
-	var args []interface{}
-	args = append(args, state, lga, state, lga, state, lga)
+    // Prepare query arguments
+    var args []interface{}
+    args = append(args, state, lga, state, lga, state, lga)
 
-	// Optional date filter
-	if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
-		defaultStartDate, err := time.Parse("2006-01-02", *startDate)
-		if err != nil {
-			return nil, nil, 0, 0, errors.New("failed to parse start date: " + err.Error())
-		}
+    // Optional date filter
+    if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
+        var err error
+        defaultStartDate, err := time.Parse("2006-01-02", *startDate)
+        if err != nil {
+            return nil, nil, 0, 0, nil, errors.New("failed to parse start date: " + err.Error())
+        }
 
-		defaultEndDate, err := time.Parse("2006-01-02", *endDate)
-		if err != nil {
-			return nil, nil, 0, 0, errors.New("failed to parse end date: " + err.Error())
-		}
+        defaultEndDate, err := time.Parse("2006-01-02", *endDate)
+        if err != nil {
+            return nil, nil, 0, 0, nil, errors.New("failed to parse end date: " + err.Error())
+        }
 
-		query += ` AND rt.date_of_incidence BETWEEN ? AND ?`
-		args = append(args, defaultStartDate, defaultEndDate)
-	}
+        query += ` AND rt.date_of_incidence BETWEEN ? AND ?`
+        args = append(args, defaultStartDate, defaultEndDate)
+    }
 
-	query += ` GROUP BY rt.category`
+    query += ` GROUP BY rt.category`
 
-	// Execute the query with parameters
-	rows, err := repo.DB.Raw(query, args...).Rows()
-	if err != nil {
-		return nil, nil, 0, 0, err
-	}
-	defer rows.Close()
+    // Execute the query with parameters
+    rows, err := repo.DB.Raw(query, args...).Rows()
+    if err != nil {
+        return nil, nil, 0, 0, nil, err
+    }
+    defer rows.Close()
 
-	// Process the result rows
-	for rows.Next() {
-		var reportType string
-		var count, users, reports int
-		if err := rows.Scan(&reportType, &count, &users, &reports); err != nil {
-			return nil, nil, 0, 0, err
-		}
-		reportTypes = append(reportTypes, reportType)
-		counts = append(counts, count)
-		totalUsers = users
-		totalReports = reports
-	}
+    // Process the result rows
+    for rows.Next() {
+        var reportType string
+        var count int
+        if err := rows.Scan(&reportType, &count, &totalUsers, &totalReports); err != nil {
+            return nil, nil, 0, 0, nil, err
+        }
+        reportTypes = append(reportTypes, reportType)
+        counts = append(counts, count)
+    }
 
-	if err := rows.Err(); err != nil {
-		return nil, nil, 0, 0, err
-	}
+    if err := rows.Err(); err != nil {
+        return nil, nil, 0, 0, nil, err
+    }
 
-	// Return the results
-	return reportTypes, counts, totalUsers, totalReports, nil
+    // Query to get all states with report counts
+    topStatesQuery := `
+        SELECT state_name, COUNT(*) AS report_count
+        FROM report_types
+        WHERE lga_name = ?
+    `
+
+    // Append date filters if provided
+    if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
+        topStatesQuery += ` AND date_of_incidence BETWEEN ? AND ?`
+    }
+
+    topStatesQuery += `
+        GROUP BY state_name
+        ORDER BY report_count DESC
+    `
+
+    topStatesArgs := []interface{}{lga}
+    if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
+        defaultStartDate, err := time.Parse("2006-01-02", *startDate)
+        if err != nil {
+            return nil, nil, 0, 0, nil, errors.New("failed to parse start date: " + err.Error())
+        }
+
+        defaultEndDate, err := time.Parse("2006-01-02", *endDate)
+        if err != nil {
+            return nil, nil, 0, 0, nil, errors.New("failed to parse end date: " + err.Error())
+        }
+
+        topStatesArgs = append(topStatesArgs, defaultStartDate, defaultEndDate)
+    }
+
+    err = repo.DB.Raw(topStatesQuery, topStatesArgs...).Scan(&topStates).Error
+    if err != nil {
+        return nil, nil, 0, 0, nil, fmt.Errorf("could not fetch top states: %v", err)
+    }
+
+    return reportTypes, counts, totalUsers, totalReports, topStates, nil
 }
 
 // SaveReportTypeAndSubReport saves both ReportType and SubReport in a transaction
@@ -638,4 +676,38 @@ func (i *incidentReportRepo) GetReportCountsByStateAndLGA() ([]models.ReportCoun
     }
 
     return results, nil
+}
+
+func (repo *incidentReportRepo) ListAllStatesWithReportCounts() ([]models.StateReportCount, error) {
+    var topStates []models.StateReportCount
+
+    // Query to get the top 6 states with their report counts
+    query := `
+        SELECT state_name, COUNT(*) AS report_count
+        FROM report_types
+        GROUP BY state_name
+        ORDER BY report_count DESC
+        LIMIT 6
+    `
+
+    // Execute the query
+    err := repo.DB.Raw(query).Scan(&topStates).Error
+    if err != nil {
+        return nil, fmt.Errorf("could not fetch states with report counts: %v", err)
+    }
+
+    return topStates, nil
+}
+
+func (i *incidentReportRepo) GetTotalReportCount() (int64, error) {
+    var count int64
+
+    err := i.DB.Model(&models.ReportType{}).
+        Count(&count).Error
+
+    if err != nil {
+        return 0, err
+    }
+
+    return count, nil
 }
