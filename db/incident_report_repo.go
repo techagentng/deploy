@@ -56,6 +56,7 @@ type IncidentReportRepository interface {
 	ListAllStatesWithReportCounts() ([]models.StateReportCount, error)
 	GetTotalReportCount() (int64, error)
 	UploadFileToS3(s *session.Session, file multipart.File, fileName string, size int64) (string, error)
+	GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error)
 }
 
 type incidentReportRepo struct {
@@ -742,3 +743,20 @@ func (i *incidentReportRepo) UploadFileToS3(s *session.Session, file multipart.F
 	})
 	return url, err
 }
+
+func (i *incidentReportRepo) GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error) {
+    var names []string
+
+    err := i.DB.Model(&models.SubReport{}).
+        Where("state_name = ? AND lga_id = ? AND report_type_category = ?", stateName, lgaID, reportTypeCategory).
+        Pluck("sub_report_name", &names).Error
+
+    if err != nil {
+        return nil, err
+    }
+
+    return names, nil
+}
+
+
+

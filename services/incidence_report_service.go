@@ -24,7 +24,7 @@ type IncidentReportService interface {
 	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, []models.StateReportCount, error)
 	ListAllStatesWithReportCounts() ([]models.StateReportCount, error)
 	GetTotalReportCount() (int64, error)
-	// GetStateReportCounts() ([]models.StateReportCount, error)
+	GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error)
 }
 
 type IncidentService struct {
@@ -213,3 +213,14 @@ func (s *IncidentService) ListAllStatesWithReportCounts() ([]models.StateReportC
 func (s *IncidentService) GetTotalReportCount() (int64, error) {
     return s.incidentRepo.GetTotalReportCount()
 }
+
+func (s *IncidentService) GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error) {
+    // Call the repository method with the correct parameters
+    names, err := s.incidentRepo.GetNamesByCategory(stateName, lgaID, reportTypeCategory)
+    if err != nil {
+        return nil, fmt.Errorf("error getting names by category: %v", err)
+    }
+    return names, nil
+}
+
+

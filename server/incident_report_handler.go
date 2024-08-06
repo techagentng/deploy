@@ -485,8 +485,13 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		}
 
 		sub := &models.SubReport{
-			ID:   reportID,
-			Name: c.PostForm("sub_report_type"),
+			ID:                 reportID,
+			ReportTypeID:       reportID,
+			LGAID:              c.PostForm("lga"),
+			UserID:             userId,
+			StateName:          c.PostForm("state_name"),
+			ReportTypeCategory: c.PostForm("category"),
+			SubReportName: c.PostForm("category"),
 		}
 
 		// Check if stateName and lgaName are empty, replace with statestring and lgastring if so
@@ -1218,3 +1223,26 @@ func (s *Server) handleGetTotalReportCount() gin.HandlerFunc {
         })
     }
 }
+
+func (s *Server) handleGetNamesByCategory() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Retrieve parameters from query
+        stateName := c.Query("state_name")
+        lga := c.Query("lga")
+        reportTypeCategory := c.Query("category")
+
+        // Call the service method
+        names, err := s.IncidentReportService.GetNamesByCategory(stateName, lga, reportTypeCategory)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        // Return the names as JSON response
+        c.JSON(http.StatusOK, gin.H{"names": names})
+    }
+}
+
+
+
+
