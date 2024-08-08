@@ -749,7 +749,7 @@ func (i *incidentReportRepo) GetNamesByCategory(stateName string, lgaID string, 
 
     err := i.DB.Model(&models.SubReport{}).
         Where("state_name = ? AND lga_id = ? AND report_type_category = ?", stateName, lgaID, reportTypeCategory).
-        Pluck("sub_report_name", &names).Error
+        Pluck("sub_report_type", &names).Error
 
     if err != nil {
         return nil, err

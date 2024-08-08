@@ -57,7 +57,7 @@ type IncidentReport struct {
 	Category            string    `json:"category"`
 	Terminal            string    `json:"terminal"`
 	QueueTime           string    `json:"queue_time"`
-	SubReportName       string    `json:"sub_report_name" gorm:"foreignKey:Name"`
+	SubReportType       string    `json:"sub_report_type" gorm:"foreignKey:Type"`
 }
 
 type ReportCount struct {
