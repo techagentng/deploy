@@ -491,7 +491,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			UserID:             userId,
 			StateName:          c.PostForm("state_name"),
 			ReportTypeCategory: c.PostForm("category"),
-			SubReportName: c.PostForm("category"),
+			SubReportType: c.PostForm("sub_report_type"),
 		}
 
 		// Check if stateName and lgaName are empty, replace with statestring and lgastring if so

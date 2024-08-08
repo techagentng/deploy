@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
 	"golang.org/x/oauth2"
@@ -23,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gin-gonic/gin"
 	"github.com/techagentng/citizenx/errors"
 	errs "github.com/techagentng/citizenx/errors"
@@ -46,22 +48,30 @@ func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key stri
     // Read the file content
     fileContent, err := io.ReadAll(file)
     if err != nil {
+        fmt.Printf("Error reading file content: %v\n", err) // Log the error
         return "", fmt.Errorf("failed to read file content: %v", err)
     }
+
+    // Log bucket and key information
+    fmt.Printf("Uploading to bucket: %s\n", bucketName)
+    fmt.Printf("Uploading with key: %s\n", key)
 
     // Upload the file to S3
     _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
         Bucket: aws.String(bucketName),
         Key:    aws.String(key),
         Body:   bytes.NewReader(fileContent),
-		ACL: "public-read",
+        ACL:    types.ObjectCannedACLPublicRead, // Use proper type from SDK
     })
     if err != nil {
+        fmt.Printf("Error uploading file to S3: %v\n", err) // Log the error
         return "", fmt.Errorf("failed to upload file to S3: %v", err)
     }
 
-    // Return the S3 URL of the uploaded file
+    // Log successful upload
     fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), key)
+    fmt.Printf("File uploaded successfully, URL: %s\n", fileURL) // Log the URL
+
     return fileURL, nil
 }
 

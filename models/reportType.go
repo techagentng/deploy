@@ -20,7 +20,7 @@ type SubReport struct {
     LGAID               string `json:"lga_id" gorm:"foreignKey:ID"`
     UserID              uint   `json:"user_id" gorm:"foreignKey:UserID"`
     StateName           string `json:"state_name" gorm:"foreignKey:StateName"`
-    SubReportName       string `json:"sub_report_name"`
+    SubReportType       string `json:"sub_report_type"`
     ReportTypeCategory  string `json:"report_type_category" gorm:"foreignKey:Category"`
 }
 
