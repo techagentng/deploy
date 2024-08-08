@@ -54,14 +54,14 @@ func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key stri
         Bucket: aws.String(bucketName),
         Key:    aws.String(key),
         Body:   bytes.NewReader(fileContent),
-        ContentType: aws.String("image/jpeg"), // or the appropriate content type
+		ACL: "public-read",
     })
     if err != nil {
         return "", fmt.Errorf("failed to upload file to S3: %v", err)
     }
 
     // Return the S3 URL of the uploaded file
-    fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, "your-region", key)
+    fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), key)
     return fileURL, nil
 }
 
@@ -152,7 +152,7 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
         // Upload file to S3
         filepath, err := uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3xxx"})
             return
         }
 

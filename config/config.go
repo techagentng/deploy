@@ -34,7 +34,8 @@ type Config struct {
 	AccessControlAllowOrigin     string `envconfig:"accessc_control_allow_origin"`
 	AWS_BUCKET             string `envconfig:"aws_bucket"`
 	AWS_REGION             string `envconfig:"aws_region"`
-	
+	AWS_ACCESS_KEY_ID             string `envconfig:"aws_access_key_id"`
+	AWS_SECRET_ACCESS_KEY             string `envconfig:"aws_secret_access_key"`
 }
 
 func Load() (*Config, error) {
