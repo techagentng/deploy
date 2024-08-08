@@ -32,6 +32,9 @@ type Config struct {
 	FacebookRedirectURL          string `envconfig:"facebook_redirect_url"`
 	GoogleMapsApiKey             string `envconfig:"google_maps_api_key"`
 	AccessControlAllowOrigin     string `envconfig:"accessc_control_allow_origin"`
+	AWS_BUCKET             string `envconfig:"aws_bucket"`
+	AWS_REGION             string `envconfig:"aws_region"`
+	
 }
 
 func Load() (*Config, error) {

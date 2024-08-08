@@ -32,7 +32,7 @@ import (
 )
 
 func createS3Client() (*s3.Client, error) {
-    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("your-region"))
+    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(os.Getenv("AWS_REGION")))
     if err != nil {
         return nil, fmt.Errorf("unable to load SDK config, %v", err)
     }
@@ -65,12 +65,51 @@ func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key stri
     return fileURL, nil
 }
 
+// Define allowed MIME types and max file size
+const (
+    MaxFileSize = 5 * 1024 * 1024 // 5 MB
+    AllowedMimeTypes = "image/jpeg,image/png,image/gif"
+)
+
+// validateFile checks the file type and size
+func validateFile(file *multipart.FileHeader) error {
+    // Check file size
+    if file.Size > MaxFileSize {
+        return fmt.Errorf("file size exceeds limit of %d bytes", MaxFileSize)
+    }
+
+    // Check file MIME type
+    mimeType := file.Header.Get("Content-Type")
+    if !isValidMimeType(mimeType) {
+        return fmt.Errorf("invalid file type: %s", mimeType)
+    }
+
+    return nil
+}
+
+// isValidMimeType checks if the MIME type is allowed
+func isValidMimeType(mimeType string) bool {
+    allowedTypes := strings.Split(AllowedMimeTypes, ",")
+    for _, allowedType := range allowedTypes {
+        if mimeType == allowedType {
+            return true
+        }
+    }
+    return false
+}
+
 func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
     return func(c *gin.Context) {
         // Handle file upload
         file, fileHeader, err := c.Request.FormFile("profileImage")
         if err != nil {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid file"})
+            return
+        }
+
+        // Validate file type and size
+        if err := validateFile(fileHeader); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
             return
         }
 
@@ -84,7 +123,6 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
         // Validate and decode the access token to get the userID
         secret := s.Config.JWTSecret // Adjust this based on your application's configuration
         accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
-        fmt.Println("was here")
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
             return
@@ -112,7 +150,7 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
         filename := userIDString + "_" + fileHeader.Filename
 
         // Upload file to S3
-        filepath, err := uploadFileToS3(s3Client, file, "your-s3-bucket-name", filename)
+        filepath, err := uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3"})
             return
@@ -132,9 +170,11 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
             return
         }
 
-        response.JSON(c, "File uploaded and user profile updated successfully", http.StatusOK, nil, nil)
+        c.JSON(http.StatusOK, gin.H{"message": "File uploaded and user profile updated successfully"})
     }
 }
+
+
 
 func init() {
 	if _, err := os.Stat("uploads"); os.IsNotExist(err) {
