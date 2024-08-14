@@ -11,7 +11,6 @@ import (
 
 type IncidentReportService interface {
 	SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error)
-	CheckReportInBookmarkedReport(userID uint, reportID string) (bool, error)
 	SaveBookmarkReport(bookmark *models.BookmarkReport) error
 	GetAllReports(page int) ([]models.IncidentReport, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
@@ -143,14 +142,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 	}
 
 	return reportResponse, nil
-}
-
-func (s *IncidentService) CheckReportInBookmarkedReport(userID uint, reportID string) (bool, error) {
-	ok, err := s.incidentRepo.CheckReportInBookmarkedReport(userID, reportID)
-	if err != nil {
-		return false, err
-	}
-	return ok, nil
 }
 
 func (s *IncidentService) SaveBookmarkReport(bookmark *models.BookmarkReport) error {

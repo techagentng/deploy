@@ -23,6 +23,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gin-gonic/gin"
@@ -34,13 +35,21 @@ import (
 )
 
 func createS3Client() (*s3.Client, error) {
-    cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(os.Getenv("AWS_REGION")))
+    cfg, err := config.LoadDefaultConfig(context.TODO(),
+        config.WithRegion(os.Getenv("AWS_REGION")),
+        config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+            os.Getenv("AWS_ACCESS_KEY_ID"),
+            os.Getenv("AWS_SECRET_ACCESS_KEY"),
+            "", // session token, if needed
+        )),
+    )
     if err != nil {
         return nil, fmt.Errorf("unable to load SDK config, %v", err)
     }
 
     return s3.NewFromConfig(cfg), nil
 }
+
 
 func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key string) (string, error) {
     defer file.Close()

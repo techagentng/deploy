@@ -2,16 +2,23 @@ package db
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"log"
 	"mime/multipart"
-	"net/http"
 	"os"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/config"
+    "github.com/aws/aws-sdk-go-v2/service/s3"
+    "github.com/aws/aws-sdk-go-v2/credentials"
+    "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	// "github.com/aws/aws-sdk-go-v2/config"
+	// "github.com/aws/aws-sdk-go-v2/credentials"
+	// "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	// "github.com/aws/aws-sdk-go/aws"
+	// "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
@@ -29,7 +36,6 @@ type IncidentReportRepository interface {
 	UpdateReward(userID uint, reward *models.Reward) error
 	FindUserByID(id uint) (*models.UserResponse, error)
 	GetReportByID(report_id string) (*models.IncidentReport, error)
-	CheckReportInBookmarkedReport(userID uint, reportID string) (bool, error)
 	GetAllReports(page int) ([]models.IncidentReport, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByLGA(lga string, page int) ([]models.IncidentReport, error)
@@ -55,8 +61,8 @@ type IncidentReportRepository interface {
 	GetReportCountsByStateAndLGA() ([]models.ReportCount, error)
 	ListAllStatesWithReportCounts() ([]models.StateReportCount, error)
 	GetTotalReportCount() (int64, error)
-	UploadFileToS3(s *session.Session, file multipart.File, fileName string, size int64) (string, error)
 	GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error)
+	UploadMediaToS3(file multipart.File, fileHeader *multipart.FileHeader, bucketName, folderName string) (string, error)
 }
 
 type incidentReportRepo struct {
@@ -157,17 +163,6 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 		return nil, err
 	}
 	return &report, nil
-}
-
-func (repo *incidentReportRepo) CheckReportInBookmarkedReport(userID uint, reportID string) (bool, error) {
-	var bookmarkedReport models.BookmarkReport
-	if err := repo.DB.Where("user_id = ? AND report_id = ?", userID, reportID).First(&bookmarkedReport).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
 }
 
 func (repo *incidentReportRepo) SaveBookmarkReport(bookmark *models.BookmarkReport) error {
@@ -721,27 +716,36 @@ func (i *incidentReportRepo) GetTotalReportCount() (int64, error) {
     return count, nil
 }
 
-func (i *incidentReportRepo) UploadFileToS3(s *session.Session, file multipart.File, fileName string, size int64) (string, error) {
-	// get the file size and read
-	// the file content into a buffer
-	buffer := make([]byte, size)
-	file.Read(buffer)
-	// config settings: this is where you choose the bucket,
-	// filename, content-type and storage class of the file
-	// you're uploading
-	url := "https://s3-eu-west-3.amazonaws.com/arp-rental/" + fileName
-	_, err := s3.New(s).PutObject(&s3.PutObjectInput{
-		Bucket:               aws.String(os.Getenv("S3_BUCKET_NAME")),
-		Key:                  aws.String(fileName),
-		ACL:                  aws.String("public-read"),
-		Body:                 bytes.NewReader(buffer),
-		ContentLength:        aws.Int64(int64(size)),
-		ContentType:          aws.String(http.DetectContentType(buffer)),
-		ContentDisposition:   aws.String("attachment"),
-		ServerSideEncryption: aws.String("AES256"),
-		StorageClass:         aws.String("INTELLIGENT_TIERING"),
-	})
-	return url, err
+func (i *incidentReportRepo) UploadFileToS3(file multipart.File, fileName string, size int64) (string, error) {
+    // Create an S3 client
+    client, err := createS3Client()
+    if err != nil {
+        return "", fmt.Errorf("failed to create S3 client: %v", err)
+    }
+
+    // Step 1: Read the file content into a buffer
+    buffer := make([]byte, size)
+    _, err = file.Read(buffer)
+    if err != nil {
+        return "", fmt.Errorf("failed to read file content: %v", err)
+    }
+
+    // Step 2: Upload the file to S3
+    _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
+        Bucket:      aws.String(os.Getenv("S3_BUCKET_NAME")), // Specify the S3 bucket name
+        Key:         aws.String(fileName),                   // Specify the file name
+        Body:        bytes.NewReader(buffer),                // Use the buffer as the body
+        ACL:         types.ObjectCannedACLPublicRead,        // Set the ACL to public-read
+        ContentType: aws.String("application/octet-stream"), // Set a default content type
+    })
+    if err != nil {
+        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+    }
+
+    // Step 3: Construct the file URL
+    url := fmt.Sprintf("https://%s.s3.amazonaws.com/%s", os.Getenv("S3_BUCKET_NAME"), fileName)
+
+    return url, nil
 }
 
 func (i *incidentReportRepo) GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error) {
@@ -756,5 +760,85 @@ func (i *incidentReportRepo) GetNamesByCategory(stateName string, lgaID string, 
     }
 
     return names, nil
+}
+
+func createS3Client() (*s3.Client, error) {
+    cfg, err := config.LoadDefaultConfig(context.TODO(),
+        config.WithRegion(os.Getenv("AWS_REGION")),
+        config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+            os.Getenv("AWS_ACCESS_KEY_ID"),
+            os.Getenv("AWS_SECRET_ACCESS_KEY"),
+            "", // session token, if needed
+        )),
+    )
+    if err != nil {
+        return nil, fmt.Errorf("unable to load SDK config, %v", err)
+    }
+
+    return s3.NewFromConfig(cfg), nil
+}
+
+
+func (i *incidentReportRepo) UploadMediaToS3(file multipart.File, fileHeader *multipart.FileHeader, bucketName, folderName string) (string, error) {
+    defer file.Close()
+
+    // Create an S3 client
+    client, err := createS3Client()
+    if err != nil {
+        return "", fmt.Errorf("failed to create S3 client: %v", err)
+    }
+
+    // Generate a unique key for the file
+    key := fmt.Sprintf("%s/%s", folderName, fileHeader.Filename)
+
+    // Upload the file to S3
+    fileURL, err := uploadFileToS3(client, file, bucketName, key)
+    if err != nil {
+        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+    }
+
+    return fileURL, nil
+}
+
+// Function to upload a file to S3
+func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key string) (string, error) {
+    defer file.Close()
+
+    // Step 1: Read the file content into memory
+    fileContent, err := io.ReadAll(file)
+    if err != nil {
+        // Log and return an error if reading the file fails
+        fmt.Printf("Error reading file content: %v\n", err)
+        return "", fmt.Errorf("failed to read file content: %v", err)
+    }
+
+    // Step 2: Log information about the bucket and key
+    fmt.Printf("Uploading to bucket: %s\n", bucketName)
+    fmt.Printf("Uploading with key: %s\n", key)
+
+    // Step 3: Prepare the S3 PutObjectInput
+    putObjectInput := &s3.PutObjectInput{
+        Bucket: aws.String(bucketName),  // Specify the S3 bucket name
+        Key:    aws.String(key),         // Specify the object key (file name)
+        Body:   bytes.NewReader(fileContent), // Use the file content as the body
+        ACL:    types.ObjectCannedACLPublicRead, // Directly use the ObjectCannedACL enum
+    }
+
+    // Step 4: Attempt to upload the file to S3
+    _, err = client.PutObject(context.TODO(), putObjectInput)
+    if err != nil {
+        // Log and return an error if the upload fails
+        fmt.Printf("Error uploading file to S3: %v\n", err)
+        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+    }
+
+    // Step 5: Construct the public URL for the uploaded file
+    fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), key)
+
+    // Step 6: Log the successful upload and the URL
+    fmt.Printf("File uploaded successfully, URL: %s\n", fileURL)
+
+    // Step 7: Return the file URL
+    return fileURL, nil
 }
 

@@ -1,6 +1,9 @@
 package db
 
 import (
+	"fmt"
+	"mime/multipart"
+
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/models"
@@ -12,6 +15,7 @@ type MediaRepository interface {
 	RewardAndSavePoints(mediaCount int, report *models.IncidentReport) error
 	GetMediaCountByByUserID(userID uint) (int, error)
 	CreateMediaCount(mediaCount *models.MediaCount) error
+	UploadMediaToS3(file multipart.File, fileHeader *multipart.FileHeader, bucketName, folderName string) (string, error)
 }
 
 type mediaRepo struct {
@@ -100,3 +104,23 @@ func (repo *mediaRepo) CreateMediaCount(mediaCount *models.MediaCount) error {
 //     }
 //     return count, nil
 // }
+func (repo *mediaRepo) UploadMediaToS3(file multipart.File, fileHeader *multipart.FileHeader, bucketName, folderName string) (string, error) {
+    defer file.Close()
+
+    // Create an S3 client
+    client, err := createS3Client()
+    if err != nil {
+        return "", fmt.Errorf("failed to create S3 client: %v", err)
+    }
+
+    // Generate a unique key for the file
+    key := fmt.Sprintf("%s/%s", folderName, fileHeader.Filename)
+
+    // Upload the file to S3
+    fileURL, err := uploadFileToS3(client, file, bucketName, key)
+    if err != nil {
+        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+    }
+
+    return fileURL, nil
+}

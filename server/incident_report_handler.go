@@ -287,13 +287,6 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
             return
         }
 
-		// profileImage, ok := profileImageURLI.(string)
-        // if !ok {
-        //     log.Println("image assertion failed")
-        //     response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
-        //     return
-        // }
-
         usernameString, ok := usernameI.(string)
         if !ok {
             log.Println("Username type assertion failed")

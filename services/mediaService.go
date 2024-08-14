@@ -78,53 +78,65 @@ func generateUniqueFilename(extension string) string {
 }
 
 func (m *mediaService) ProcessMedia(c *gin.Context, formMedia []*multipart.FileHeader, userID uint, reportID string) ([]string, []string, []string, []string, error) {
-	var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
+    var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
+    bucketName := os.Getenv("AWS_BUCKET") // Replace with your actual bucket name
 
-	for _, fileHeader := range formMedia {
-		file, err := fileHeader.Open()
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to open file: %v", err)
-		}
-		defer file.Close()
+    for _, fileHeader := range formMedia {
+        file, err := fileHeader.Open()
+        if err != nil {
+            return nil, nil, nil, nil, fmt.Errorf("failed to open file: %v", err)
+        }
 
-		fileBytes, err := ioutil.ReadAll(file)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to read file: %v", err)
-		}
+        // Read the file content
+        fileBytes, err := ioutil.ReadAll(file)
+        if err != nil {
+            return nil, nil, nil, nil, fmt.Errorf("failed to read file: %v", err)
+        }
 
-		fileType := getFileType(fileBytes)
-		var feedURL, thumbnailURL, fullsizeURL string
+        fileType := getFileType(fileBytes)
+        var feedURL, thumbnailURL, fullsizeURL string
 
-		switch fileType {
-		case "image":
-			feedURL, thumbnailURL, fullsizeURL, err = processAndStoreImage(fileBytes)
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("failed to process and store image: %v", err)
-			}
-		case "video":
-			// Process and store video
-			feedURL, thumbnailURL, fullsizeURL, err = processAndStoreVideo(fileBytes)
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("failed to process and store video: %v", err)
-			}
-		case "audio":
-			// Process and store audio
-			feedURL, thumbnailURL, err = processAndStoreAudio(fileBytes)
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("failed to process and store audio: %v", err)
-			}
-		default:
-			return nil, nil, nil, nil, fmt.Errorf("unsupported file typexx")
-		}
+        // Define the folder name based on the file type
+        folderName := ""
+        switch fileType {
+        case "image":
+            folderName = "images"
+            feedURL, thumbnailURL, fullsizeURL, err = processAndStoreImage(fileBytes)
+            if err != nil {
+                return nil, nil, nil, nil, fmt.Errorf("failed to process and store image: %v", err)
+            }
+        case "video":
+            folderName = "videos"
+            feedURL, thumbnailURL, fullsizeURL, err = processAndStoreVideo(fileBytes)
+            if err != nil {
+                return nil, nil, nil, nil, fmt.Errorf("failed to process and store video: %v", err)
+            }
+        case "audio":
+            folderName = "audio"
+            feedURL, thumbnailURL, err = processAndStoreAudio(fileBytes)
+            if err != nil {
+                return nil, nil, nil, nil, fmt.Errorf("failed to process and store audio: %v", err)
+            }
+        default:
+            return nil, nil, nil, nil, fmt.Errorf("unsupported file type")
+        }
 
-		feedURLs = append(feedURLs, feedURL)
-		thumbnailURLs = append(thumbnailURLs, thumbnailURL)
-		fullsizeURLs = append(fullsizeURLs, fullsizeURL)
-		fileTypes = append(fileTypes, fileType)
-	}
+        // Upload the processed media to S3
+        feedURL, err = m.mediaRepo.UploadMediaToS3(file, fileHeader, bucketName, folderName)
+        if err != nil {
+            return nil, nil, nil, nil, fmt.Errorf("failed to upload media to S3: %v", err)
+        }
 
-	return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
+        // Append the URLs and file type to their respective slices
+        feedURLs = append(feedURLs, feedURL)
+        thumbnailURLs = append(thumbnailURLs, thumbnailURL)
+        fullsizeURLs = append(fullsizeURLs, fullsizeURL)
+        fileTypes = append(fileTypes, fileType)
+    }
+
+    return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
 }
+
 
 func getFileType(fileBytes []byte) string {
 	// Determine the file type based on the file signature (magic number)
