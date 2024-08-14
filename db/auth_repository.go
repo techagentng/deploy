@@ -247,7 +247,7 @@ func (a *authRepo) EditUserProfile(userID uint, userDetails *models.EditProfileR
 	}
 
 	// Update user details based on userDetails
-	user.Fullname = userDetails.Fullname
+	user.Fullname = userDetails.Name
 	user.Username = userDetails.Username
 	// Update other fields as needed
 
