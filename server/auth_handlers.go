@@ -791,6 +791,7 @@ func (s *Server) handleEditUserProfile() gin.HandlerFunc {
 
 func (s *Server) handleShowProfile() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Retrieve user ID from context
 		userID, ok := c.Get("userID")
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
@@ -810,29 +811,19 @@ func (s *Server) handleShowProfile() gin.HandlerFunc {
 			return
 		}
 
-		// // If user's thumbnail URL is empty, set it to the default thumbnail URL
-		// if user.ThumbNailURL == "" {
-		// 	user.ThumbNailURL = "default_thumbnail_url"
-		// }
-
-		user, err = s.AuthService.GetUserProfile(userIDStr)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
-			return
-		}
-
-		// Prepare response data
+		// Prepare response data with the necessary fields
 		responseData := gin.H{
-			"name":         user.Fullname,
-			"username":     user.Username,
 			"email":        user.Email,
+			"name":         user.Fullname,
 			"profileImage": user.ThumbNailURL,
+			"username":     user.Username,
 		}
 
-		// Return the response
+		// Return the response with the user's profile data
 		response.JSON(c, "User profile retrieved successfully", http.StatusOK, responseData, nil)
 	}
 }
+
 
 // Assuming you have imported necessary packages and defined your server and repository
 
