@@ -162,7 +162,7 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
         // Upload file to S3
         filepath, err := uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3xxx"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3"})
             return
         }
 
@@ -173,18 +173,20 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
             return
         }
 
-        // Create new image record for the user
+        // Update user image URL
         user.ThumbNailURL = filepath
-        if err := s.AuthRepository.CreateUserImage(user); err != nil {
+        if err := s.AuthRepository.UpsertUserImage(user.ID, filepath); err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
             return
         }
 
-        c.JSON(http.StatusOK, gin.H{"message": "File uploaded and user profile updated successfully"})
+        log.Println("Filepath:", filepath)
+        c.JSON(http.StatusOK, gin.H{
+            "message": "File uploaded and user profile updated successfully",
+            "url": filepath,
+        })
     }
 }
-
-
 
 func init() {
 	if _, err := os.Stat("uploads"); os.IsNotExist(err) {
@@ -827,10 +829,10 @@ func (s *Server) handleShowProfile() gin.HandlerFunc {
 			return
 		}
 
-		// If user's thumbnail URL is empty, set it to the default thumbnail URL
-		if user.ThumbNailURL == "" {
-			user.ThumbNailURL = "default_thumbnail_url"
-		}
+		// // If user's thumbnail URL is empty, set it to the default thumbnail URL
+		// if user.ThumbNailURL == "" {
+		// 	user.ThumbNailURL = "default_thumbnail_url"
+		// }
 
 		user, err = s.AuthService.GetUserProfile(userIDStr)
 		if err != nil {

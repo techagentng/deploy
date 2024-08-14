@@ -17,6 +17,9 @@ import (
 	"sync"
 	"time"
 
+	// "github.com/aws/aws-sdk-go-v2/aws"
+	// "github.com/aws/aws-sdk-go-v2/service/s3"
+	// "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -269,11 +272,14 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		userId := userI.(*models.User).ID
         fullNameI, _ := c.Get("fullName")
         usernameI, _ := c.Get("username")
-		// profileImageURLI, _ := c.Get("profile_image")
-		// if !exists {
-		// 	profileImageURLI = "default-profile-image-url" // Fallback if profile image URL is not set
-		// }
+		profileImageURLI, _ := c.Get("profile_image")
+		if !exists {
+			profileImageURLI = "default-profile-image-url" // Fallback if profile image URL is not set
+		}
+
+			ProfileImageURL:= profileImageURLI.(string)
 		
+
         fullName, ok := fullNameI.(string)
         if !ok {
             log.Println("Full name type assertion failed")
@@ -443,45 +449,54 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		log.Printf("Final State: %s, LGA: %s", reportType.StateName, reportType.LGAName) // Add logging to verify values before saving
 
 		incidentReport := &models.IncidentReport{
-			ID:                 reportID,
-			UserUsername: usernameString,
-			UserFullname: fullName,
-			ThumbnailURLs: "",
-			DateOfIncidence:    c.PostForm("date_of_incidence"),
-			StateName:          c.PostForm("state_name"),
-			LGAName:            c.PostForm("lga_name"),
-			Latitude:           lat,
-			Longitude:          lng,
-			UserID:             userId,
-			AdminID:            0,
-			Landmark:           c.PostForm("landmark"),
-			LikeCount:          0,
-			BookmarkedReports:  []*models.User{},
-			IsResponse:         false,
-			TimeofIncidence:    time.Now(),
-			ReportStatus:       "Pending",
-			RewardPoint:        0,
-			ActionTypeName:     "",
-			ReportTypeName:     c.PostForm("report_type"),
-			IsState:            false,
-			HospitalName:       c.PostForm("hospital_name"),
-			Department:         c.PostForm("department"),
-			DepartmentHeadName: c.PostForm("department_head_name"),
-			AccidentCause:      c.PostForm("accident_cause"),
-			SchoolName:         c.PostForm("school_name"),
-			VicePrincipal:      c.PostForm("vice_principal"),
-			OutageLength:       c.PostForm("outage_length"),
-			Rating:             c.PostForm("rating"),
-			AirportName:        c.PostForm("airport_name"),
-			Country:            c.PostForm("country"),
-			HospitalAddress:    c.PostForm("hospital_address"),
-			RoadName:           c.PostForm("road_name"),
-			AirlineName:        c.PostForm("airline_name"),
-			NoWater:            true,
+			ID:                   reportID,
+			CreatedAt:            0,
+			UserFullname:         fullName,
+			DateOfIncidence:      c.PostForm("date_of_incidence"),
+			Description:          c.PostForm("description"),
+			FeedURLs:             feedURL,
+			ThumbnailURLs:        ProfileImageURL,
+			FullSizeURLs:         fullsizeURL,
+			ProductName:          "",
+			StateName:            c.PostForm("state_name"),
+			LGAName:              c.PostForm("lga_name"),
+			Latitude:             lat,
+			Longitude:            lng,
+			UserIsAnonymous:      false,
+			Address:              "",
+			UserUsername:         usernameString,
+			Telephone:            "",
+			Email:                "",
+			View:                 0,
+			IsVerified:           false,
+			UserID:               userId,
+			ReportTypeID:         reportID,
+			AdminID:              0,
+			Landmark:             c.PostForm("landmark"),
+			LikeCount:            0,
+			BookmarkedReports:    []*models.User{},
+			IsResponse:           false,
+			TimeofIncidence:      time.Now(),
+			ReportStatus:         "Pending",
+			ReportTypeName:       c.PostForm("report_type"),
+			Rating:               c.PostForm("rating"),
+			HospitalName:         c.PostForm("hospital_name"),
+			Department:           c.PostForm("department"),
+			DepartmentHeadName:   c.PostForm("department_head_name"),
+			AccidentCause:        c.PostForm("accident_cause"),
+			SchoolName:           c.PostForm("school_name"),
+			VicePrincipal:        c.PostForm("vice_principal"),
+			OutageLength:         c.PostForm("outage_length"),
+			AirportName:          c.PostForm("airport_name"),
+			Country:              c.PostForm("country"),
+			StateEmbassyLocation: state,
+			NoWater:              true,
+			HospitalAddress:      c.PostForm("hospital_address"),
+			RoadName:             c.PostForm("road_name"),
+			AirlineName:          c.PostForm("airline_name"),
 			Category:             c.PostForm("category"),
-			Terminal: c.PostForm("terminal"),
-			QueueTime: c.PostForm("queue_time"),
-			Description: c.PostForm("description"),
+			Terminal:             c.PostForm("terminal"),
+			QueueTime:            c.PostForm("queue_time"),
 		}
 
 		sub := &models.SubReport{

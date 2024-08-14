@@ -758,5 +758,3 @@ func (i *incidentReportRepo) GetNamesByCategory(stateName string, lgaID string, 
     return names, nil
 }
 
-
-

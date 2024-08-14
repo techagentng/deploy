@@ -106,7 +106,7 @@ type UserImage struct {
 
 type EditProfileResponse struct {
 	ID          uint   `json:"id"`
-	Fullname    string `json:"fullname"`
+	Name    string `json:"fullname"`
 	Username    string `json:"username"`
 	PhoneNumber string `json:"phone_number"`
 	Email       string `json:"email"`

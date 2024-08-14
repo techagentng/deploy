@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
-
 	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
@@ -35,7 +33,7 @@ type AuthRepository interface {
 	SetUserOffline(user *models.User) error
 	GetOnlineUserCount() (int64, error)
 	GetAllUsers() ([]models.User, error)
-	CreateUserImage(user *models.User) error
+	UpsertUserImage(userID uint, filepath string) error
 }
 
 type authRepo struct {
@@ -216,28 +214,30 @@ func (a *authRepo) FindUserByMacAddress(macAddress string) (*models.LoginRequest
 	return &user, nil
 }
 
-func (a *authRepo) CreateUserImage(user *models.User) error {
-    // Assuming you have a UserImage model or similar
-    newUserImage := models.UserImage{
-        UserID:      user.ID,
-        ThumbNailURL: user.ThumbNailURL,
-        CreatedAt:   time.Now(),
-    }
+func (a *authRepo) UpsertUserImage(userID uint, filepath string) error {
+    var user models.User
+    // Find the user by ID
+    result := a.DB.Where("id = ?", userID).First(&user)
 
-    result := a.DB.Create(&newUserImage)
     if result.Error != nil {
-        log.Printf("Error creating user image in database: %v", result.Error)
+        if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+            // Record does not exist
+            return errors.New("user not found")
+        }
+        // Other errors
+        log.Printf("Error retrieving user record: %v", result.Error)
         return result.Error
     }
 
-    if result.RowsAffected == 0 {
-        log.Println("No rows affected when creating user image")
-        return errors.New("failed to create user image")
+    // Update the user's thumbnail URL
+    user.ThumbNailURL = filepath
+    if err := a.DB.Save(&user).Error; err != nil {
+        log.Printf("Error updating user thumbnail URL: %v", err)
+        return err
     }
 
     return nil
 }
-
 
 func (a *authRepo) EditUserProfile(userID uint, userDetails *models.EditProfileResponse) error {
 	// Fetch the user from the database
