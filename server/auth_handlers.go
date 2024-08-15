@@ -2,6 +2,7 @@ package server
 
 import (
 	// "bytes"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -12,6 +13,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strconv"
+
 	// "strconv"
 	"strings"
 	"time"
@@ -21,11 +24,11 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	// "github.com/aws/aws-sdk-go-v2/aws"
-	// "github.com/aws/aws-sdk-go-v2/config"
-	// "github.com/aws/aws-sdk-go-v2/credentials"
-	// "github.com/aws/aws-sdk-go-v2/service/s3"
-	// "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gin-gonic/gin"
 	"github.com/techagentng/citizenx/errors"
 	errs "github.com/techagentng/citizenx/errors"
@@ -34,55 +37,55 @@ import (
 	jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
 
-// func createS3Client() (*s3.Client, error) {
-//     cfg, err := config.LoadDefaultConfig(context.Background(),
-//         config.WithRegion(os.Getenv("AWS_REGION")),
-//         config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-//             os.Getenv("AWS_ACCESS_KEY_ID"),
-//             os.Getenv("AWS_SECRET_ACCESS_KEY"),
-//             "", 
-//         )),
-//     )
-//     if err != nil {
-//         return nil, fmt.Errorf("unable to load SDK config, %v", err)
-//     }
+func createS3Client() (*s3.Client, error) {
+    cfg, err := config.LoadDefaultConfig(context.Background(),
+        config.WithRegion(os.Getenv("AWS_REGION")),
+        config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+            os.Getenv("AWS_ACCESS_KEY_ID"),
+            os.Getenv("AWS_SECRET_ACCESS_KEY"),
+            "", 
+        )),
+    )
+    if err != nil {
+        return nil, fmt.Errorf("unable to load SDK config, %v", err)
+    }
 
-//     return s3.NewFromConfig(cfg), nil
-// }
+    return s3.NewFromConfig(cfg), nil
+}
 
 
-// func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key string) (string, error) {
-//     defer file.Close()
+func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key string) (string, error) {
+    defer file.Close()
 
-//     // Read the file content
-//     fileContent, err := io.ReadAll(file)
-//     if err != nil {
-//         fmt.Printf("Error reading file content: %v\n", err) // Log the error
-//         return "", fmt.Errorf("failed to read file content: %v", err)
-//     }
+    // Read the file content
+    fileContent, err := io.ReadAll(file)
+    if err != nil {
+        fmt.Printf("Error reading file content: %v\n", err) // Log the error
+        return "", fmt.Errorf("failed to read file content: %v", err)
+    }
 
 //     // Log bucket and key information
-//     fmt.Printf("Uploading to bucket: %s\n", bucketName)
-//     fmt.Printf("Uploading with key: %s\n", key)
+    fmt.Printf("Uploading to bucket: %s\n", bucketName)
+    fmt.Printf("Uploading with key: %s\n", key)
 
-//     // Upload the file to S3
-//     _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
-//         Bucket: aws.String(bucketName),
-//         Key:    aws.String(key),
-//         Body:   bytes.NewReader(fileContent),
-//         ACL:    types.ObjectCannedACLPublicRead, // Use proper type from SDK
-//     })
-//     if err != nil {
-//         fmt.Printf("Error uploading file to S3: %v\n", err) // Log the error
-//         return "", fmt.Errorf("failed to upload file to S3x: %v", err)
-//     }
+    // Upload the file to S3
+    _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
+        Bucket: aws.String(bucketName),
+        Key:    aws.String(key),
+        Body:   bytes.NewReader(fileContent),
+        ACL:    types.ObjectCannedACLPublicRead, // Use proper type from SDK
+    })
+    if err != nil {
+        fmt.Printf("Error uploading file to S3: %v\n", err) // Log the error
+        return "", fmt.Errorf("failed to upload file to S3x: %v", err)
+    }
 
-//     // Log successful upload
-//     fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), key)
-//     fmt.Printf("File uploaded successfully, URL: %s\n", fileURL) // Log the URL
+    // Log successful upload
+    fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), key)
+    fmt.Printf("File uploaded successfully, URL: %s\n", fileURL) // Log the URL
 
-//     return fileURL, nil
-// }
+    return fileURL, nil
+}
 
 // Define allowed MIME types and max file size
 const (
@@ -120,17 +123,17 @@ func isValidMimeType(mimeType string) bool {
 func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
     return func(c *gin.Context) {
         // Handle file upload
-        // file, fileHeader, err := c.Request.FormFile("profileImage")
-        // if err != nil {
-        //     c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid file"})
-        //     return
-        // }
+        file, fileHeader, err := c.Request.FormFile("profileImage")
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid file"})
+            return
+        }
 
         // Validate file type and size
-        // if err := validateFile(fileHeader); err != nil {
-        //     c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        //     return
-        // }
+        if err := validateFile(fileHeader); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+            return
+        }
 
         // Get the access token from the authorization header
         accessToken := getTokenFromHeader(c)
@@ -140,60 +143,60 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
         }
 
         // Validate and decode the access token to get the userID
-        // secret := s.Config.JWTSecret 
-        // accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
-        // if err != nil {
-        //     c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-        //     return
-        // }
+        secret := s.Config.JWTSecret 
+        accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+            return
+        }
 
-        // var userID uint
-        // switch userIDValue := accessClaims["id"].(type) {
-        // case float64:
-        //     userID = uint(userIDValue)
-        // default:
-        //     c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
-        //     return
-        // }
+        var userID uint
+        switch userIDValue := accessClaims["id"].(type) {
+        case float64:
+            userID = uint(userIDValue)
+        default:
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
+            return
+        }
 
         // Create S3 client
-        // s3Client, err := createS3Client()
-        // if err != nil {
-        //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create S3 client"})
-        //     return
-        // }
+        s3Client, err := createS3Client()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create S3 client"})
+            return
+        }
 
-        // userIDString := strconv.FormatUint(uint64(userID), 10)
+        userIDString := strconv.FormatUint(uint64(userID), 10)
 
         // Generate unique filename
-        // filename := userIDString + "_" + fileHeader.Filename
+        filename := userIDString + "_" + fileHeader.Filename
 
         // Upload file to S3
-        // filepath, err := uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
-        // if err != nil {
-        //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3xx"})
-        //     return
-        // }
+        filepath, err := uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3xx"})
+            return
+        }
 
         // Retrieve user from service
-        // user, err := s.AuthRepository.FindUserByID(userID)
-        // if err != nil {
-        //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
-        //     return
-        // }
+        user, err := s.AuthRepository.FindUserByID(userID)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+            return
+        }
 
         // Update user image URL
-        // user.ThumbNailURL = filepath
-        // if err := s.AuthRepository.UpsertUserImage(user.ID, filepath); err != nil {
-        //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
-        //     return
-        // }
+        user.ThumbNailURL = filepath
+        if err := s.AuthRepository.UpsertUserImage(user.ID, filepath); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
+            return
+        }
 
-        // log.Println("Filepath:", filepath)
-        // c.JSON(http.StatusOK, gin.H{
-        //     "message": "File uploaded and user profile updated successfully",
-        //     "url": filepath,
-        // })
+        log.Println("Filepath:", filepath)
+        c.JSON(http.StatusOK, gin.H{
+            "message": "File uploaded and user profile updated successfully",
+            "url": filepath,
+        })
     }
 }
 
@@ -217,33 +220,33 @@ func (s *Server) handleSignup() gin.HandlerFunc {
         var filePath string // This will hold the S3 URL
 
         // Get the profile image from the form
-        // file, handler, err := c.Request.FormFile("profile_image")
-        // if err == nil {
-        //     defer file.Close()
+        file, handler, err := c.Request.FormFile("profile_image")
+        if err == nil {
+            defer file.Close()
 
             // Create S3 client
-            // s3Client, err := createS3Client()
-            // if err != nil {
-            //     response.JSON(c, "", http.StatusInternalServerError, nil, err)
-            //     return
-            // }
+            s3Client, err := createS3Client()
+            if err != nil {
+                response.JSON(c, "", http.StatusInternalServerError, nil, err)
+                return
+            }
 
             // Generate unique filename
-            // userID := c.PostForm("user_id") 
-            // filename := fmt.Sprintf("%s_%s", userID, handler.Filename)
+            userID := c.PostForm("user_id") 
+            filename := fmt.Sprintf("%s_%s", userID, handler.Filename)
 
             // Upload file to S3
-            // filePath, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
-            // if err != nil {
-            //     response.JSON(c, "", http.StatusInternalServerError, nil, err)
-            //     return
-            // }
-        // } else if err == http.ErrMissingFile {
-        //     filePath = "uploads/default-profile.png" // Adjust this to a default S3 URL if necessary
-        // } else {
-        //     response.JSON(c, "", http.StatusBadRequest, nil, err)
-        //     return
-        // }
+            filePath, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
+            if err != nil {
+                response.JSON(c, "", http.StatusInternalServerError, nil, err)
+                return
+            }
+        } else if err == http.ErrMissingFile {
+            filePath = "uploads/default-profile.png" // Adjust this to a default S3 URL if necessary
+        } else {
+            response.JSON(c, "", http.StatusBadRequest, nil, err)
+            return
+        }
 
         // Decode the other form data into the user struct
         var user models.User
