@@ -74,7 +74,7 @@ func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key stri
     })
     if err != nil {
         fmt.Printf("Error uploading file to S3: %v\n", err) // Log the error
-        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+        return "", fmt.Errorf("failed to upload file to S3x: %v", err)
     }
 
     // Log successful upload
@@ -171,7 +171,7 @@ func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
         // Upload file to S3
         filepath, err := uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3xx"})
             return
         }
 

@@ -745,7 +745,7 @@ func (i *incidentReportRepo) uploadFileToS3(file multipart.File, bucketName, key
     // Step 5: Upload the file to S3
     _, err = svc.PutObject(context.TODO(), putObjectInput)
     if err != nil {
-        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+        return "", fmt.Errorf("failed to upload file to S3a: %v", err)
     }
 
     // Step 6: Construct and return the file URL
@@ -799,7 +799,7 @@ func (i *incidentReportRepo) UploadMediaToS3(file multipart.File, fileHeader *mu
     // Upload the file to S3
     fileURL, err := uploadFileToS3(client, file, bucketName, key)
     if err != nil {
-        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+        return "", fmt.Errorf("failed to upload file to S3b: %v", err)
     }
 
     return fileURL, nil
@@ -834,7 +834,7 @@ func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key stri
     if err != nil {
         // Log and return an error if the upload fails
         fmt.Printf("Error uploading file to S3: %v\n", err)
-        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+        return "", fmt.Errorf("failed to upload file to S3c: %v", err)
     }
 
     // Step 5: Construct the public URL for the uploaded file

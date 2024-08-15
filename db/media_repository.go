@@ -119,7 +119,7 @@ func (repo *mediaRepo) UploadMediaToS3(file multipart.File, fileHeader *multipar
     // Upload the file to S3
     fileURL, err := uploadFileToS3(client, file, bucketName, key)
     if err != nil {
-        return "", fmt.Errorf("failed to upload file to S3: %v", err)
+        return "", fmt.Errorf("failed to upload file to S3d: %v", err)
     }
 
     return fileURL, nil
