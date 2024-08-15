@@ -711,36 +711,46 @@ func (i *incidentReportRepo) GetTotalReportCount() (int64, error) {
     return count, nil
 }
 
-func (i *incidentReportRepo) UploadFileToS3(file multipart.File, fileName string, size int64) (string, error) {
-    // Create an S3 client
-    client, err := createS3Client()
+func (i *incidentReportRepo) uploadFileToS3(file multipart.File, bucketName, key string) (string, error) {
+    defer file.Close()
+
+    // Step 1: Load the AWS config with environment credentials
+    cfg, err := config.LoadDefaultConfig(context.TODO(),
+        config.WithRegion(os.Getenv("AWS_REGION")),
+        config.WithCredentialsProvider(
+            credentials.NewStaticCredentialsProvider(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), ""),
+        ),
+    )
     if err != nil {
-        return "", fmt.Errorf("failed to create S3 client: %v", err)
+        return "", fmt.Errorf("unable to load AWS config: %v", err)
     }
 
-    // Step 1: Read the file content into a buffer
-    buffer := make([]byte, size)
-    _, err = file.Read(buffer)
+    // Step 2: Create an S3 client with the configured credentials
+    svc := s3.NewFromConfig(cfg)
+
+    // Step 3: Read the file content into memory
+    fileContent, err := io.ReadAll(file)
     if err != nil {
         return "", fmt.Errorf("failed to read file content: %v", err)
     }
 
-    // Step 2: Upload the file to S3
-    _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
-        Bucket:      aws.String(os.Getenv("S3_BUCKET_NAME")), // Specify the S3 bucket name
-        Key:         aws.String(fileName),                   // Specify the file name
-        Body:        bytes.NewReader(buffer),                // Use the buffer as the body
-        ACL:         types.ObjectCannedACLPublicRead,        // Set the ACL to public-read
-        ContentType: aws.String("application/octet-stream"), // Set a default content type
-    })
+    // Step 4: Prepare the S3 PutObjectInput
+    putObjectInput := &s3.PutObjectInput{
+        Bucket: aws.String(bucketName),
+        Key:    aws.String(key),
+        Body:   bytes.NewReader(fileContent),
+        ACL:    "public-read", // Set the ACL to public-read
+    }
+
+    // Step 5: Upload the file to S3
+    _, err = svc.PutObject(context.TODO(), putObjectInput)
     if err != nil {
         return "", fmt.Errorf("failed to upload file to S3: %v", err)
     }
 
-    // Step 3: Construct the file URL
-    url := fmt.Sprintf("https://%s.s3.amazonaws.com/%s", os.Getenv("S3_BUCKET_NAME"), fileName)
-
-    return url, nil
+    // Step 6: Construct and return the file URL
+    fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), key)
+    return fileURL, nil
 }
 
 func (i *incidentReportRepo) GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error) {
