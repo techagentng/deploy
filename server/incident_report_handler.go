@@ -470,7 +470,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			BookmarkedReports:    []*models.User{},
 			IsResponse:           false,
 			TimeofIncidence:      time.Now(),
-			ReportStatus:         "Pending",
+			ReportStatus:         "Verified",
 			ReportTypeName:       c.PostForm("report_type"),
 			Rating:               c.PostForm("rating"),
 			HospitalName:         c.PostForm("hospital_name"),
