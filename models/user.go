@@ -106,11 +106,11 @@ type UserImage struct {
 
 type EditProfileResponse struct {
 	ID          uint   `json:"id"`
-	Name    string `json:"fullname"`
+	FullName    string `json:"fullname"`
 	Username    string `json:"username"`
-	PhoneNumber string `json:"phone_number"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
+	Phone string `json:"phone"`
+	State       string `json:"state"`
+	Lga    string `json:"lga"`
 }
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`

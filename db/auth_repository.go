@@ -239,17 +239,22 @@ func (a *authRepo) UpsertUserImage(userID uint, filepath string) error {
     return nil
 }
 
+// Repository method to update user profile in the database
 func (a *authRepo) EditUserProfile(userID uint, userDetails *models.EditProfileResponse) error {
 	// Fetch the user from the database
-	user := models.User{}
+	var user models.User
 	if err := a.DB.First(&user, userID).Error; err != nil {
 		return err // return error if user not found
 	}
 
-	// Update user details based on userDetails
-	user.Fullname = userDetails.Name
-	user.Username = userDetails.Username
-	// Update other fields as needed
+	// Update user fields based on the userDetails
+	if userDetails.FullName != "" {
+		user.Fullname = userDetails.FullName
+	}
+	if userDetails.Username != "" {
+		user.Username = userDetails.Username
+	}
+	// Update other fields as needed (e.g., profile image, email, etc.)
 
 	// Perform the update operation
 	if err := a.DB.Save(&user).Error; err != nil {
