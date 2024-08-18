@@ -60,7 +60,7 @@ func migrate(db *gorm.DB) error {
 		&models.Notification{},
 		&models.Comment{},
 		&models.ReportType{},
-		&models.SubReport{},
+		
 		&models.LGA{},
 		&models.State{},
 		&models.BookmarkReport{},
@@ -69,6 +69,7 @@ func migrate(db *gorm.DB) error {
 		&models.LoginRequestMacAddress{},
 		&models.UserImage{},
 		&models.ReportCount{},
+		&models.SubReport{},
 	)
 	if err != nil {
 		return fmt.Errorf("migrations error: %v", err)

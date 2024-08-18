@@ -274,7 +274,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
         usernameI, _ := c.Get("username")
 		profileImageURLI, _ := c.Get("profile_image")
 		if !exists {
-			profileImageURLI = "default-profile-image-url" // Fallback if profile image URL is not set
+			profileImageURLI = "default-profile-image-url" 
 		}
 
 			ProfileImageURL:= profileImageURLI.(string)
@@ -495,10 +495,6 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		sub := &models.SubReport{
 			ID:                 reportID,
 			ReportTypeID:       reportID,
-			LGAID:              c.PostForm("lga"),
-			UserID:             userId,
-			StateName:          c.PostForm("state_name"),
-			ReportTypeCategory: c.PostForm("category"),
 			SubReportType: c.PostForm("sub_report_type"),
 		}
 
