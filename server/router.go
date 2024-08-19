@@ -131,7 +131,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/report/sub_reports", s.HandleGetSubReportsByCategory())
 	authorized.PUT("/report/upvote/:reportID", s.HandleUpvoteReport())
 	authorized.PUT("/report/downvote/:reportID", s.HandleDownvoteReport())
-	// authorized.PUT("/user/medications/:medicationID", s.handleUpdateMedication())
+	authorized.GET("/user/reports", s.HandleGetAllReportsByUser())
 	// authorized.GET("/user/medications/next", s.handleGetNextMedication())
 	// authorized.GET("/user/medications/search", s.handleFindMedication())
 

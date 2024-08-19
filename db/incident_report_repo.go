@@ -61,6 +61,7 @@ type IncidentReportRepository interface {
 	SaveReportType(reportType *models.ReportType) (*models.ReportType, error)
 	SaveSubReport(subReport *models.SubReport) (*models.SubReport, error)
 	GetSubReportsByCategory(category string) ([]models.SubReport, error)
+	GetAllReportsByUser(userID uint, page int) ([]models.IncidentReport, error)
 }
 
 type incidentReportRepo struct {
@@ -879,4 +880,20 @@ func (repo *incidentReportRepo) GetSubReportsByCategory(category string) ([]mode
     }
 
     return subReports, nil
+}
+
+func (repo *incidentReportRepo) GetAllReportsByUser(userID uint, page int) ([]models.IncidentReport, error) {
+	var reports []models.IncidentReport
+	// Calculate the offset
+	offset := (page - 1) * 20
+
+	// Query the reports by user ID with pagination
+	err := repo.DB.Where("user_id = ?", userID).Limit(20).Offset(offset).Order("timeof_incidence DESC").Find(&reports).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("no incident reports found for this user")
+		}
+		return nil, err
+	}
+	return reports, nil
 }
