@@ -8,13 +8,8 @@ import (
 
 // LikeService interface
 type LikeService interface {
-	// Define methods for handling likes
-	// Example:
-	LikeReport(userID uint, postID string) error
-	// UnlikeReport(userID uint, reportID uint64) error
-	// UnlikePost(userID uint, postID uint) error
-	// IsPostLikedByUser(userID uint, postID uint) (bool, error)
-	// Add other methods as per your requirements
+	LikeReport(userID uint, reportID string) error
+	DislikeReport(userID uint, reportID string) error
 }
 
 // likeService struct
@@ -31,8 +26,15 @@ func NewLikeService(likeRepo db.LikeRepository, conf *config.Config) LikeService
 	}
 }
 
+// LikeReport handles the logic for liking a report
 func (lk *likeService) LikeReport(userID uint, reportID string) error {
 	var like models.Like
 	like.UserID = userID
 	return lk.likeRepo.LikePost(userID, reportID, like)
 }
+
+// DislikeReport handles the logic for disliking a report
+func (lk *likeService) DislikeReport(userID uint, reportID string) error {
+	return lk.likeRepo.DislikeReport(userID, reportID)
+}
+

@@ -39,11 +39,19 @@ type User struct {
 	MacAddress     string         `json:"mac_address"`
 	LGAName        string         `gorm:"foreignKey:Name"`
 	Online         bool           `json:"online"`
+	Upvotes        int             `json:"upvote"`
+    Downvotes      int             `json:"downvote"`
 }
 
 type Admin struct {
 	Model
 	Status bool `json:"is_admin"`
+}
+
+type UserPoints struct {
+	Model
+	UserID string `json:"user_id"`
+	Points int    `json:"points"`
 }
 
 // CreateSocialUserParams represents the parameters required to create a new social user.
@@ -106,11 +114,11 @@ type UserImage struct {
 
 type EditProfileResponse struct {
 	ID          uint   `json:"id"`
-	Name    string `json:"fullname"`
+	FullName    string `json:"fullname"`
 	Username    string `json:"username"`
-	PhoneNumber string `json:"phone_number"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
+	Phone string `json:"phone"`
+	State       string `json:"state"`
+	Lga    string `json:"lga"`
 }
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`

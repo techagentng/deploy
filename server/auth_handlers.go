@@ -750,6 +750,7 @@ func (s *Server) handleLogout() gin.HandlerFunc {
 	}
 }
 
+// Handler for updating user profile
 func (s *Server) handleEditUserProfile() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the access token from the authorization header
@@ -760,7 +761,7 @@ func (s *Server) handleEditUserProfile() gin.HandlerFunc {
 		}
 
 		// Validate and decode the access token to get the userID
-		secret := s.Config.JWTSecret // Adjust this based on your application's configuration
+		secret := s.Config.JWTSecret
 		accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
@@ -770,7 +771,7 @@ func (s *Server) handleEditUserProfile() gin.HandlerFunc {
 		// Extract userID from accessClaims
 		userIDValue, ok := accessClaims["id"]
 		if !ok {
-			respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("UserID not found in claims", http.StatusBadRequest))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "UserID not found in claims"})
 			return
 		}
 
@@ -780,7 +781,7 @@ func (s *Server) handleEditUserProfile() gin.HandlerFunc {
 		case float64:
 			userID = uint(v)
 		default:
-			respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("Invalid userID format", http.StatusBadRequest))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
 			return
 		}
 
@@ -797,7 +798,7 @@ func (s *Server) handleEditUserProfile() gin.HandlerFunc {
 			return
 		}
 
-		response.JSON(c, "User details updated successfully", http.StatusOK, nil, nil)
+		c.JSON(http.StatusOK, gin.H{"message": "User details updated successfully"})
 	}
 }
 

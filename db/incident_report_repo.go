@@ -45,7 +45,7 @@ type IncidentReportRepository interface {
 	GetAllReportsByStateByTime(state string, startTime, endTime time.Time, page int) ([]models.IncidentReport, error)
 	GetReportsByTypeAndLGA(reportType string, lga string) ([]models.SubReport, error)
 	GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, []models.StateReportCount, error)
-	SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error
+	SaveStateLgaReportType(lga *models.LGA, state *models.State) error
 	GetIncidentMarkers() ([]Marker, error)
 	DeleteByID(id string) error
 	GetStateReportCounts() ([]models.StateReportCount, error)
@@ -58,6 +58,9 @@ type IncidentReportRepository interface {
 	GetTotalReportCount() (int64, error)
 	GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error)
 	UploadMediaToS3(file multipart.File, fileHeader *multipart.FileHeader, bucketName, folderName string) (string, error)
+	SaveReportType(reportType *models.ReportType) (*models.ReportType, error)
+	SaveSubReport(subReport *models.SubReport) (*models.SubReport, error)
+	GetSubReportsByCategory(category string) ([]models.SubReport, error)
 }
 
 type incidentReportRepo struct {
@@ -472,34 +475,26 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
 }
 
 // SaveReportTypeAndSubReport saves both ReportType and SubReport in a transaction
-func (repo *incidentReportRepo) SaveStateLgaReportType(lga *models.LGA, state *models.State, reportType *models.ReportType, subReport *models.SubReport) error {
+func (repo *incidentReportRepo) SaveStateLgaReportType(lga *models.LGA, state *models.State) error {
 	// Start a transaction
 	tx := repo.DB.Begin()
 
-	// Commit ReportType to the database
-	if err := tx.Create(reportType).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	// Commit SubReport to the database
-	if err := tx.Create(subReport).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
+	// Commit LGA to the database
 	if err := tx.Create(lga).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
 
+	// Commit State to the database
 	if err := tx.Create(state).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
+
 	// Commit the transaction
 	return tx.Commit().Error
 }
+
 
 type Marker struct {
 	Lat   float64 `json:"lat"`
@@ -847,3 +842,41 @@ func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key stri
     return fileURL, nil
 }
 
+func (i *incidentReportRepo) SaveReportType(reportType *models.ReportType) (*models.ReportType, error) {
+    // Save the new ReportType to the database
+    if err := i.DB.Create(&reportType).Error; err != nil {
+        return nil, fmt.Errorf("failed to save report type: %v", err)
+    }
+
+    return reportType, nil
+}
+
+// SaveSubReport saves the sub report to the database.
+func (i *incidentReportRepo) SaveSubReport(subReport *models.SubReport) (*models.SubReport, error) {
+	// Save the new SubReport to the database
+	if err := i.DB.Create(&subReport).Error; err != nil {
+		return nil, fmt.Errorf("failed to save sub report: %v", err)
+	}
+
+	return subReport, nil
+}
+
+func (repo *incidentReportRepo) GetSubReportsByCategory(category string) ([]models.SubReport, error) {
+    var subReports []models.SubReport
+
+    // Query to get sub-reports for the specified report type category
+    query := `
+        SELECT sr.*
+        FROM sub_reports sr
+        JOIN report_types rt ON sr.report_type_id = rt.id
+        WHERE rt.category = ?
+    `
+
+    // Execute the query with the category parameter
+    err := repo.DB.Raw(query, category).Scan(&subReports).Error
+    if err != nil {
+        return nil, fmt.Errorf("could not fetch sub-reports: %v", err)
+    }
+
+    return subReports, nil
+}

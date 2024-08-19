@@ -274,7 +274,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
         usernameI, _ := c.Get("username")
 		profileImageURLI, _ := c.Get("profile_image")
 		if !exists {
-			profileImageURLI = "default-profile-image-url" // Fallback if profile image URL is not set
+			profileImageURLI = "default-profile-image-url" 
 		}
 
 			ProfileImageURL:= profileImageURLI.(string)
@@ -494,11 +494,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 
 		sub := &models.SubReport{
 			ID:                 reportID,
-			ReportTypeID:       reportID,
-			LGAID:              c.PostForm("lga"),
-			UserID:             userId,
-			StateName:          c.PostForm("state_name"),
-			ReportTypeCategory: c.PostForm("category"),
+			ReportTypeID:       reportType.ID,
 			SubReportType: c.PostForm("sub_report_type"),
 		}
 
@@ -508,10 +504,25 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			reportType.LGAName = locality
 		}
 
-		err = s.IncidentReportRepository.SaveStateLgaReportType(lga, stateStruct, reportType, sub)
+		// Call repo to save the report type
+		_, err = s.IncidentReportRepository.SaveReportType(reportType)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": "Unable to save report",
+				"message": "Unable to save report type",
+				"error":   err.Error(),
+			})
+			return
+		}
+
+		_, err = s.IncidentReportRepository.SaveSubReport(sub)
+		if err != nil {
+			return
+		}
+		
+		err = s.IncidentReportRepository.SaveStateLgaReportType(lga, stateStruct)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Unable to save LGA & State",
 				"error":   err.Error(),
 			})
 			return
@@ -1251,6 +1262,23 @@ func (s *Server) handleGetNamesByCategory() gin.HandlerFunc {
     }
 }
 
+func (s *Server) HandleGetSubReportsByCategory() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Extract the category from query parameters
+        category := c.Query("category")
+        if category == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Category is required"})
+            return
+        }
 
+        // Fetch sub-reports from the repository
+        subReports, err := s.IncidentReportRepository.GetSubReportsByCategory(category)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
 
-
+        // Respond with the sub-reports data
+        c.JSON(http.StatusOK, gin.H{"data": subReports})
+    }
+}
