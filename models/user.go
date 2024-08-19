@@ -39,8 +39,8 @@ type User struct {
 	MacAddress     string         `json:"mac_address"`
 	LGAName        string         `gorm:"foreignKey:Name"`
 	Online         bool           `json:"online"`
-	Upvotes        int             `json:"upvote"`
-    Downvotes      int             `json:"downvote"`
+	Upvotes        int             `json:"up_vote"`
+    Downvotes      int             `json:"down_vote"`
 }
 
 type Admin struct {

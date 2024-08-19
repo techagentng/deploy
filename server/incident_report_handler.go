@@ -1282,3 +1282,4 @@ func (s *Server) HandleGetSubReportsByCategory() gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{"data": subReports})
     }
 }
+

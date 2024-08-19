@@ -30,7 +30,7 @@ func NewLikeService(likeRepo db.LikeRepository, conf *config.Config) LikeService
 func (lk *likeService) LikeReport(userID uint, reportID string) error {
 	var like models.Like
 	like.UserID = userID
-	return lk.likeRepo.LikePost(userID, reportID, like)
+	return lk.likeRepo.UpvoteReport(userID, reportID)
 }
 
 // DislikeReport handles the logic for disliking a report
