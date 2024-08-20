@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -11,7 +12,6 @@ import (
 
 type IncidentReportService interface {
 	SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error)
-	SaveBookmarkReport(bookmark *models.BookmarkReport) error
 	GetAllReports(page int) ([]models.IncidentReport, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByLGA(lga string, page int) ([]models.IncidentReport, error)
@@ -24,6 +24,7 @@ type IncidentReportService interface {
 	ListAllStatesWithReportCounts() ([]models.StateReportCount, error)
 	GetTotalReportCount() (int64, error)
 	GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error)
+	BookmarkReport(userID uint, reportID string) error
 }
 
 type IncidentService struct {
@@ -144,15 +145,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 	return reportResponse, nil
 }
 
-func (s *IncidentService) SaveBookmarkReport(bookmark *models.BookmarkReport) error {
-	err := s.incidentRepo.SaveBookmarkReport(bookmark)
-	if err != nil {
-		// Handle error
-		return err
-	}
-	return nil
-}
-
 func (s *IncidentService) GetAllReports(page int) ([]models.IncidentReport, error) {
 	return s.incidentRepo.GetAllReports(page)
 }
@@ -214,4 +206,21 @@ func (s *IncidentService) GetNamesByCategory(stateName string, lgaID string, rep
     return names, nil
 }
 
+func (s *IncidentService) BookmarkReport(userID uint, reportID string) error {
+	// Check if the report is already bookmarked by the user
+	var bookmark models.Bookmark
+	err := s.incidentRepo.IsBookmarked(userID, reportID, &bookmark)
+	if err == nil {
+		// Report is already bookmarked, return an appropriate response
+		return errors.New("report already bookmarked")
+	}
 
+	// Create a new bookmark
+	bookmark = models.Bookmark{
+		UserID:   userID,
+		ReportID: reportID,
+	}
+
+	// Save the bookmark
+	return s.incidentRepo.SaveBookmark(&bookmark)
+}

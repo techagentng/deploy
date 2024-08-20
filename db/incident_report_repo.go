@@ -25,7 +25,6 @@ const (
 )
 
 type IncidentReportRepository interface {
-	SaveBookmarkReport(bookmark *models.BookmarkReport) error
 	SaveIncidentReport(report *models.IncidentReport) (*models.IncidentReport, error)
 	HasPreviousReports(userID uint) (bool, error)
 	UpdateReward(userID uint, reward *models.Reward) error
@@ -62,6 +61,8 @@ type IncidentReportRepository interface {
 	SaveSubReport(subReport *models.SubReport) (*models.SubReport, error)
 	GetSubReportsByCategory(category string) ([]models.SubReport, error)
 	GetAllReportsByUser(userID uint, page int) ([]models.IncidentReport, error)
+	IsBookmarked(userID uint, reportID string, bookmark *models.Bookmark) error
+	SaveBookmark(bookmark *models.Bookmark) error
 }
 
 type incidentReportRepo struct {
@@ -162,29 +163,6 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 		return nil, err
 	}
 	return &report, nil
-}
-
-func (repo *incidentReportRepo) SaveBookmarkReport(bookmark *models.BookmarkReport) error {
-	tx := repo.DB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	if err := tx.Create(bookmark).Error; err != nil {
-		tx.Rollback()
-		log.Printf("Error creating bookmark: %v", err)
-		return err
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		log.Printf("Error committing transaction: %v", err)
-		return err
-	}
-
-	log.Printf("Bookmark saved successfully: %+v", bookmark)
-	return nil
 }
 
 func (repo *incidentReportRepo) GetAllReports(page int) ([]models.IncidentReport, error) {
@@ -896,4 +874,12 @@ func (repo *incidentReportRepo) GetAllReportsByUser(userID uint, page int) ([]mo
 		return nil, err
 	}
 	return reports, nil
+}
+
+func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID string, bookmark *models.Bookmark) error {
+	return repo.DB.Where("user_id = ? AND report_id = ?", userID, reportID).First(bookmark).Error
+}
+
+func (repo *incidentReportRepo) SaveBookmark(bookmark *models.Bookmark) error {
+	return repo.DB.Create(bookmark).Error
 }

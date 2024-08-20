@@ -63,7 +63,7 @@ func migrate(db *gorm.DB) error {
 		
 		&models.LGA{},
 		&models.State{},
-		&models.BookmarkReport{},
+		&models.Bookmark{},
 		&models.StateReportPercentage{},
 		&models.MediaCount{},
 		&models.LoginRequestMacAddress{},

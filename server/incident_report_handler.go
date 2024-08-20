@@ -467,7 +467,6 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			AdminID:              0,
 			Landmark:             c.PostForm("landmark"),
 			LikeCount:            0,
-			BookmarkedReports:    []*models.User{},
 			IsResponse:           false,
 			TimeofIncidence:      time.Now(),
 			ReportStatus:         "Verified",
@@ -1333,4 +1332,34 @@ func (s *Server) HandleGetVoteCounts() gin.HandlerFunc {
             "downvotes": downvotes,
         })
     }
+}
+
+func (s *Server) HandleBookmarkReport() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Extract user ID from context
+		userIDCtx, ok := c.Get("userID")
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "userID not found in context"})
+			return
+		}
+
+		// Assert the userID type
+		userID, ok := userIDCtx.(uint)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "userID is not of type uint"})
+			return
+		}
+
+		// Extract reportID from request parameters
+		reportID := c.Param("reportID")
+
+		// Call the bookmark service
+		err := s.IncidentReportService.BookmarkReport(userID, reportID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Report bookmarked successfully"})
+	}
 }

@@ -1,7 +1,10 @@
 package models
 
-type BookmarkReport struct {
-	ID       string `json:"id" gorm:"primaryKey"`
-	UserID   uint   `json:"user_id" gorm:"foreignKey:ID"`
-	ReportID string `json:"report_id"`
+import "time"
+
+type Bookmark struct {
+	ID        uint   `gorm:"primaryKey"`
+	UserID    uint   `gorm:"not null"`
+	ReportID  string `gorm:"not null"` 
+	CreatedAt time.Time
 }
