@@ -1363,3 +1363,35 @@ func (s *Server) HandleBookmarkReport() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": "Report bookmarked successfully"})
 	}
 }
+
+func (s *Server) HandleGetBookmarkedReports() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Extract user ID from context
+        userIDCtx, ok := c.Get("userID")
+        if !ok {
+            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("userID not found in context", http.StatusInternalServerError))
+            return
+        }
+
+        // Assert the type of userID as uint
+        userID, ok := userIDCtx.(uint)
+        if !ok {
+            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("userID is not of type uint", http.StatusInternalServerError))
+            return
+        }
+
+        // Fetch bookmarked reports
+        bookmarkedReports, err := s.IncidentReportService.GetBookmarkedReports(userID)
+        if err != nil {
+            response.JSON(c, "", http.StatusInternalServerError, nil, err)
+            return
+        }
+
+        // Return the bookmarked reports
+        c.JSON(http.StatusOK, gin.H{
+            "bookmarked_reports": bookmarkedReports,
+        })
+    }
+}
+
+

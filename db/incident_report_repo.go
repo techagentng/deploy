@@ -63,6 +63,7 @@ type IncidentReportRepository interface {
 	GetAllReportsByUser(userID uint, page int) ([]models.IncidentReport, error)
 	IsBookmarked(userID uint, reportID string, bookmark *models.Bookmark) error
 	SaveBookmark(bookmark *models.Bookmark) error
+	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 }
 
 type incidentReportRepo struct {
@@ -883,3 +884,24 @@ func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID string, bookm
 func (repo *incidentReportRepo) SaveBookmark(bookmark *models.Bookmark) error {
 	return repo.DB.Create(bookmark).Error
 }
+
+func (repo *incidentReportRepo) GetBookmarkedReports(userID uint) ([]models.IncidentReport, error) {
+    var reports []models.IncidentReport
+    
+    log.Printf("Retrieving bookmarked reports for userID: %d", userID)
+    
+    err := repo.DB.
+        Joins("JOIN incident_report_user ON incident_report_user.incident_report_id = incident_reports.id").
+        Where("incident_report_user.user_id = ?", userID).
+        Find(&reports).Error
+    
+    if err != nil {
+        log.Printf("Error retrieving reports: %v", err)
+        return nil, err
+    }
+    
+    log.Printf("Found reports: %v", reports)
+    
+    return reports, nil
+}
+

@@ -104,6 +104,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.PUT("/me/updateUserProfile", s.handleEditUserProfile())
 	authorized.GET("/me", s.handleShowProfile())
 	authorized.GET("/user/bookmark/:reportID", s.HandleBookmarkReport())
+	authorized.GET("/user/bookmark", s.HandleGetBookmarkedReports())
 	authorized.GET("/approve/:reportID/:userID/report", s.handleApproveReportPoints())
 	authorized.GET("/reject/:reportID/:userID/report", s.handleRejectReportPoints())
 	authorized.GET("/accept/:reportID/:userID/report", s.handleAcceptReportPoints())

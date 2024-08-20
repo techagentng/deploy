@@ -29,7 +29,7 @@ type IncidentReport struct {
 	AdminID              uint      `json:"is_admin" gorm:"foreignKey:Status"` // admin
 	Landmark             string    `json:"landmark"`
 	LikeCount            int       `json:"like_count" gorm:"foreignKey:Count"`
-	BookmarkedReports    []*User   `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
+	BookmarkedReports []*User     `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
 	IsResponse           bool      `json:"is_response"`
 	TimeofIncidence      time.Time `json:"time_of_incidence"`
 	ReportStatus         string    `json:"report_status"`

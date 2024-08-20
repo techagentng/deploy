@@ -41,6 +41,7 @@ type User struct {
 	Online         bool           `json:"online"`
 	Upvotes        int             `json:"up_vote"`
     Downvotes      int             `json:"down_vote"`
+	BookmarkedReports  []*IncidentReport `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
 }
 
 type Admin struct {

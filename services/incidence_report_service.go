@@ -25,6 +25,7 @@ type IncidentReportService interface {
 	GetTotalReportCount() (int64, error)
 	GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error)
 	BookmarkReport(userID uint, reportID string) error
+	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 }
 
 type IncidentService struct {
@@ -224,3 +225,9 @@ func (s *IncidentService) BookmarkReport(userID uint, reportID string) error {
 	// Save the bookmark
 	return s.incidentRepo.SaveBookmark(&bookmark)
 }
+
+func (s *IncidentService) GetBookmarkedReports(userID uint) ([]models.IncidentReport, error) {
+    // Call the repository method to get the bookmarked reports
+    return s.incidentRepo.GetBookmarkedReports(userID)
+}
+
