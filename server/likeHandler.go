@@ -56,7 +56,7 @@ func (s *Server) HandleDownvoteReport() gin.HandlerFunc {
 		}
 
 		reportID := c.Param("reportID")
-		err := s.LikeService.DislikeReport(userID, reportID)
+		err := s.LikeService.DownVoteReport(userID, reportID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

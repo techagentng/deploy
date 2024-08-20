@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/pkg/errors"
@@ -14,8 +15,9 @@ type LikeRepository interface {
 	UpdateUserPoints(userID uint, points int) error
 	RecordVote(userID uint, reportID string, voteType string) error
 	BeginTransaction() *gorm.DB
-	DislikeReport(userID uint, reportID string) error
+	DownVoteReport(userID uint, reportID string) error
 	UpvoteReport(userID uint, reportID string) error
+	GetUpvoteAndDownvoteCounts(reportID string) (int, int, error)
 }
 
 // likeRepo struct
@@ -28,33 +30,41 @@ func NewLikeRepo(db *GormDB) LikeRepository {
 	return &likeRepo{db.DB}
 }
 
-
 func (lk *likeRepo) UpvoteReport(userID uint, reportID string) error {
+    // Start a transaction to ensure consistency
+    tx := lk.DB.Begin()
+
     // Check if the user has already upvoted this report
     var existingVote models.Votes
-    if err := lk.DB.Where("user_id = ? AND report_id = ? AND vote_type = ?", userID, reportID, "upvote").First(&existingVote).Error; err == nil {
-        // User has already upvoted, do nothing
+    if err := tx.Where("user_id = ? AND report_id = ? AND vote_type = ?", userID, reportID, "upvote").First(&existingVote).Error; err == nil {
+        // User has already upvoted, rollback and return
+		log.Println("User has already upvoted, rolling back transaction")
+        tx.Rollback()
         return nil
     }
 
-    // If no existing upvote, proceed to increment the upvote count
-    if err := lk.DB.Model(&models.IncidentReport{}).Where("id = ?", reportID).UpdateColumn("upvote_count", gorm.Expr("upvote_count + 1")).Error; err != nil {
-        return err
-    }
-
+    // Increment the upvote count using the Update method
+	if err := tx.Model(&models.IncidentReport{}).Where("id = ?", reportID).Update("upvote_count", gorm.Expr("upvote_count + ?", 1)).Error; err != nil {
+		log.Println("Failed to update upvote count, rolling back")
+		tx.Rollback()
+		return fmt.Errorf("failed to update upvote count: %w", err)
+	}
+	
+	log.Println("Recording vote")
     // Record the upvote in the votes table
     vote := models.Votes{
         UserID:   userID,
         ReportID: reportID,
         VoteType: "upvote",
     }
-    if err := lk.DB.Create(&vote).Error; err != nil {
+    if err := tx.Create(&vote).Error; err != nil {
+        tx.Rollback() // Rollback transaction on error
         return err
     }
-
-    return nil
+	log.Println("Committing transaction")
+    // Commit the transaction
+    return tx.Commit().Error
 }
-
 
 func (r *likeRepo) GetUserPoints(userID uint) (int, error) {
 	var userPoints models.UserPoints
@@ -77,9 +87,9 @@ func (r *likeRepo) BeginTransaction() *gorm.DB {
 	return r.DB.Begin()
 }
 
-// DislikeReport handles the logic for disliking a report with transaction management
-func (r *likeRepo) DislikeReport(userID uint, reportID string) error {
-    log.Printf("DislikeReport called: userID = %d, reportID = %s", userID, reportID)
+// DownVoteReport handles the logic for disliking a report with transaction management
+func (r *likeRepo) DownVoteReport(userID uint, reportID string) error {
+    log.Printf("DownVoteReport called: userID = %d, reportID = %s", userID, reportID)
     
     tx := r.BeginTransaction()
     if tx == nil {
@@ -103,3 +113,11 @@ func (r *likeRepo) DislikeReport(userID uint, reportID string) error {
     return tx.Commit().Error
 }
 
+// GetUpvoteAndDownvoteCounts retrieves the upvote and downvote counts for a report.
+func (r *likeRepo) GetUpvoteAndDownvoteCounts(reportID string) (int, int, error) {
+    var report models.IncidentReport
+    if err := r.DB.Select("upvote_count, downvote_count").Where("id = ?", reportID).First(&report).Error; err != nil {
+        return 0, 0, err
+    }
+    return report.UpvoteCount, report.DownvoteCount, nil
+}

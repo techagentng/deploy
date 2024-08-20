@@ -58,8 +58,8 @@ type IncidentReport struct {
 	Terminal            string    `json:"terminal"`
 	QueueTime           string    `json:"queue_time"`
 	SubReportType       string    `json:"sub_report_type" gorm:"foreignKey:Type"`
-	UpvoteCount        int             `json:"upvote_count"`
-	DownvoteCount        int             `json:"downvote_count"`
+	UpvoteCount          int       `json:"upvote_count" gorm:"default:0"`
+	DownvoteCount        int       `json:"downvote_count" gorm:"default:0"`
 }
 
 type ReportCount struct {

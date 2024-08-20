@@ -9,7 +9,8 @@ import (
 // LikeService interface
 type LikeService interface {
 	LikeReport(userID uint, reportID string) error
-	DislikeReport(userID uint, reportID string) error
+	DownVoteReport(userID uint, reportID string) error
+	GetVoteCounts(reportID string) (int, int, error)
 }
 
 // likeService struct
@@ -33,8 +34,16 @@ func (lk *likeService) LikeReport(userID uint, reportID string) error {
 	return lk.likeRepo.UpvoteReport(userID, reportID)
 }
 
-// DislikeReport handles the logic for disliking a report
-func (lk *likeService) DislikeReport(userID uint, reportID string) error {
-	return lk.likeRepo.DislikeReport(userID, reportID)
+// DownVoteReport handles the logic for disliking a report
+func (lk *likeService) DownVoteReport(userID uint, reportID string) error {
+	return lk.likeRepo.DownVoteReport(userID, reportID)
+}
+
+func (lk *likeService) GetVoteCounts(reportID string) (int, int, error) {
+    upvotes, downvotes, err := lk.likeRepo.GetUpvoteAndDownvoteCounts(reportID)
+    if err != nil {
+        return 0, 0, err
+    }
+    return upvotes, downvotes, nil
 }
 

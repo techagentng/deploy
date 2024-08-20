@@ -1318,3 +1318,19 @@ func (s *Server) HandleGetAllReportsByUser() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"reports": reports})
 	}
 }
+
+func (s *Server) HandleGetVoteCounts() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        reportID := c.Param("reportID")
+        upvotes, downvotes, err := s.LikeService.GetVoteCounts(reportID)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "upvotes":   upvotes,
+            "downvotes": downvotes,
+        })
+    }
+}
