@@ -60,7 +60,7 @@ func migrate(db *gorm.DB) error {
 		&models.Notification{},
 		&models.Comment{},
 		&models.ReportType{},
-		
+		&models.IncidentReportUser{},
 		&models.LGA{},
 		&models.State{},
 		&models.Bookmark{},

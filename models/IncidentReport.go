@@ -68,6 +68,19 @@ type ReportCount struct {
     Count     int
 }
 
+// IncidentReportUser defines the relationship between users and incident reports (i.e., bookmarks)
+type IncidentReportUser struct {
+    ID               uint      `gorm:"primaryKey;autoIncrement"`
+    UserID           uint      `gorm:"not null"`
+    IncidentReportID uint      `gorm:"not null"`
+    CreatedAt        time.Time `gorm:"autoCreateTime"`
+    UpdatedAt        time.Time `gorm:"autoUpdateTime"`
+
+    // Foreign key associations
+    User             User             `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+    IncidentReport   IncidentReport   `gorm:"foreignKey:IncidentReportID;constraint:OnDelete:CASCADE"`
+}
+
 type Actions struct {
 	Model
 	ActionType string `json:"action_type"`

@@ -142,7 +142,6 @@ func (a *authRepo) FindUserByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
-
 func (a *authRepo) UpdateUser(user *models.User) error {
 	return nil
 }
