@@ -404,7 +404,7 @@ func (a *authRepo) FindRoleByName(name string) (*models.Role, error) {
     if err := a.DB.Where("name = ?", name).First(&role).Error; err != nil {
         if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Println("Role not foundx-:", name)
-            return nil, errors.New("role not foundx")
+            return nil, errors.New("role not found--x")
         }
         return nil, err
     }
