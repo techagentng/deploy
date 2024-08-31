@@ -389,7 +389,7 @@ func (a *authRepo) FindRoleByUserEmail(email string) (*models.Role, error) {
     // Find the role by the user's RoleID
     if err := a.DB.Where("id = ?", user.Role).First(&role).Error; err != nil {
         if err == gorm.ErrRecordNotFound {
-            return nil, fmt.Errorf("role not found")
+            return nil, fmt.Errorf("role not foundxx")
         }
         return nil, err
     }
@@ -403,8 +403,8 @@ func (a *authRepo) FindRoleByName(name string) (*models.Role, error) {
     var role models.Role
     if err := a.DB.Where("name = ?", name).First(&role).Error; err != nil {
         if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Println("Role not found:", name)
-            return nil, errors.New("role not found")
+			log.Println("Role not foundx:", name)
+            return nil, errors.New("role not foundx")
         }
         return nil, err
     }
