@@ -3,6 +3,8 @@ package db
 import (
 	"fmt"
 	"log"
+
+	"github.com/google/uuid"
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/driver/postgres"
@@ -46,6 +48,21 @@ func getPostgresDB(c *config.Config) *gorm.DB {
     }
 
     return gormDB
+}
+
+func SeedRoles(db *gorm.DB) error {
+    roles := []models.Role{
+        {ID: uuid.New(), Name: "Admin"},
+        {ID: uuid.New(), Name: "User"},
+    }
+
+    for _, role := range roles {
+        if err := db.FirstOrCreate(&role, models.Role{Name: role.Name}).Error; err != nil {
+            return err
+        }
+    }
+
+    return nil
 }
 
 func migrate(db *gorm.DB) error {
