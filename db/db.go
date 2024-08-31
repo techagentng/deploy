@@ -2,82 +2,108 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"log"
 )
 
 type GormDB struct {
-	DB *gorm.DB
+    DB *gorm.DB
 }
 
 func GetDB(c *config.Config) *GormDB {
-	gormDB := &GormDB{}
-	gormDB.Init(c)
-	return gormDB
+    gormDB := &GormDB{}
+    gormDB.Init(c)
+    return gormDB
 }
 
 func (g *GormDB) Init(c *config.Config) {
-	g.DB = getPostgresDB(c)
+    g.DB = getPostgresDB(c)
 
-	if err := migrate(g.DB); err != nil {
-		log.Fatalf("unable to run migrations: %v", err)
-	}
+    if err := migrate(g.DB); err != nil {
+        log.Fatalf("unable to run migrations: %v", err)
+    }
 }
 
 func getPostgresDB(c *config.Config) *gorm.DB {
-	log.Printf("Connecting to postgres: %+v", c)
-	postgresDSN := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d TimeZone=Africa/Lagos",
-		c.PostgresHost, c.PostgresUser, c.PostgresPassword, c.PostgresDB, c.PostgresPort)
+    log.Printf("Connecting to postgres: %+v", c)
+    postgresDSN := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d TimeZone=Africa/Lagos",
+        c.PostgresHost, c.PostgresUser, c.PostgresPassword, c.PostgresDB, c.PostgresPort)
 
-	// Create GORM DB instance
-	gormConfig := &gorm.Config{}
-	if c.Env != "prod" {
-		gormConfig.Logger = logger.Default.LogMode(logger.Info)
-	}
-	gormDB, err := gorm.Open(postgres.New(postgres.Config{
-		DSN: postgresDSN,
-	}), gormConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
+    // Create GORM DB instance
+    gormConfig := &gorm.Config{}
+    if c.Env != "prod" {
+        gormConfig.Logger = logger.Default.LogMode(logger.Info)
+    }
+    gormDB, err := gorm.Open(postgres.New(postgres.Config{
+        DSN: postgresDSN,
+    }), gormConfig)
+    if err != nil {
+        log.Fatal(err)
+    }
 
-	return gormDB
+    return gormDB
 }
 
 func migrate(db *gorm.DB) error {
-	// AutoMigrate all the models
-	err := db.AutoMigrate(
-		&models.User{},
-		&models.Blacklist{},
-		&models.IncidentReport{},
-		&models.Media{},
-		&models.Reward{},
-		&models.Like{},
-		&models.Notification{},
-		&models.Comment{},
-		&models.ReportType{},
-		&models.IncidentReportUser{},
-		&models.LGA{},
-		&models.State{},
-		&models.Bookmark{},
-		&models.StateReportPercentage{},
-		&models.MediaCount{},
-		&models.LoginRequestMacAddress{},
-		&models.UserImage{},
-		&models.ReportCount{},
-		&models.SubReport{},
-		&models.Votes{},
-		&models.UserPoints{},
-	)
-	if err != nil {
-		return fmt.Errorf("migrations error: %v", err)
-	}
+    // AutoMigrate all the models
+    err := db.AutoMigrate(
+        &models.User{},
+        &models.Blacklist{},
+        &models.IncidentReport{},
+        &models.Media{},
+        &models.Reward{},
+        &models.Like{},
+        &models.Notification{},
+        &models.Comment{},
+        &models.ReportType{},
+        &models.IncidentReportUser{},
+        &models.LGA{},
+        &models.State{},
+        &models.Bookmark{},
+        &models.StateReportPercentage{},
+        &models.MediaCount{},
+        &models.LoginRequestMacAddress{},
+        &models.UserImage{},
+        &models.ReportCount{},
+        &models.SubReport{},
+        &models.Votes{},
+        &models.UserPoints{},
+        &models.Role{}, // Ensure Role model is included
+    )
+    if err != nil {
+        return fmt.Errorf("migrations error: %v", err)
+    }
 
-	// Add any additional migrations here if needed
+    // Seed roles
+    // if err := seedRoles(db); err != nil {
+    //     return fmt.Errorf("seeding error: %v", err)
+    // }
 
-	return nil
+    // Add any additional migrations or seeds here if needed
+
+    return nil
 }
+
+// func seedRoles(db *gorm.DB) error {
+//     roles := []string{"Admin", "User"}
+
+//     for _, roleName := range roles {
+//         var existingRole models.Role
+//         if err := db.Where("name = ?", roleName).First(&existingRole).Error; err != nil {
+//             if errors.Is(err, gorm.ErrRecordNotFound) {
+//                 newRole := models.Role{Name: roleName}
+//                 if err := db.Create(&newRole).Error; err != nil {
+//                     return fmt.Errorf("error creating role %s: %v", roleName, err)
+//                 }
+//                 log.Printf("Role %s created successfully", roleName)
+//             } else {
+//                 return fmt.Errorf("error checking role existence: %v", err)
+//             }
+//         }
+//     }
+//     return nil
+// }

@@ -257,6 +257,17 @@ func (s *Server) handleSignup() gin.HandlerFunc {
         user.Password = c.PostForm("password")
         user.ThumbNailURL = filePath // Set the S3 URL in the user struct
 
+        // Fetch the UUID for the role
+        role, err := s.AuthService.GetRoleByName("User") // Use a service method to fetch the role by name
+        if err != nil {
+            response.JSON(c, "", http.StatusInternalServerError, nil, err)
+            return
+        }
+        log.Printf("Fetched role ID for 'User': %s", role.ID.String())
+
+        // Assign the role UUID directly to RoleID
+        user.RoleID = role.ID
+
         // Validate the user data using the validator package
         validate := validator.New()
         if err := validate.Struct(user); err != nil {
@@ -507,12 +518,21 @@ func (s *Server) googleSignInUser(c *gin.Context, token string) (*AuthPayload, e
 		return nil, fmt.Errorf("unable to get user details from google: %v", err)
 	}
 
-	authPayload, err := s.GetGoogleSignInToken(c, googleUserDetails)
+	// Fetch or determine the role for the user
+	role, err := s.AuthRepository.FindRoleByUserEmail(googleUserDetails.Email)
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch role for user: %v", err)
+	}
+
+	// Call GetGoogleSignInToken with the googleUserDetails and the found role
+	authPayload, err := s.GetGoogleSignInToken(c, googleUserDetails, role)
 	if err != nil {
 		return nil, fmt.Errorf("unable to sign in user: %v", err)
 	}
+
+	// Log the Google user details and the authentication payload for debugging
 	fmt.Println("Google user details:", googleUserDetails)
-	// Log authentication payload for debugging
+	fmt.Printf("Auth Payload: %+v\n", authPayload)
 
 	return authPayload, nil
 }
@@ -547,7 +567,7 @@ func (srv *Server) getUserInfoFromGoogle(token string) (*GoogleUser, error) {
 }
 
 // GetGoogleSignInToken returns the signin access token and refresh token pair to the social user
-func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleUser) (*AuthPayload, error) {
+func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleUser, roleName *models.Role) (*AuthPayload, error) {
     log.Println("Starting Google sign-in process")
 
     if googleUserDetails == nil {
@@ -581,8 +601,25 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
         log.Printf("Existing user found: %+v", user)
     }
 
+    // Use the roleName provided in the function argument
+    var roleNameString string
+    if roleName != nil {
+        roleNameString = roleName.Name
+    } else {
+        roleNameString = "default_role" // Fallback if no role is provided
+    }
+
     log.Printf("Generating token pair for user: %s", googleUserDetails.Email)
-    accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(user.Email, s.Config.JWTSecret, user.AdminStatus, user.ID)
+
+    // Generate the token pair, using correct user data
+    accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(
+        user.Email,            // Use the user's email
+        s.Config.JWTSecret,    // JWT secret from the server config
+        user.AdminStatus,      // Admin status from the user model
+        user.ID,               // Use the correct user ID
+        roleNameString,        // Pass the role name
+    )
+
     if err != nil {
         log.Printf("Error generating token pair for email %s: %v", googleUserDetails.Email, err)
         return nil, fmt.Errorf("error generating token pair: %v", err)
@@ -601,13 +638,23 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
 func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUser) (*models.User, error) {
 	log.Printf("Attempting to sign up user with email: %s", googleUserDetails.Email)
 
+	// Fetch the role you want to assign (e.g., "User" role) using the repository
+	roleName := "User"
+	role, err := s.AuthRepository.FindRoleByName(roleName)
+	if err != nil {
+		log.Printf("Error fetching role: %v", err)
+		return nil, fmt.Errorf("error fetching role: %v", err)
+	}
+
+	// Create a new user with the fetched role's ID
 	newUser := &models.User{
 		Email:    googleUserDetails.Email,
 		IsSocial: true,
 		Fullname: googleUserDetails.Name,
-		// Add other fields as necessary
+		RoleID:   role.ID, // Assign the RoleID
 	}
 
+	// Create the user using the repository
 	createdUser, err := s.AuthRepository.CreateUser(newUser)
 	if err != nil {
 		log.Printf("Error creating user for email %s: %v", googleUserDetails.Email, err)
@@ -618,40 +665,49 @@ func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUs
 	return createdUser, nil
 }
 
+
 func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption func(*AuthPayload), c *gin.Context) (*AuthPayload, error) {
-	// Get the user ID from the context
-	userID, ok := c.Get("userID")
-	if !ok {
-		return nil, fmt.Errorf("userID not found in context")
-	}
+    // Get the user ID from the context
+    userID, ok := c.Get("userID")
+    if !ok {
+        return nil, fmt.Errorf("userID not found in context")
+    }
 
-	userIDString, ok := userID.(uint)
-	if !ok {
-		// Handle the case where userID is not a string
-		log.Println("userID is not a string")
-		return nil, nil
-	}
-	// Get email, isAdmin, and id from authRequest or other sources
-	email := authRequest.email
-	isAdmin := false
+    userIDUint, ok := userID.(uint)
+    if !ok {
+        log.Println("userID is not a uint")
+        return nil, fmt.Errorf("userID is not a valid uint")
+    }
 
-	// Call GenerateTokenPair with the obtained values
-	accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(email, s.Config.GoogleClientSecret, isAdmin, userIDString)
-	if err != nil {
-		return nil, err
-	}
+    // Get email from authRequest
+    email := authRequest.email
 
-	// Construct AuthPayload and return
-	payload := &AuthPayload{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		TokenType:    "Bearer",
-		ExpiresIn:    int(AccessTokenDuration.Seconds()),
-	}
+    // Fetch the role from the repository based on userID
+    userRole, err := s.AuthRepository.GetUserRoleByUserID(userIDUint)
+    if err != nil {
+        return nil, fmt.Errorf("failed to retrieve role for user: %v", err)
+    }
 
-	authPayloadOption(payload)
+    // Determine if the user is an admin
+    isAdmin := userRole.Name == "admin"
 
-	return payload, nil
+    // Pass the role name to GenerateTokenPair
+    accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(email, s.Config.GoogleClientSecret, isAdmin, userIDUint, userRole.Name)
+    if err != nil {
+        return nil, err
+    }
+
+    // Construct AuthPayload and return
+    payload := &AuthPayload{
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+        TokenType:    "Bearer",
+        ExpiresIn:    int(AccessTokenDuration.Seconds()),
+    }
+
+    authPayloadOption(payload)
+
+    return payload, nil
 }
 
 // validateState checks the state string with the system jwt secret while also validating the state validity

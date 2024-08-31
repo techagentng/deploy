@@ -188,6 +188,7 @@ func contains(slice []string, item string) bool {
 	}
 	return false
 }
+
 func generateIDx() string {
 	id, err := uuid.NewUUID()
 	if err != nil {
@@ -195,6 +196,15 @@ func generateIDx() string {
 	}
 	return id.String()
 }
+
+func generateIDr() uuid.UUID {
+    id, err := uuid.NewUUID()
+    if err != nil {
+        log.Fatalf("Failed to generate UUID: %v", err)
+    }
+    return id
+}
+
 
 func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*models.LGA, *models.State, *models.ReportType, string, string, error) {
 	apiKey := os.Getenv("GOOGLE_MAPS_API_KEY")

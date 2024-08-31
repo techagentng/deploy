@@ -18,13 +18,14 @@ import (
 	"gorm.io/gorm"
 	"log"
 	"net/http"
+	"github.com/google/uuid"
 )
 
 //go:generate mockgen -destination=../mocks/auth_mock.go -package=mocks github.com/decagonhq/meddle-api/services AuthService
 
 // AuthService interface
 type AuthService interface {
-	LoginUser(request *models.LoginRequest) (*models.LoginResponse, *apiError.Error)
+	LoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error)
 	LoginMacAddressUser(loginRequest *models.LoginRequestMacAddress) (*models.LoginRequestMacAddress, *apiError.Error)
 	SignupUser(request *models.User) (*models.User, error)
 	// UpdateUserImageUrl(imagePath string) *apiError.Error
@@ -36,6 +37,8 @@ type AuthService interface {
 	ResetPassword(user *models.ResetPassword, token string) *apiError.Error
 	GetAllUsers() ([]models.User, error)
 	// DeleteUserByEmail(userEmail string) *apiError.Error
+	GetRoleByName(name string) (*models.Role, error)
+	
 }
 
 // authService struct
@@ -126,53 +129,61 @@ func (a *authService) LoginMacAddressUser(loginRequest *models.LoginRequestMacAd
 
 // LoginUser logs in a user and returns the login response
 func (a *authService) LoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error) {
-	foundUser, err := a.authRepo.FindUserByEmail(loginRequest.Email)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apiError.New("invalid email or password", http.StatusUnprocessableEntity)
-		} else {
-			log.Printf("error from database: %v", err)
+    // Find the user by email
+    foundUser, err := a.authRepo.FindUserByEmail(loginRequest.Email)
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, apiError.New("invalid email or password", http.StatusUnprocessableEntity)
+        }
+        log.Printf("Error finding user by email: %v", err)
+        return nil, apiError.New("unable to find user", http.StatusInternalServerError)
+    }
 
-			return nil, apiError.New("unable to find user", http.StatusInternalServerError)
-		}
-	}
+    // Verify user password
+    if err := foundUser.VerifyPassword(loginRequest.Password); err != nil {
+        log.Printf("Invalid password for user %s", foundUser.Email)
+        return nil, apiError.ErrInvalidPassword
+    }
 
-	// if !foundUser.IsEmailActive {
-	// 	return nil, apiError.New("email not verified", http.StatusUnauthorized)
-	// }
+    // Ensure RoleID is not empty
+    if foundUser.RoleID == uuid.Nil {
+        log.Printf("User %s does not have a role assigned", foundUser.Email)
+        return nil, apiError.New("user role not assigned", http.StatusInternalServerError)
+    }
 
-	if err := foundUser.VerifyPassword(loginRequest.Password); err != nil {
-		return nil, apiError.ErrInvalidPassword
-	}
+    // Fetch the user's role
+    log.Printf("Fetching role with ID: %s for user %s", foundUser.RoleID.String(), foundUser.Email)
+    role, err := a.authRepo.FindRoleByID(foundUser.RoleID)
+    if err != nil {
+        log.Printf("Error fetching role for user %s: %v", foundUser.Email, err)
+        return nil, apiError.New("unable to fetch role", http.StatusInternalServerError)
+    }
+    
+    roleName := role.Name
 
-	accessToken, refreshToken, err := jwt.GenerateTokenPair(foundUser.Email, a.Config.JWTSecret, foundUser.AdminStatus, foundUser.ID)
-	if err != nil {
-		log.Printf("error generating token pair: %v", err)
-		return nil, apiError.ErrInternalServerError
-	}
+    // Generate tokens with role information
+    log.Printf("Generating token pair for user %s with role %s", foundUser.Email, roleName)
+    accessToken, refreshToken, err := jwt.GenerateTokenPair(foundUser.Email, a.Config.JWTSecret, foundUser.AdminStatus, foundUser.ID, roleName)
+    if err != nil {
+        log.Printf("Error generating token pair for user %s: %v", foundUser.Email, err)
+        return nil, apiError.ErrInternalServerError
+    }
 
-	return &models.LoginResponse{
-		UserResponse: models.UserResponse{
-			ID:        foundUser.ID,
-			Fullname:  foundUser.Fullname,
-			Username:  foundUser.Username,
-			Telephone: foundUser.Telephone,
-			Email:     foundUser.Email,
-		},
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}, nil
+    return &models.LoginResponse{
+        UserResponse: models.UserResponse{
+            ID:        foundUser.ID,
+            Fullname:  foundUser.Fullname,
+            Username:  foundUser.Username,
+            Telephone: foundUser.Telephone,
+            Email:     foundUser.Email,
+            RoleName:  roleName, 
+        },
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+    }, nil
 }
 
-func (a *authService) VerifyEmail(token string) error {
-	claims, err := jwt.ValidateAndGetClaims(token, a.Config.JWTSecret)
-	if err != nil {
-		return apiError.New("invalid link", http.StatusUnauthorized)
-	}
-	email := claims["email"].(string)
-	err = a.authRepo.VerifyEmail(email, token)
-	return err
-}
+
 
 // func (a *authService) GetUserByID(id string) (*models.User, error) {
 //     user, err := a.authRepo.FindByID(id)
@@ -240,3 +251,14 @@ func (s *authService) GetAllUsers() ([]models.User, error) {
 	}
 	return users, nil
 }
+
+// GetRoleByName retrieves a role from the repository by its name.
+func (a *authService) GetRoleByName(name string) (*models.Role, error) {
+    // Call the repository method to fetch the role
+    role, err := a.authRepo.FindRoleByName(name)
+    if err != nil {
+        return nil, err
+    }
+    return role, nil
+}
+

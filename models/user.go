@@ -7,6 +7,7 @@ import (
 	"time"
 
 	goval "github.com/go-passwd/validator"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	// "github.com/go-playground/locales/en"
@@ -41,6 +42,8 @@ type User struct {
 	Online         bool           `json:"online"`
 	Upvotes        int             `json:"up_vote"`
     Downvotes      int             `json:"down_vote"`
+	RoleID      uuid.UUID `gorm:"type:uuid" json:"role_id"`
+	Role        Role      `gorm:"foreignKey:RoleID" json:"role"`  
 	BookmarkedReports  []*IncidentReport `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
 }
 
@@ -104,6 +107,7 @@ type UserResponse struct {
 	Telephone string `json:"telephone"`
 	Email     string `json:"email"`
 	LGA       string `json:"LGA" gorm:"foreignkey:LGA(id)"`
+	RoleName      string             `json:"role_name"`
 }
 
 type UserImage struct {
@@ -161,6 +165,7 @@ type LoginResponse struct {
 	UserResponse
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	RoleID      string             `json:"role_id"`
 }
 
 // VerifyPassword verifies the collected password with the user's hashed password

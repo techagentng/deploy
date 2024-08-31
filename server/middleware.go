@@ -68,13 +68,20 @@ func (s *Server) Authorize() gin.HandlerFunc {
             }
         }
 
+				// Extract role from claims
+				role, ok := accessClaims["role"].(string)
+				if !ok {
+					respondAndAbort(c, "invalid role information", http.StatusBadRequest, nil, errs.New("Invalid role in token", http.StatusBadRequest))
+					return
+				}
+
         c.Set("user", user)
         c.Set("userID", userID)
         c.Set("access_token", accessToken)
         c.Set("fullName", user.Fullname)
         c.Set("username", user.Username)
 		c.Set("profile_image", user.ThumbNailURL)
-
+		c.Set("user_role", role)
 		// Log to check if values are set
 		log.Printf("Username in middleware: %v", c.Value("username"))
 		log.Printf("FullName in middleware: %v", c.Value("fullName"))
