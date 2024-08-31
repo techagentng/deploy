@@ -63,9 +63,9 @@ func (a *authRepo) CreateUser(user *models.User) (*models.User, error) {
         return nil, errors.New("user is nil")
     }
 
-    // Optional: Assign a default role if the Role is not set
+    // Assign a default role if the RoleID is not set
     if user.RoleID == uuid.Nil {
-        // Fetch or create the default role
+        // Fetch the default role by name
         var defaultRole models.Role
         if err := a.DB.Where("name = ?", models.RoleUser).First(&defaultRole).Error; err != nil {
             if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -96,7 +96,6 @@ func (a *authRepo) CreateUser(user *models.User) (*models.User, error) {
     // Return the created user
     return user, nil
 }
-
 
 
 // CreateUserWithMacAddress updates the MAC address field for an existing user or creates a new user with the provided MAC address
