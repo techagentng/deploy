@@ -99,27 +99,48 @@ func (r *likeRepo) BeginTransaction() *gorm.DB {
 func (r *likeRepo) DownVoteReport(userID uint, reportID string) error {
     log.Printf("DownVoteReport called: userID = %d, reportID = %s", userID, reportID)
     
-    tx := r.BeginTransaction()
-    if tx == nil {
-        return errors.New("failed to start transaction")
-    }
-    defer tx.Rollback()
+    // Start a transaction to ensure consistency
+    tx := r.DB.Begin()
 
+    // Check if the user has already downvoted this report
     var existingVote models.Votes
-    if err := tx.Where("user_id = ? AND report_id = ?", userID, reportID).First(&existingVote).Error; err == nil {
+    if err := tx.Where("user_id = ? AND report_id = ? AND vote_type = ?", userID, reportID, "downvote").First(&existingVote).Error; err == nil {
+        log.Println("User has already downvoted, rolling back transaction")
+        tx.Rollback()
         return errors.New("user has already downvoted")
     }
 
-    if err := tx.Model(&models.IncidentReport{}).Where("id = ?", reportID).UpdateColumn("downvote_count", gorm.Expr("downvote_count + 1")).Error; err != nil {
+    // Record the downvote in the votes table
+    vote := models.Votes{
+        UserID:   userID,
+        ReportID: reportID,
+        VoteType: "downvote",
+    }
+    if err := tx.Create(&vote).Error; err != nil {
+        log.Println("Failed to record downvote, rolling back")
+        tx.Rollback() // Rollback transaction on error
         return err
     }
 
-    if err := r.RecordVote(userID, reportID, "downvote"); err != nil {
-        return err
+    // Update the downvote count by querying the Votes table
+    var downvoteCount int64
+    if err := tx.Model(&models.Votes{}).Where("report_id = ? AND vote_type = ?", reportID, "downvote").Count(&downvoteCount).Error; err != nil {
+        log.Println("Failed to count downvotes, rolling back")
+        tx.Rollback()
+        return fmt.Errorf("failed to count downvotes: %w", err)
     }
 
+    if err := tx.Model(&models.IncidentReport{}).Where("id = ?", reportID).Update("downvote_count", downvoteCount).Error; err != nil {
+        log.Println("Failed to update downvote count, rolling back")
+        tx.Rollback()
+        return fmt.Errorf("failed to update downvote count: %w", err)
+    }
+
+    log.Println("Committing transaction")
+    // Commit the transaction
     return tx.Commit().Error
 }
+
 
 // GetUpvoteAndDownvoteCounts retrieves the upvote and downvote counts for a report.
 func (r *likeRepo) GetUpvoteAndDownvoteCounts(reportID string) (int, int, error) {
