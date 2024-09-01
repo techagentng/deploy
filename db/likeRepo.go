@@ -38,19 +38,11 @@ func (lk *likeRepo) UpvoteReport(userID uint, reportID string) error {
     var existingVote models.Votes
     if err := tx.Where("user_id = ? AND report_id = ? AND vote_type = ?", userID, reportID, "upvote").First(&existingVote).Error; err == nil {
         // User has already upvoted, rollback and return
-		log.Println("User has already upvoted, rolling back transaction")
+        log.Println("User has already upvoted, rolling back transaction")
         tx.Rollback()
         return nil
     }
 
-    // Increment the upvote count using the Update method
-	if err := tx.Model(&models.IncidentReport{}).Where("id = ?", reportID).Update("upvote_count", gorm.Expr("upvote_count + ?", 1)).Error; err != nil {
-		log.Println("Failed to update upvote count, rolling back")
-		tx.Rollback()
-		return fmt.Errorf("failed to update upvote count: %w", err)
-	}
-	
-	log.Println("Recording vote")
     // Record the upvote in the votes table
     vote := models.Votes{
         UserID:   userID,
@@ -61,10 +53,26 @@ func (lk *likeRepo) UpvoteReport(userID uint, reportID string) error {
         tx.Rollback() // Rollback transaction on error
         return err
     }
-	log.Println("Committing transaction")
+
+    // Update the upvote count by querying the Votes table
+    var upvoteCount int64
+    if err := tx.Model(&models.Votes{}).Where("report_id = ? AND vote_type = ?", reportID, "upvote").Count(&upvoteCount).Error; err != nil {
+        log.Println("Failed to count upvotes, rolling back")
+        tx.Rollback()
+        return fmt.Errorf("failed to count upvotes: %w", err)
+    }
+
+    if err := tx.Model(&models.IncidentReport{}).Where("id = ?", reportID).Update("upvote_count", upvoteCount).Error; err != nil {
+        log.Println("Failed to update upvote count, rolling back")
+        tx.Rollback()
+        return fmt.Errorf("failed to update upvote count: %w", err)
+    }
+
+    log.Println("Committing transaction")
     // Commit the transaction
     return tx.Commit().Error
 }
+
 
 func (r *likeRepo) GetUserPoints(userID uint) (int, error) {
 	var userPoints models.UserPoints

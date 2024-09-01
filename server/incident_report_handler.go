@@ -269,7 +269,15 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 
 	return lga, stateStruct, reportType, locality, state, nil
 }
-
+		// Utility function to split URLs in a slice of strings if needed
+		func splitUrlSlice(urls []string) []string {
+			var result []string
+			for _, url := range urls {
+				result = append(result, strings.Split(url, ",")...)
+			}
+			return result
+		}
+		
 // Handle the upload of media file
 func (s *Server) handleIncidentReport() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -384,23 +392,30 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 				response.JSON(c, "Unable to process media", http.StatusInternalServerError, nil, err)
 				return
 			}
-			feedURLs = append(feedURLs, processedFeedURLs...)
-			thumbnailURLs = append(thumbnailURLs, processedThumbnailURLs...)
-			fullsizeURLs = append(fullsizeURLs, processedFullsizeURLs...)
+		
+			// If feedURLs is a slice of comma-separated URLs as strings, split them first
+			currentFeedURLs := splitUrlSlice(feedURLs)
+			currentThumbnailURLs := splitUrlSlice(thumbnailURLs)
+			currentFullsizeURLs := splitUrlSlice(fullsizeURLs)
+		
+			// Now, append the processed URLs to the existing arrays
+			feedURLs = append(currentFeedURLs, processedFeedURLs...)
+			thumbnailURLs = append(currentThumbnailURLs, processedThumbnailURLs...)
+			fullsizeURLs = append(currentFullsizeURLs, processedFullsizeURLs...)
 			fileTypes = append(fileTypes, processedFileTypes...)
 		}
 		wg.Wait()
-
-		 // Log media type counts and calculate totals
+		
+		// Log media type counts and calculate totals
 		for fileType, count := range mediaTypeCounts {
 			log.Printf("File type: %s, Count: %d\n", fileType, count)
 		}
-
+		
 		imageCount, videoCount, audioCount := CreateMediaCount(mediaTypeCounts)
 		totalPoints := calculateMediaPoints(mediaTypeCounts)
 		log.Println("Image count:", imageCount)
 		log.Println("Total points:", totalPoints)
-
+		
 		var feedURL, thumbnailURL, fullsizeURL, fileType string
 		if len(feedURLs) > 0 {
 			feedURL = strings.Join(feedURLs, ",")

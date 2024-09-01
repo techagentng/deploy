@@ -748,7 +748,7 @@ func createS3Client() (*s3.Client, error) {
         config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
             os.Getenv("AWS_ACCESS_KEY_ID"),
             os.Getenv("AWS_SECRET_ACCESS_KEY"),
-            "", // session token, if needed
+            "", 
         )),
     )
     if err != nil {
