@@ -26,6 +26,7 @@ type IncidentReportService interface {
 	GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error)
 	BookmarkReport(userID uint, reportID string) error
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
+	GetUserReports(userID uint) ([]models.ReportType, error)
 }
 
 type IncidentService struct {
@@ -231,3 +232,6 @@ func (s *IncidentService) GetBookmarkedReports(userID uint) ([]models.IncidentRe
     return s.incidentRepo.GetBookmarkedReports(userID)
 }
 
+func (s *IncidentService) GetUserReports(userID uint) ([]models.ReportType, error) {
+    return s.incidentRepo.GetReportsByUserID(userID)
+}

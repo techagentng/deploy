@@ -1419,4 +1419,32 @@ func (s *Server) HandleGetBookmarkedReports() gin.HandlerFunc {
     }
 }
 
+func (s *Server) HandleGetReportsByUserID() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Get user ID from context
+        userIDCtx, ok := c.Get("userID")
+        if !ok {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+            return
+        }
+
+        // Assert userID as uint
+        userID, ok := userIDCtx.(uint)
+        if !ok {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
+            return
+        }
+
+        // Fetch reports
+        reports, err := s.IncidentReportService.GetUserReports(userID)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports"})
+            return
+        }
+
+        // Return reports
+        c.JSON(http.StatusOK, reports)
+    }
+}
+
 

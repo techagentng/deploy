@@ -64,6 +64,7 @@ type IncidentReportRepository interface {
 	IsBookmarked(userID uint, reportID string, bookmark *models.Bookmark) error
 	SaveBookmark(bookmark *models.Bookmark) error
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
+	GetReportsByUserID(userID uint) ([]models.ReportType, error)
 }
 
 type incidentReportRepo struct {
@@ -905,3 +906,13 @@ func (repo *incidentReportRepo) GetBookmarkedReports(userID uint) ([]models.Inci
     return reports, nil
 }
 
+func (repo *incidentReportRepo) GetReportsByUserID(userID uint) ([]models.ReportType, error) {
+    var reports []models.ReportType
+    
+    err := repo.DB.Preload("SubReports").Where("user_id = ?", userID).Find(&reports).Error
+    if err != nil {
+        return nil, err
+    }
+
+    return reports, nil
+}
