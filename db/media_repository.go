@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"mime/multipart"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -107,19 +108,22 @@ func (repo *mediaRepo) CreateMediaCount(mediaCount *models.MediaCount) error {
 func (repo *mediaRepo) UploadMediaToS3(file multipart.File, fileHeader *multipart.FileHeader, bucketName, folderName string) (string, error) {
     defer file.Close()
 
+    // Sanitize the filename by replacing spaces with underscores
+    sanitizedFilename := strings.ReplaceAll(fileHeader.Filename, " ", "_")
+
+    // Generate a unique key for the file
+    key := fmt.Sprintf("%s/%s", folderName, sanitizedFilename)
+
     // Create an S3 client
     client, err := createS3Client()
     if err != nil {
         return "", fmt.Errorf("failed to create S3 client: %v", err)
     }
 
-    // Generate a unique key for the file
-    key := fmt.Sprintf("%s/%s", folderName, fileHeader.Filename)
-
     // Upload the file to S3
     fileURL, err := uploadFileToS3(client, file, bucketName, key)
     if err != nil {
-        return "", fmt.Errorf("failed to upload file to S3d: %v", err)
+        return "", fmt.Errorf("failed to upload file to S3: %v", err)
     }
 
     return fileURL, nil
