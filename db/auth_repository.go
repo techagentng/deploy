@@ -39,6 +39,7 @@ type AuthRepository interface {
 	FindRoleByUserEmail(email string) (*models.Role, error)
 	FindRoleByName(name string) (*models.Role, error)
 	GetUserRoleByUserID(userID uint) (*models.Role, error)
+	SoftDeleteUser(userID uint) error
 }
 
 type authRepo struct {
@@ -434,4 +435,14 @@ func (a *authRepo) GetUserRoleByUserID(userID uint) (*models.Role, error) {
 
     // Return the role if found, otherwise return nil and an error.
     return &role, nil
+}
+
+func (a *authRepo) SoftDeleteUser(userID uint) error {
+    var user models.User
+    if err := a.DB.First(&user, userID).Error; err != nil {
+        return err
+    }
+
+    // Perform soft delete
+    return a.DB.Delete(&user).Error
 }

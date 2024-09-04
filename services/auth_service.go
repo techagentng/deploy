@@ -38,7 +38,7 @@ type AuthService interface {
 	GetAllUsers() ([]models.User, error)
 	// DeleteUserByEmail(userEmail string) *apiError.Error
 	GetRoleByName(name string) (*models.Role, error)
-	
+	DeleteUser(userID uint) error
 }
 
 // authService struct
@@ -183,8 +183,6 @@ func (a *authService) LoginUser(loginRequest *models.LoginRequest) (*models.Logi
     }, nil
 }
 
-
-
 // func (a *authService) GetUserByID(id string) (*models.User, error) {
 //     user, err := a.authRepo.FindByID(id)
 //     if err != nil {
@@ -262,3 +260,6 @@ func (a *authService) GetRoleByName(name string) (*models.Role, error) {
     return role, nil
 }
 
+func (s *authService) DeleteUser(userID uint) error {
+    return s.authRepo.SoftDeleteUser(userID)
+}
