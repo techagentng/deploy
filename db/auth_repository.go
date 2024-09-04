@@ -50,10 +50,7 @@ func NewAuthRepo(db *GormDB) AuthRepository {
 }
 
 func generateIDx2() uuid.UUID {
-    id, err := uuid.NewUUID()
-    if err != nil {
-        log.Fatalf("Failed to generate UUID: %v", err)
-    }
+    id := uuid.New() // Generates a UUIDv4
     return id
 }
 

@@ -1,10 +1,14 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // LGA struct
 type ReportType struct {
-	ID                   string     `json:"id" gorm:"primaryKey"`
+	ID   uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
 	UserID               uint       `json:"user_id"`  
 	ReportID             string     `json:"report_id"`  
 	Category             string     `json:"category" binding:"required"`
@@ -16,8 +20,8 @@ type ReportType struct {
 }
 
 type SubReport struct {
-	ID             string `json:"id" gorm:"primaryKey;index"`
-	ReportTypeID   string `json:"report_type_id"`  // Foreign key referring to ReportType table
+	ID   uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
+	ReportTypeID  uuid.UUID  `json:"report_type_id"`  // Foreign key referring to ReportType table
 	SubReportType  string `json:"sub_report_type"`
 }
 

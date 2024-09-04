@@ -9,11 +9,12 @@ import (
 	"mime/multipart"
 	"os"
 	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
-    "github.com/aws/aws-sdk-go-v2/config"
-    "github.com/aws/aws-sdk-go-v2/service/s3"
-    "github.com/aws/aws-sdk-go-v2/credentials"
-    "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
@@ -65,6 +66,8 @@ type IncidentReportRepository interface {
 	SaveBookmark(bookmark *models.Bookmark) error
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 	GetReportsByUserID(userID uint) ([]models.ReportType, error)
+	GetReportTypeCountsByLGA(lga string) ([]string, []int, error)
+	GetReportCountsByState(state string) ([]string, []int, error)
 }
 
 type incidentReportRepo struct {
@@ -459,23 +462,22 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
 func (repo *incidentReportRepo) SaveStateLgaReportType(lga *models.LGA, state *models.State) error {
 	// Start a transaction
 	tx := repo.DB.Begin()
-
+		// Commit State to the database
+		if err := tx.Create(state).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	
 	// Commit LGA to the database
 	if err := tx.Create(lga).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	// Commit State to the database
-	if err := tx.Create(state).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
 
 	// Commit the transaction
 	return tx.Commit().Error
 }
-
 
 type Marker struct {
 	Lat   float64 `json:"lat"`
@@ -915,4 +917,81 @@ func (repo *incidentReportRepo) GetReportsByUserID(userID uint) ([]models.Report
     }
 
     return reports, nil
+}
+
+func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) ([]string, []int, error) {
+    var reportTypes []string
+    var counts []int
+
+    // SQL query to get report types and their counts for the specified LGA
+    query := `
+        SELECT rt.category AS report_type, COUNT(*) AS report_count
+        FROM report_types rt
+        WHERE rt.lga_name = ?
+        GROUP BY rt.category
+        ORDER BY report_count DESC;
+    `
+
+    // Execute the query
+    rows, err := repo.DB.Raw(query, lga).Rows()
+    if err != nil {
+        return nil, nil, err
+    }
+    defer rows.Close()
+
+    // Process the result rows
+    for rows.Next() {
+        var reportType string
+        var count int
+        if err := rows.Scan(&reportType, &count); err != nil {
+            return nil, nil, err
+        }
+        reportTypes = append(reportTypes, reportType)
+        counts = append(counts, count)
+    }
+
+    if err := rows.Err(); err != nil {
+        return nil, nil, err
+    }
+
+    return reportTypes, counts, nil
+}
+
+// Repository function
+func (repo *incidentReportRepo) GetReportCountsByState(state string) ([]string, []int, error) {
+    var lgas []string
+    var counts []int
+
+    // SQL query to get LGAs and their report counts for the selected state
+    query := `
+        SELECT lga_name, COUNT(*) AS report_count
+        FROM incident_reports
+        WHERE state_name = ?
+        GROUP BY lga_name
+        ORDER BY report_count DESC;
+    `
+
+    // Execute the query with the state parameter
+    rows, err := repo.DB.Raw(query, state).Rows()
+    if err != nil {
+        return nil, nil, err
+    }
+    defer rows.Close()
+
+    // Process the result rows
+    for rows.Next() {
+        var lgaName string
+        var count int
+        if err := rows.Scan(&lgaName, &count); err != nil {
+            return nil, nil, err
+        }
+        lgas = append(lgas, lgaName)
+        counts = append(counts, count)
+    }
+
+    if err := rows.Err(); err != nil {
+        return nil, nil, err
+    }
+
+    return lgas, counts, nil
 }

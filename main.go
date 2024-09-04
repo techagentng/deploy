@@ -21,7 +21,10 @@ func main() {
 	mailgunClient.Init()
 
 	gormDB := db.GetDB(conf)
-
+	// Seed roles
+	if err := db.SeedRoles(gormDB.DB); err != nil {
+		log.Fatalf("error seeding roles: %v", err)
+	}
 	authRepo := db.NewAuthRepo(gormDB)
 	mediaRepo := db.NewMediaRepo(gormDB)
 	incidentReportRepo := db.NewIncidentReportRepo(gormDB)

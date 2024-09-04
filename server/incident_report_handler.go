@@ -2,12 +2,10 @@ package server
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"math/big"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -189,20 +187,13 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-func generateIDx() string {
-	id, err := uuid.NewUUID()
-	if err != nil {
-		log.Fatalf("Failed to generate UUID: %v", err)
-	}
-	return id.String()
-}
-
-func generateIDr() uuid.UUID {
+func generateIDx() uuid.UUID {
     id, err := uuid.NewUUID()
     if err != nil {
         log.Fatalf("Failed to generate UUID: %v", err)
     }
     return id
+
 }
 
 
@@ -240,13 +231,11 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 	lga := &models.LGA{
 		ID:           generateIDx(),
 		Name:         locality,
-		ReportTypeID: reportID,
 	}
 
 	stateStruct := &models.State{
 		ID:       generateIDx(),
 		Name:     state,
-		ReportID: reportID,
 	}
 
 	userI, exists := c.Get("user")
@@ -278,6 +267,13 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 			return result
 		}
 		
+		func generateIDls() uuid.UUID {
+			id, err := uuid.NewUUID()
+			if err != nil {
+				log.Fatalf("Failed to generate UUID: %v", err)
+			}
+			return id
+		}
 // Handle the upload of media file
 func (s *Server) handleIncidentReport() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -464,7 +460,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
-		log.Printf("Final State: %s, LGA: %s", reportType.StateName, reportType.LGAName) // Add logging to verify values before saving
+		log.Printf("Final State: %s, LGA: %s", reportType.StateName, reportType.LGAName) 
 
 		incidentReport := &models.IncidentReport{
 			ID:                   reportID,
@@ -516,8 +512,13 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			QueueTime:            c.PostForm("queue_time"),
 		}
 
+		uuidReportID, err := uuid.Parse(reportID)
+		if err != nil {
+			log.Fatalf("Failed to parse reportID: %v", err)
+		}
+
 		sub := &models.SubReport{
-			ID:                 reportID,
+			ID:                 uuidReportID,
 			ReportTypeID:       reportType.ID,
 			SubReportType: c.PostForm("sub_report_type"),
 		}
@@ -542,7 +543,27 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		if err != nil {
 			return
 		}
+		stateID := generateIDls()
+		lgaID := generateIDls()
 		
+
+		stateStruct = &models.State{
+			ID:   stateID,
+			Name: c.PostForm("state_name"),
+		}
+    // Create LGA and State objects with generated IDs
+    lga = &models.LGA{
+    	ID:      lgaID,
+    	Name:    c.PostForm("lga_name"),
+    	StateID: stateID,
+    	State:   models.State{},
+    }
+
+
+
+	log.Printf("Generated LGA ID: %s", lga)
+log.Printf("Generated State ID: %s", stateStruct)
+
 		err = s.IncidentReportRepository.SaveStateLgaReportType(lga, stateStruct)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -672,17 +693,11 @@ func getPageFromQuery(c *gin.Context) (int, error) {
 }
 
 func generateID() (string, error) {
-	const idLength = 14
-	const charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	id := make([]byte, idLength)
-	for i := range id {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-		if err != nil {
-			return "", err
-		}
-		id[i] = charset[num.Int64()]
-	}
-	return string(id), nil
+    newUUID, err := uuid.NewRandom()
+    if err != nil {
+        return "", err
+    }
+    return newUUID.String(), nil
 }
 
 func (s *Server) handleApproveReportPoints() gin.HandlerFunc {
@@ -1447,4 +1462,36 @@ func (s *Server) HandleGetReportsByUserID() gin.HandlerFunc {
     }
 }
 
+func (s *Server) GetReportTypeCountsByLGA() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        lga := c.Param("lga") 
 
+        reportTypes, reportCounts, err := s.IncidentReportService.GetReportTypeCountsByLGA(lga)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "report_types":  reportTypes,
+            "report_counts": reportCounts,
+        })
+    }
+}
+
+func (s *Server) GetReportCountsByStateAndLGA() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        state := c.Param("state")
+
+        lgas, reportCounts, err := s.IncidentReportRepository.GetReportCountsByState(state)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "lgas":           lgas,
+            "report_counts":  reportCounts,
+        })
+    }
+}

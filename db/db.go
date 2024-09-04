@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/driver/postgres"
@@ -105,22 +106,22 @@ func migrate(db *gorm.DB) error {
     return nil
 }
 
-// func seedRoles(db *gorm.DB) error {
-//     roles := []string{"Admin", "User"}
+func seedRoles(db *gorm.DB) error {
+    roles := []string{"Admin", "User"}
 
-//     for _, roleName := range roles {
-//         var existingRole models.Role
-//         if err := db.Where("name = ?", roleName).First(&existingRole).Error; err != nil {
-//             if errors.Is(err, gorm.ErrRecordNotFound) {
-//                 newRole := models.Role{Name: roleName}
-//                 if err := db.Create(&newRole).Error; err != nil {
-//                     return fmt.Errorf("error creating role %s: %v", roleName, err)
-//                 }
-//                 log.Printf("Role %s created successfully", roleName)
-//             } else {
-//                 return fmt.Errorf("error checking role existence: %v", err)
-//             }
-//         }
-//     }
-//     return nil
-// }
+    for _, roleName := range roles {
+        var existingRole models.Role
+        if err := db.Where("name = ?", roleName).First(&existingRole).Error; err != nil {
+            if errors.Is(err, gorm.ErrRecordNotFound) {
+                newRole := models.Role{Name: roleName}
+                if err := db.Create(&newRole).Error; err != nil {
+                    return fmt.Errorf("error creating role %s: %v", roleName, err)
+                }
+                log.Printf("Role %s created successfully", roleName)
+            } else {
+                return fmt.Errorf("error checking role existence: %v", err)
+            }
+        }
+    }
+    return nil
+}
