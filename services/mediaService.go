@@ -93,6 +93,9 @@ func (m *mediaService) ProcessMedia(c *gin.Context, formMedia []*multipart.FileH
             return nil, nil, nil, nil, fmt.Errorf("failed to read file: %v", err)
         }
 
+		// Reset file pointer to the beginning after reading it
+		file.Seek(0, io.SeekStart)
+
         fileType := getFileType(fileBytes)
         var feedURL, thumbnailURL, fullsizeURL string
 

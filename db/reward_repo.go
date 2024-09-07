@@ -79,7 +79,6 @@ func (repo *rewardRepo) GetCurrentRewardByUserID(userID uint) (int, error) {
 
 func (repo *rewardRepo) GetUserRewardBalance(userID uint) (int, error) {
 	var reward models.Reward
-
 	// Query the database to find the reward for the given user ID
 	err := repo.DB.Where("user_id = ?", userID).First(&reward).Error
 	if err != nil {
@@ -98,7 +97,6 @@ func (repo *rewardRepo) GetUserRewardBalance(userID uint) (int, error) {
 func (r *rewardRepo) GetRewardPointByReportID(reportID string) (int, error) {
 	// Initialize a variable to store the reward point
 	var rewardPoint int
-
 	// Query the reward table to get the point corresponding to the reportID
 	if err := r.DB.Model(&models.Reward{}).
 		Where("incident_report_id = ?", reportID).
