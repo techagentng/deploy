@@ -651,7 +651,7 @@ func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUs
 		Email:    googleUserDetails.Email,
 		IsSocial: true,
 		Fullname: googleUserDetails.Name,
-		RoleID:   role.ID, // Assign the RoleID
+		RoleID:   role.ID, 
 	}
 
 	// Create the user using the repository

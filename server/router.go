@@ -104,6 +104,8 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.PUT("/me/updateUserProfile", s.handleEditUserProfile())
 	authorized.GET("/me", s.handleShowProfile())
 	authorized.GET("/user/bookmark/:reportID", s.HandleBookmarkReport())
+	// router.POST("/reports/:reportID/bookmark", server.HandleBookmarkReport())
+
 	authorized.GET("/user/bookmark", s.HandleGetBookmarkedReports())
 	authorized.GET("/approve/:reportID/:userID/report", s.handleApproveReportPoints())
 	authorized.GET("/reject/:reportID/:userID/report", s.handleRejectReportPoints())
@@ -138,7 +140,8 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/report/counts/lga/:lga", s.GetReportTypeCountsByLGA())
 	authorized.GET("/report/counts/state/:state", s.GetReportCountsByStateAndLGA())
 	authorized.DELETE("/delete/user/:id", s.handleDeleteUser())
-
+	authorized.GET("/top/report/categories", s.handleGetTopCategories())
+	authorized.GET("/report/type/id", s.GetReportsByCategory())
 	// authorized.GET("/api/v1/report/counts/state/:state/lga", s.GetReportTypeCountsByLGA)
 	// authorized.GET("/api/v1/report/counts/lga/:lga", s.GetReportCountsByStateAndLGA)
 

@@ -61,7 +61,6 @@ type IncidentReport struct {
     UpvoteCount          int       `json:"upvote_count" gorm:"default:0"`
     DownvoteCount        int       `json:"downvote_count" gorm:"default:0"`
 }
-
 type ReportCount struct {
     StateName string
     LGAName   string

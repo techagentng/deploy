@@ -20,6 +20,7 @@ type RewardRepository interface {
 	GetUserRewardBalance(userID uint) (int, error)
 	SumAllRewardsBalance() (int, error)
 	GetAllRewards() ([]models.Reward, error)
+	GetUserReward(userID uint) (models.Reward, error)
 }
 
 type rewardRepo struct {
@@ -124,4 +125,31 @@ func (r *rewardRepo) GetAllRewards() ([]models.Reward, error) {
 		return nil, err
 	}
 	return rewards, nil
+}
+
+func (r *rewardRepo) GetUserReward(userID uint) (models.Reward, error) {
+    var reward models.Reward
+    err := r.DB.Where("user_id = ?", userID).First(&reward).Error
+
+    if err != nil {
+        if err == gorm.ErrRecordNotFound {
+            // Record not found, initialize a new reward record with default values
+            reward = models.Reward{
+                UserID:        userID,
+                Point:         0,       // Default points
+                Balance:       0,       // Default balance
+                RewardType:    "default", // Set a default reward type or adjust as needed
+                AccountNumber: "",      // Default or empty account number
+            }
+            // Create a new record
+            err = r.DB.Create(&reward).Error
+            if err != nil {
+                return reward, err
+            }
+        } else {
+            return reward, err
+        }
+    }
+
+    return reward, nil
 }

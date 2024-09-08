@@ -68,6 +68,9 @@ type IncidentReportRepository interface {
 	GetReportsByUserID(userID uint) ([]models.ReportType, error)
 	GetReportTypeCountsByLGA(lga string) ([]string, []int, error)
 	GetReportCountsByState(state string) ([]string, []int, error)
+	GetTopCategories() ([]string, []int, error)
+	GetReportsByCategoryAndReportID(category string, reportID string) ([]models.ReportType, error)
+	GetReportsByCategory(category string) ([]models.ReportType, error)
 }
 
 type incidentReportRepo struct {
@@ -995,3 +998,76 @@ func (repo *incidentReportRepo) GetReportCountsByState(state string) ([]string, 
 
     return lgas, counts, nil
 }
+
+func (repo *incidentReportRepo) GetTopCategories() ([]string, []int, error) {
+    var categories []string
+    var counts []int
+
+    // SQL query to get top 10 categories and their report counts
+    query := `
+        SELECT category, COUNT(*) AS report_count
+        FROM incident_reports
+        GROUP BY category
+        ORDER BY report_count DESC
+        LIMIT 10;
+    `
+
+    // Execute the query
+    rows, err := repo.DB.Raw(query).Rows()
+    if err != nil {
+        return nil, nil, err
+    }
+    defer rows.Close()
+
+    // Process the result rows
+    for rows.Next() {
+        var category string
+        var count int
+        if err := rows.Scan(&category, &count); err != nil {
+            return nil, nil, err
+        }
+        categories = append(categories, category)
+        counts = append(counts, count)
+    }
+
+    if err := rows.Err(); err != nil {
+        return nil, nil, err
+    }
+
+    return categories, counts, nil
+}
+
+func (repo *incidentReportRepo) GetReportsByCategoryAndReportID(category string, reportID string) ([]models.ReportType, error) {
+    var reports []models.ReportType
+
+    // GORM query to fetch reports by category and report_id
+    err := repo.DB.
+        Where("category = ? AND report_id = ?", category, reportID).
+        Order("date_of_incidence DESC").
+        Find(&reports).Error
+
+    if err != nil {
+        return nil, err
+    }
+
+    return reports, nil
+}
+
+
+func (repo *incidentReportRepo) GetReportsByCategory(category string) ([]models.ReportType, error) {
+    var reports []models.ReportType
+
+    // GORM query to fetch reports by category
+    err := repo.DB.
+        Where("category = ?", category).
+        Order("date_of_incidence DESC").
+        Find(&reports).Error
+
+    if err != nil {
+        return nil, err
+    }
+
+    return reports, nil
+}
+
+

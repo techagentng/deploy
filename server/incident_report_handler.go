@@ -329,6 +329,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		log.Println("Parsed multipart form successfully")
 
 		formMedia := c.Request.MultipartForm.File["mediaFiles"]
+		totalPoints := len(formMedia)
 		log.Printf("Number of files received: %d\n", len(formMedia))
 
 		reportID, err := generateID()
@@ -408,7 +409,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		}
 		
 		imageCount, videoCount, audioCount := CreateMediaCount(mediaTypeCounts)
-		totalPoints := calculateMediaPoints(mediaTypeCounts)
+		// totalPoints = calculateMediaPoints(mediaTypeCounts)
 		log.Println("Image count:", imageCount)
 		log.Println("Total points:", totalPoints)
 		
@@ -1495,3 +1496,47 @@ func (s *Server) GetReportCountsByStateAndLGA() gin.HandlerFunc {
         })
     }
 }
+
+func (s *Server) handleGetTopCategories() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Call the repository function to get top categories and their counts
+        categories, counts, err := s.IncidentReportRepository.GetTopCategories()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        // Respond with the categories and their counts
+        c.JSON(http.StatusOK, gin.H{
+            "categories":   categories,
+            "report_counts": counts,
+        })
+    }
+}
+
+func (s *Server) GetReportsByCategory() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        category := c.Query("category")
+
+        if category == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Category is required"})
+            return
+        }
+
+        reports, err := s.IncidentReportRepository.GetReportsByCategory(category)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        if len(reports) == 0 {
+            c.JSON(http.StatusOK, gin.H{"message": "No reports found for the specified category"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "reports": reports,
+        })
+    }
+}
+

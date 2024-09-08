@@ -381,9 +381,14 @@ func (m *mediaService) SaveMedia(media models.Media, reportID string, userID uin
 	ID := uuid.New()
 	media.ID = ID.String()
 	media.UserID = userID
+	    // Multiply totalPoints by 10
+		rewardPoints := totalPoints * 10
+
+		// Set the points on the media
+		media.Points = rewardPoints
 	// media.IncidentReportID = reportID
 	media.Points = totalPoints
-
+fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxT", rewardPoints)
 	// Save the media to the database
 	err := m.mediaRepo.SaveMedia(media, reportID, userID)
 	if err != nil {
@@ -397,49 +402,21 @@ func (m *mediaService) SaveMedia(media models.Media, reportID string, userID uin
 	mcount.IncidentReportID = reportID
 	mcount.UserID = userID
 
-	err = m.mediaRepo.CreateMediaCount(&mcount)
-	if err != nil {
-		return err
-		// log.Println("error happened", err)
-	}
-	// Calculate and update the reward points
-	// totalPoints := mediaCount * 10
+	// Update the reward points and balance
+    reward, err := m.rewardRepo.GetUserReward(userID)
+    if err != nil {
+        return err
+    }
 
-	// Query to get the report status
-	// reportStatus, err := m.IncidentReportRepo.GetReportStatusByID(reportID)
-	// if err != nil {
-	// 	return err
-	// }
+    // Update the balance and points
+    reward.Balance += rewardPoints
+    reward.Point += rewardPoints
+	err = m.rewardRepo.SaveReward(&reward)
+    if err != nil {
+        return err
+    }
 
-	// if reportStatus != "approved" {
-	// 	return nil // Or return an appropriate error
-	// }
-
-	// Query to get user's reward balance
-	// balance, err := m.rewardRepo.GetUserRewardBalance(userID)
-	// if err != nil {
-	// 	return err
-	// }
-	// Update the balance with the new points
-	// balance += totalPoints
-
-	// Initialize the reward object with the updated balance and other necessary fields
-	// reward := &models.Reward{
-	// 	IncidentReportID: reportID,
-	// 	UserID:           userID,
-	// 	RewardType:       "media_upload",
-	// 	// Point:            totalPoints,
-	// 	Balance:       balance,
-	// 	AccountNumber: "", // Set this if needed
-	// }
-
-	// Save the updated reward to the database
-	// err = m.rewardRepo.SaveReward(reward)
-	// if err != nil {
-	// 	return err
-	// }
-
-	return nil
+    return nil
 }
 
 func processAndStoreVideo(fileBytes []byte) (string, string, string, error) {
