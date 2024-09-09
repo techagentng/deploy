@@ -47,6 +47,7 @@ func main() {
 		IncidentReportService:    incidentReportService,
 		IncidentReportRepository: incidentReportRepo,
 		RewardService:            rewardService,
+		RewardRepository:         rewardRepo,
 		LikeService:              likeService,
 		DB:                       db.GormDB{},
 	}

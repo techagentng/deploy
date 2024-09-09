@@ -139,9 +139,12 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/all/user/report", s.HandleGetReportsByUserID())
 	authorized.GET("/report/counts/lga/:lga", s.GetReportTypeCountsByLGA())
 	authorized.GET("/report/counts/state/:state", s.GetReportCountsByStateAndLGA())
-	authorized.DELETE("/delete/user/:id", s.handleDeleteUser())
+	authorized.DELETE("/delete/user", s.handleDeleteUser())
 	authorized.GET("/top/report/categories", s.handleGetTopCategories())
 	authorized.GET("/report/type/id", s.GetReportsByCategory())
+	authorized.GET("/get/user/balance", s.handleGetUserRewardBalance())
+	
+	
 	// authorized.GET("/api/v1/report/counts/state/:state/lga", s.GetReportTypeCountsByLGA)
 	// authorized.GET("/api/v1/report/counts/lga/:lga", s.GetReportCountsByStateAndLGA)
 

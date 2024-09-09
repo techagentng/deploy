@@ -928,13 +928,22 @@ func (s *Server) handleGetAllUsers() gin.HandlerFunc {
 
 func (s *Server) handleDeleteUser() gin.HandlerFunc {
     return func(c *gin.Context) {
-        userID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-        if err != nil {
-            response.JSON(c, "Invalid user ID", http.StatusBadRequest, nil, err)
+        // Retrieve the userID from the context
+        userID, exists := c.Get("userID")
+        if !exists {
+            response.JSON(c, "User ID not found in context", http.StatusUnauthorized, nil, nil)
             return
         }
 
-        if err := s.AuthService.DeleteUser(uint(userID)); err != nil {
+        // Type assert to uint
+        userIDUint, ok := userID.(uint)
+        if !ok {
+            response.JSON(c, "Invalid user ID type", http.StatusInternalServerError, nil, nil)
+            return
+        }
+
+        // Perform the user deletion
+        if err := s.AuthService.DeleteUser(userIDUint); err != nil {
             response.JSON(c, "Failed to delete user", http.StatusInternalServerError, nil, err)
             return
         }
@@ -942,6 +951,7 @@ func (s *Server) handleDeleteUser() gin.HandlerFunc {
         response.JSON(c, "User deleted successfully", http.StatusOK, nil, nil)
     }
 }
+
 
 // func (s *Server) SendPasswordResetEmail(token, email string) *apiError.Error {
 // 	link := fmt.Sprintf("%s/verifyEmail/%s", s.Config.BaseUrl, token)

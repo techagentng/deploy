@@ -17,10 +17,11 @@ type RewardRepository interface {
 	GetReportByID(reportID string) (*models.IncidentReport, error)
 	GetCurrentRewardByUserID(userID uint) (int, error)
 	GetRewardPointByReportID(reportID string) (int, error)
-	GetUserRewardBalance(userID uint) (int, error)
 	SumAllRewardsBalance() (int, error)
 	GetAllRewards() ([]models.Reward, error)
-	GetUserReward(userID uint) (models.Reward, error)
+	GetUserRewardBalance(userID uint) (int, error)
+	SumRewardBalanceByUserID(userID uint) (int, error)
+	GetRewardByUserID(userID uint) (*models.Reward, error)
 }
 
 type rewardRepo struct {
@@ -78,21 +79,13 @@ func (repo *rewardRepo) GetCurrentRewardByUserID(userID uint) (int, error) {
 	return reward.Point, nil
 }
 
-func (repo *rewardRepo) GetUserRewardBalance(userID uint) (int, error) {
-	var reward models.Reward
-	// Query the database to find the reward for the given user ID
-	err := repo.DB.Where("user_id = ?", userID).First(&reward).Error
+func (r *rewardRepo) GetUserRewardBalance(userID uint) (int, error) {
+	var balance int
+	err := r.DB.Model(&models.Reward{}).Where("user_id = ?", userID).Select("SUM(balance)").Scan(&balance).Error
 	if err != nil {
-		// If the error is "record not found", return 0 balance
-		if err == gorm.ErrRecordNotFound {
-			return 0, nil
-		}
-		// Return the error if it's not a "record not found" error
-		return 0, fmt.Errorf("could not find reward for user: %v", err)
+		return 0, err
 	}
-
-	// Return the balance of the reward
-	return reward.Balance, nil
+	return balance, nil
 }
 
 func (r *rewardRepo) GetRewardPointByReportID(reportID string) (int, error) {
@@ -152,4 +145,33 @@ func (r *rewardRepo) GetUserReward(userID uint) (models.Reward, error) {
     }
 
     return reward, nil
+}
+
+func (r *rewardRepo) SumRewardBalanceByUserID(userID uint) (int, error) {
+	var totalBalance int
+	err := r.DB.Model(&models.Reward{}).Where("user_id = ?", userID).Select("SUM(balance)").Scan(&totalBalance).Error
+	if err != nil {
+		return 0, err
+	}
+	return totalBalance, nil
+}
+
+func (r *rewardRepo) GetRewardByUserID(userID uint) (*models.Reward, error) {
+    var reward models.Reward
+    
+    // Query the database to find the reward for the given userID
+    err := r.DB.Where("user_id = ?", userID).First(&reward).Error
+    
+    // Error handling: check if the record is not found or there's another error
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            // No reward record exists for this user, return nil without error
+            return nil, nil
+        }
+        // Return an error if something went wrong with the query
+        return nil, fmt.Errorf("error fetching reward for user %d: %w", userID, err)
+    }
+    
+    // Return the reward record for the user
+    return &reward, nil
 }

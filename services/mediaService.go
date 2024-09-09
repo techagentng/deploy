@@ -377,47 +377,61 @@ func getImageDimensions(file []byte) (int, int, error) {
 }
 
 func (m *mediaService) SaveMedia(media models.Media, reportID string, userID uint, imageCount int, videoCount int, audioCount int, totalPoints int) error {
-	// Generate a new UUID for the media ID
-	ID := uuid.New()
-	media.ID = ID.String()
-	media.UserID = userID
-	    // Multiply totalPoints by 10
-		rewardPoints := totalPoints * 10
+    // Generate a new UUID for the media ID
+    ID := uuid.New()
+    media.ID = ID.String()
+    media.UserID = userID
 
-		// Set the points on the media
-		media.Points = rewardPoints
-	// media.IncidentReportID = reportID
-	media.Points = totalPoints
-fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxT", rewardPoints)
-	// Save the media to the database
-	err := m.mediaRepo.SaveMedia(media, reportID, userID)
-	if err != nil {
-		return err
-		// log.Println("error happened", err)
-	}
-	var mcount models.MediaCount
-	mcount.Images = imageCount
-	mcount.Videos = videoCount
-	mcount.Audios = audioCount
-	mcount.IncidentReportID = reportID
-	mcount.UserID = userID
+    // Multiply totalPoints by 10
+    rewardPoints := totalPoints * 10
 
-	// Update the reward points and balance
-    reward, err := m.rewardRepo.GetUserReward(userID)
+    // Set the points on the media (remove the redundant assignment)
+    media.Points = rewardPoints
+
+    fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxT", rewardPoints)
+
+    // Save the media to the database
+    err := m.mediaRepo.SaveMedia(media, reportID, userID)
     if err != nil {
         return err
     }
 
-    // Update the balance and points
+    // Create and save the media count for the report
+    var mcount models.MediaCount
+    mcount.Images = imageCount
+    mcount.Videos = videoCount
+    mcount.Audios = audioCount
+    mcount.IncidentReportID = reportID
+    mcount.UserID = userID
+
+    // Get the user's reward record
+    reward, err := m.rewardRepo.GetRewardByUserID(userID)
+    if err != nil {
+        return err
+    }
+
+    // If no reward record exists, create a new one
+    if reward == nil {
+        reward = &models.Reward{
+            UserID:  userID,
+            Balance: 0,
+            Point:   0,
+        }
+    }
+
+    // Update the reward balance and points
     reward.Balance += rewardPoints
     reward.Point += rewardPoints
-	err = m.rewardRepo.SaveReward(&reward)
+
+    // Save the updated reward record
+    err = m.rewardRepo.SaveReward(reward)
     if err != nil {
         return err
     }
 
     return nil
 }
+
 
 func processAndStoreVideo(fileBytes []byte) (string, string, string, error) {
 	videoFilename := generateUniqueFilename(".mp4")
