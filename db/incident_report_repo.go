@@ -3,6 +3,7 @@ package db
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -71,6 +72,7 @@ type IncidentReportRepository interface {
 	GetTopCategories() ([]string, []int, error)
 	GetReportsByCategoryAndReportID(category string, reportID string) ([]models.ReportType, error)
 	GetReportsByCategory(category string) ([]models.ReportType, error)
+	GetFilteredIncidentReports(category, state, lga string) ([]models.IncidentReport, []string, error)
 }
 
 type incidentReportRepo struct {
@@ -82,40 +84,54 @@ func NewIncidentReportRepo(db *GormDB) IncidentReportRepository {
 }
 
 func (i *incidentReportRepo) UpdateReward(userID uint, reward *models.Reward) error {
-	// Find the existing reward for the user
-	existingReward := &models.Reward{}
+    // Find the existing reward for the user
+    existingReward := &models.Reward{}
 
-	// Retrieve the existing reward from the database
-	if err := i.DB.Where("user_id = ?", userID).First(existingReward).Error; err != nil {
-		// Check if the error is due to record not found
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// If record not found, create a new reward with the provided details
-			// and save it to the database
-			if err := i.DB.Create(reward).Error; err != nil {
-				return err
-			}
-			return nil
-		}
-		// Return other errors
-		return err
-	}
+    // Retrieve the existing reward from the database
+    if err := i.DB.Where("user_id = ?", userID).First(existingReward).Error; err != nil {
+        // Check if the error is due to record not found
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            // If record not found, create a new reward with the provided details
+            // and save it to the database
+            if err := i.DB.Create(reward).Error; err != nil {
+                return err
+            }
+            return nil
+        }
+        // Return other errors
+        return err
+    }
 
-	// Update the existing reward with the new values
-	existingReward.RewardType = reward.RewardType
-	existingReward.Point = reward.Point
-	existingReward.IncidentReportID = reward.IncidentReportID
+    // Use COALESCE to handle NULL sums
+    var totalBalance sql.NullInt64
+    err := i.DB.Table("rewards").Select("COALESCE(SUM(balance), 0)").Where("user_id = ?", userID).Scan(&totalBalance).Error
+    if err != nil {
+        return fmt.Errorf("failed to retrieve total balance: %w", err)
+    }
 
-	// Update the balance if provided in the reward parameter
-	if reward.Balance != 0 {
-		existingReward.Balance = reward.Balance
-	}
+    // Log or use the balance
+    if totalBalance.Valid {
+        fmt.Println("Total balance:", totalBalance.Int64)
+    } else {
+        fmt.Println("Total balance is 0")
+    }
 
-	// Save the updated reward to the database
-	if err := i.DB.Save(existingReward).Error; err != nil {
-		return err
-	}
+    // Update the existing reward with the new values
+    existingReward.RewardType = reward.RewardType
+    existingReward.Point = reward.Point
+    existingReward.IncidentReportID = reward.IncidentReportID
 
-	return nil
+    // Update the balance if provided in the reward parameter
+    if reward.Balance != 0 {
+        existingReward.Balance = reward.Balance
+    }
+
+    // Save the updated reward to the database
+    if err := i.DB.Save(existingReward).Error; err != nil {
+        return fmt.Errorf("failed to update reward: %w", err)
+    }
+
+    return nil
 }
 
 func (i *incidentReportRepo) SaveIncidentReport(report *models.IncidentReport) (*models.IncidentReport, error) {
@@ -1071,4 +1087,32 @@ func (repo *incidentReportRepo) GetReportsByCategory(category string) ([]models.
     return reports, nil
 }
 
+func (i *incidentReportRepo) GetFilteredIncidentReports(category, state, lga string) ([]models.IncidentReport, []string, error) {
+    var reports []models.IncidentReport
+    var filters []string
 
+    // Start building the query
+    query := i.DB.Model(&models.IncidentReport{})
+
+    // Apply the filters only if they are provided
+    if category != "" {
+        query = query.Where("category = ?", category)
+        filters = append(filters, category)  // Append the category value, not the name
+    }
+    if state != "" {
+        query = query.Where("state_name = ?", state)
+        filters = append(filters, state)  // Append the state value
+    }
+    if lga != "" {
+        query = query.Where("lga_name = ?", lga)
+        filters = append(filters, lga)  // Append the LGA value
+    }
+
+    // Execute the query and get the results
+    if err := query.Find(&reports).Error; err != nil {
+        return nil, nil, err
+    }
+
+    // Return the incident reports and the filters that were applied
+    return reports, filters, nil
+}

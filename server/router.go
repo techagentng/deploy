@@ -143,6 +143,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/top/report/categories", s.handleGetTopCategories())
 	authorized.GET("/report/type/id", s.GetReportsByCategory())
 	authorized.GET("/get/user/balance", s.handleGetUserRewardBalance())
+	authorized.GET("reports/filters", s.handleGetReportsByFilters())
 	
 	
 	// authorized.GET("/api/v1/report/counts/state/:state/lga", s.GetReportTypeCountsByLGA)

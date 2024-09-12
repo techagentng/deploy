@@ -1540,3 +1540,29 @@ func (s *Server) GetReportsByCategory() gin.HandlerFunc {
     }
 }
 
+func (s *Server) handleGetReportsByFilters() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        category := c.Query("category")
+        state := c.Query("state")
+        lga := c.Query("lga")
+
+        // Call the repository function with all filters
+        reports, filters, err := s.IncidentReportRepository.GetFilteredIncidentReports(category, state, lga)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        if len(reports) == 0 {
+            c.JSON(http.StatusOK, gin.H{"message": "No reports found for the specified filters"})
+            return
+        }
+
+        // Return the reports and the applied filters
+        c.JSON(http.StatusOK, gin.H{
+            "reports": reports,
+            "filters": filters,
+        })
+    }
+}
+
