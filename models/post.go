@@ -6,6 +6,6 @@ type Post struct {
 	UserID          uint   `json:"user_id" gorm:"foreignKey:ID"`
 	Title           string `json:"post"`
 	PostCategory    string `json:"post_category"`
-	Image           string `json:"string"`
+	Image           string `json:"post_image"`
 	PostDescription string `json:"post_description"`
 }

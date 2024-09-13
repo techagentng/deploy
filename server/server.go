@@ -27,6 +27,8 @@ type Server struct {
 	RewardService            services.RewardService
 	RewardRepository         db.RewardRepository
 	LikeService              services.LikeService
+	PostService              services.PostService
+	PostRepository           db.PostRepository
 	DB                       db.GormDB
 }
 

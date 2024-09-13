@@ -90,7 +90,8 @@ func migrate(db *gorm.DB) error {
         &models.SubReport{},
         &models.Votes{},
         &models.UserPoints{},
-        &models.Role{}, // Ensure Role model is included
+        &models.Role{}, 
+        &models.Post{},
     )
     if err != nil {
         return fmt.Errorf("migrations error: %v", err)

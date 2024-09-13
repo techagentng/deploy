@@ -30,12 +30,14 @@ func main() {
 	incidentReportRepo := db.NewIncidentReportRepo(gormDB)
 	rewardRepo := db.NewRewardRepo(gormDB)
 	likeRepo := db.NewLikeRepo(gormDB)
+	postRepo := db.NewPostRepo(gormDB)
 
 	authService := services.NewAuthService(authRepo, conf)
 	mediaService := services.NewMediaService(mediaRepo, rewardRepo, incidentReportRepo, conf)
 	incidentReportService := services.NewIncidentReportService(incidentReportRepo, rewardRepo, mediaRepo, conf)
 	rewardService := services.NewRewardService(rewardRepo, incidentReportRepo, conf)
 	likeService := services.NewLikeService(likeRepo, conf)
+	postService := services.NewPostService(postRepo, conf)
 
 	s := &server.Server{
 		Mail:                     mailgunClient,
@@ -49,6 +51,8 @@ func main() {
 		RewardService:            rewardService,
 		RewardRepository:         rewardRepo,
 		LikeService:              likeService,
+		PostService:              postService,
+		PostRepository:           postRepo, 
 		DB:                       db.GormDB{},
 	}
 
