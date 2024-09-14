@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
+	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
@@ -518,10 +519,16 @@ func (s *Server) googleSignInUser(c *gin.Context, token string) (*AuthPayload, e
 		return nil, fmt.Errorf("unable to get user details from google: %v", err)
 	}
 
-	// Fetch or determine the role for the user
+	// Fetch the role for the user based on their email
 	role, err := s.AuthRepository.FindRoleByUserEmail(googleUserDetails.Email)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch role for user: %v", err)
+	}
+
+	// Check if the role is valid
+	if role == nil || role.ID == uuid.Nil {
+		log.Printf("Role is invalid for user %s, defaulting to 'default_role'", googleUserDetails.Email)
+		role = &models.Role{ID: uuid.Nil, Name: "User"}
 	}
 
 	// Call GetGoogleSignInToken with the googleUserDetails and the found role
@@ -536,6 +543,7 @@ func (s *Server) googleSignInUser(c *gin.Context, token string) (*AuthPayload, e
 
 	return authPayload, nil
 }
+
 
 // getUserInfoFromGoogle will return information of user which is fetched from Google
 func (srv *Server) getUserInfoFromGoogle(token string) (*GoogleUser, error) {
@@ -602,13 +610,15 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
     }
 
     // Use the roleName provided in the function argument
-    var roleNameString string
-    if roleName == nil || roleName.Name == "" {
-        log.Println("RoleName is nil or empty. Using default role.")
-        roleNameString = "User"
-    } else {
-        roleNameString = roleName.Name
-    }
+	var roleNameString string
+	if roleName == nil || roleName.ID == uuid.Nil {
+		log.Printf("RoleName is nil or has an invalid ID. Fetching role or using default.")
+		// Handle fetching role logic here or assign a default role
+		roleNameString = "default_role" // or handle fetching a default role
+	} else {
+		roleNameString = roleName.Name
+	}
+	
 
     log.Printf("Generating token pair for user: %s", googleUserDetails.Email)
 
