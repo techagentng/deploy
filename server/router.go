@@ -68,7 +68,7 @@ func (s *Server) setupRouter() *gin.Engine {
 	}))
 	
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:    []string{"https://citizenx-dashboard-sbqx.onrender.com"},
+		AllowOrigins:    []string{"https://citizenx-9hk2.onrender.com/api/v1/google/login"},
 		AllowMethods:    []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:    []string{"Origin", "Authorization", "Content-Type"},
 		AllowCredentials: true,
