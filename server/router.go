@@ -60,13 +60,21 @@ func (s *Server) setupRouter() *gin.Engine {
 	// }
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"https://citizenx-dashboard-sbqx.onrender.com"},
 		AllowAllOrigins: true,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		AllowMethods:    []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders:    []string{"Origin", "Authorization", "Content-Type"},
 		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
+		MaxAge:          12 * time.Hour,
 	}))
+	
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:    []string{"https://citizenx-dashboard-sbqx.onrender.com"},
+		AllowMethods:    []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders:    []string{"Origin", "Authorization", "Content-Type"},
+		AllowCredentials: true,
+		MaxAge:          12 * time.Hour,
+	}))
+	
 	r.MaxMultipartMemory = 32 << 20
 	s.defineRoutes(r)
 
