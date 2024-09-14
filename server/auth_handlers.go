@@ -606,7 +606,7 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
     if roleName != nil {
         roleNameString = roleName.Name
     } else {
-        roleNameString = "default_role" // Fallback if no role is provided
+        roleNameString = "User" 
     }
 
     log.Printf("Generating token pair for user: %s", googleUserDetails.Email)
