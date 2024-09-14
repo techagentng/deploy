@@ -603,10 +603,11 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
 
     // Use the roleName provided in the function argument
     var roleNameString string
-    if roleName != nil {
-        roleNameString = roleName.Name
+    if roleName == nil || roleName.Name == "" {
+        log.Println("RoleName is nil or empty. Using default role.")
+        roleNameString = "User"
     } else {
-        roleNameString = "User" 
+        roleNameString = roleName.Name
     }
 
     log.Printf("Generating token pair for user: %s", googleUserDetails.Email)
@@ -634,6 +635,7 @@ func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleU
     log.Printf("Auth payload generated for user %s: %+v", googleUserDetails.Email, payload)
     return payload, nil
 }
+
 
 func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUser) (*models.User, error) {
 	log.Printf("Attempting to sign up user with email: %s", googleUserDetails.Email)
