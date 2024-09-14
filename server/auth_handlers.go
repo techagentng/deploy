@@ -514,36 +514,35 @@ func AddRefreshTokenSessionEntry(c context.Context, duration time.Duration) func
 }
 
 func (s *Server) googleSignInUser(c *gin.Context, token string) (*AuthPayload, error) {
-	googleUserDetails, err := s.getUserInfoFromGoogle(token)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get user details from google: %v", err)
-	}
+    googleUserDetails, err := s.getUserInfoFromGoogle(token)
+    if err != nil {
+        return nil, fmt.Errorf("unable to get user details from google: %v", err)
+    }
 
-	// Fetch the role for the user based on their email
-	role, err := s.AuthRepository.FindRoleByUserEmail(googleUserDetails.Email)
-	if err != nil {
-		return nil, fmt.Errorf("unable to fetch role for user: %v", err)
-	}
+    // Fetch user by email to get the role ID
+    user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
+    if err != nil {
+        return nil, fmt.Errorf("unable to fetch user by email: %v", err)
+    }
 
-	// Check if the role is valid
-	if role == nil || role.ID == uuid.Nil {
-		log.Printf("Role is invalid for user %s, defaulting to 'default_role'", googleUserDetails.Email)
-		role = &models.Role{ID: uuid.Nil, Name: "User"}
-	}
+    // Fetch the role by ID
+    role, err := s.AuthRepository.FindRoleByID(user.RoleID)
+    if err != nil {
+        return nil, fmt.Errorf("unable to fetch role for user: %v", err)
+    }
 
-	// Call GetGoogleSignInToken with the googleUserDetails and the found role
-	authPayload, err := s.GetGoogleSignInToken(c, googleUserDetails, role)
-	if err != nil {
-		return nil, fmt.Errorf("unable to sign in user: %v", err)
-	}
+    // Call GetGoogleSignInToken with the googleUserDetails and the found role
+    authPayload, err := s.GetGoogleSignInToken(c, googleUserDetails, role)
+    if err != nil {
+        return nil, fmt.Errorf("unable to sign in user: %v", err)
+    }
 
-	// Log the Google user details and the authentication payload for debugging
-	fmt.Println("Google user details:", googleUserDetails)
-	fmt.Printf("Auth Payload: %+v\n", authPayload)
+    // Log the Google user details and the authentication payload for debugging
+    fmt.Println("Google user details:", googleUserDetails)
+    fmt.Printf("Auth Payload: %+v\n", authPayload)
 
-	return authPayload, nil
+    return authPayload, nil
 }
-
 
 // getUserInfoFromGoogle will return information of user which is fetched from Google
 func (srv *Server) getUserInfoFromGoogle(token string) (*GoogleUser, error) {
