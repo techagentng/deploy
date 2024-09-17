@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/techagentng/citizenx/errors"
 	"github.com/techagentng/citizenx/server/response"
 	"github.com/techagentng/citizenx/services"
+	"github.com/techagentng/citizenx/services/jwt"
 	// jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
 
 func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Parse the email from the request
 		email := struct {
-			Email string `json:"email" binding:"required"`
+			Email string `json:"email" binding:"required,email"`
 		}{}
 		errs := decode(c, &email)
 		if errs != nil {
@@ -23,27 +25,39 @@ func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 			return
 		}
 
+		// Find user by email
 		user, err := s.AuthRepository.FindUserByEmail(email.Email)
-		if err != nil {
-			response.JSON(c, "", http.StatusNotFound, nil, errors.New("user not found", http.StatusNotFound))
+		if err != nil || user == nil {
+			response.JSON(c, "", http.StatusNotFound, nil, fmt.Errorf("user not found"))
 			return
 		}
 
-		// Check if user is nil
-		if user == nil {
-			response.JSON(c, "", http.StatusNotFound, nil, errors.New("user not found", http.StatusNotFound))
+        // Generate password reset token
+        resetToken, err := jwt.GeneratePasswordResetToken(user.ID, s.Config.JWTSecret)
+        if err != nil {
+            response.JSON(c, "failed to generate reset token", http.StatusInternalServerError, nil, err)
+            return
+        }
+
+		baseURL := os.Getenv("BASE_URL")
+		if baseURL == "" {
+			baseURL = "http://localhost:3002"
+		}
+		// Create reset link
+		resetLink := fmt.Sprintf("%s/reset-password/%s", baseURL, resetToken)
+
+		// Send password reset email
+		_, err = s.Mail.SendResetPassword(user.Email, resetLink)
+		if err != nil {
+			response.JSON(c, "connection to mail service interrupted", http.StatusInternalServerError, nil, err)
 			return
 		}
 
-		//link := fmt.Sprintf("%s/verifyEmail/%s", s.Config.BaseUrl, token)
-		_, err = s.Mail.SendResetPassword(user.Email, fmt.Sprintf("http://localhost:3000/reset-password/%d", user.ID))
-		if err != nil {
-			response.JSON(c, "connection to mail service interupted", http.StatusInternalServerError, nil, err)
-			return
-		}
+		// Respond with success
 		response.JSON(c, "Reset Password Link Sent Successfully", http.StatusOK, nil, nil)
 	}
 }
+
 
 func (s *Server) ResetPassword() gin.HandlerFunc {
 	return func(c *gin.Context) {

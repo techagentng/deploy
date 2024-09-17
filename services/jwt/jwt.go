@@ -162,3 +162,28 @@ func GenerateMacAddressClaims(macAddress string) jwt.MapClaims {
 	}
 	return accessClaims
 }
+
+// GeneratePasswordResetToken generates a token specifically for password reset
+func GeneratePasswordResetToken(userID uint, secret string) (string, error) {
+    if secret == "" {
+        return "", errors.New("secret key is required", http.StatusInternalServerError)
+    }
+
+    // Create claims with user ID and an expiration time for the reset token
+    resetTokenClaims := jwt.MapClaims{
+        "user_id": userID,
+        "exp":     time.Now().Add(time.Hour * 1).Unix(), // Token valid for 1 hour
+        "type":    "password_reset_token",
+    }
+
+    // Create a new token object with the claims
+    resetToken := jwt.NewWithClaims(jwt.SigningMethodHS256, resetTokenClaims)
+
+    // Sign and get the complete encoded token as a string using the secret
+    resetTokenString, err := resetToken.SignedString([]byte(secret))
+    if err != nil {
+        return "", err
+    }
+
+    return resetTokenString, nil
+}

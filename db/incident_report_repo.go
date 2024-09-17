@@ -67,7 +67,7 @@ type IncidentReportRepository interface {
 	SaveBookmark(bookmark *models.Bookmark) error
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 	GetReportsByUserID(userID uint) ([]models.ReportType, error)
-	GetReportTypeCountsByLGA(lga string) ([]string, []int, error)
+	GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error)
 	GetReportCountsByState(state string) ([]string, []int, error)
 	GetTopCategories() ([]string, []int, error)
 	GetReportsByCategoryAndReportID(category string, reportID string) ([]models.ReportType, error)
@@ -939,9 +939,10 @@ func (repo *incidentReportRepo) GetReportsByUserID(userID uint) ([]models.Report
     return reports, nil
 }
 
-func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) ([]string, []int, error) {
+func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error) {
     var reportTypes []string
     var counts []int
+    var totalCount int
 
     // SQL query to get report types and their counts for the specified LGA
     query := `
@@ -955,7 +956,7 @@ func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) ([]string, 
     // Execute the query
     rows, err := repo.DB.Raw(query, lga).Rows()
     if err != nil {
-        return nil, nil, err
+        return nil, err
     }
     defer rows.Close()
 
@@ -964,18 +965,27 @@ func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) ([]string, 
         var reportType string
         var count int
         if err := rows.Scan(&reportType, &count); err != nil {
-            return nil, nil, err
+            return nil, err
         }
         reportTypes = append(reportTypes, reportType)
         counts = append(counts, count)
+        totalCount += count // Sum up the report counts
     }
 
     if err := rows.Err(); err != nil {
-        return nil, nil, err
+        return nil, err
     }
 
-    return reportTypes, counts, nil
+    // Prepare the final response structure
+    response := map[string]interface{}{
+        "report_types":  reportTypes,
+        "report_counts": counts,
+        "total_count":   totalCount,
+    }
+
+    return response, nil
 }
+
 
 // Repository function
 func (repo *incidentReportRepo) GetReportCountsByState(state string) ([]string, []int, error) {

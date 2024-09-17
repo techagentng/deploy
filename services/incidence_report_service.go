@@ -27,7 +27,7 @@ type IncidentReportService interface {
 	BookmarkReport(userID uint, reportID string) error
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 	GetUserReports(userID uint) ([]models.ReportType, error)
-	GetReportTypeCountsByLGA(lga string) ([]string, []int, error)
+	GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error)
 }
 
 type IncidentService struct {
@@ -237,6 +237,6 @@ func (s *IncidentService) GetUserReports(userID uint) ([]models.ReportType, erro
     return s.incidentRepo.GetReportsByUserID(userID)
 }
 
-func (s *IncidentService) GetReportTypeCountsByLGA(lga string) ([]string, []int, error) {
+func (s *IncidentService) GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error) {
     return s.incidentRepo.GetReportTypeCountsByLGA(lga)
 }

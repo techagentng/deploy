@@ -1465,20 +1465,20 @@ func (s *Server) HandleGetReportsByUserID() gin.HandlerFunc {
 
 func (s *Server) GetReportTypeCountsByLGA() gin.HandlerFunc {
     return func(c *gin.Context) {
-        lga := c.Param("lga") 
+        lga := c.Param("lga")
 
-        reportTypes, reportCounts, err := s.IncidentReportService.GetReportTypeCountsByLGA(lga)
+        // Get the result as a map from the service
+        result, err := s.IncidentReportService.GetReportTypeCountsByLGA(lga)
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
             return
         }
 
-        c.JSON(http.StatusOK, gin.H{
-            "report_types":  reportTypes,
-            "report_counts": reportCounts,
-        })
+        // Send the result map as JSON
+        c.JSON(http.StatusOK, result)
     }
 }
+
 
 func (s *Server) GetReportCountsByStateAndLGA() gin.HandlerFunc {
     return func(c *gin.Context) {
