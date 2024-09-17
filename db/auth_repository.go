@@ -40,6 +40,7 @@ type AuthRepository interface {
 	FindRoleByName(name string) (*models.Role, error)
 	GetUserRoleByUserID(userID uint) (*models.Role, error)
 	SoftDeleteUser(userID uint) error
+	UpdateUserPassword(user *models.User, hashedPassword string) error
 }
 
 type authRepo struct {
@@ -445,4 +446,10 @@ func (a *authRepo) SoftDeleteUser(userID uint) error {
 
     // Perform soft delete
     return a.DB.Delete(&user).Error
+}
+
+// UpdateUserPassword updates the password for a given user
+func (a *authRepo) UpdateUserPassword(user *models.User, hashedPassword string) error {
+	user.Password = hashedPassword
+	return a.DB.Save(user).Error
 }

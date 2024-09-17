@@ -2,16 +2,15 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
-    "github.com/dgrijalva/jwt-go"
+    "golang.org/x/crypto/bcrypt"
 	"github.com/gin-gonic/gin"
 	"github.com/techagentng/citizenx/errors"
+	"github.com/golang-jwt/jwt"
 	"github.com/techagentng/citizenx/server/response"
-	"github.com/techagentng/citizenx/models"
-	"github.com/techagentng/citizenx/services/jwt"
+	"github.com/techagentng/citizenx/services/utils"
 	// jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
 
@@ -35,7 +34,7 @@ func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 		}
 
         // Generate password reset token
-        resetToken, err := jwt.GeneratePasswordResetToken(user.ID, s.Config.JWTSecret)
+        resetToken, err := utils.GeneratePasswordResetToken(user.Email, s.Config.JWTSecret)
         if err != nil {
             response.JSON(c, "failed to generate reset token", http.StatusInternalServerError, nil, err)
             return
@@ -66,43 +65,45 @@ type ResetPasswordRequest struct {
 }
 
 // ResetPasswordHandler handles the reset password request
-func ResetPasswordHandler(c *gin.Context) {
-	var req ResetPasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Step 1: Parse and validate the request
+        var req ResetPasswordRequest
+        if err := c.ShouldBindJSON(&req); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+            return
+        }
 
-	// Step 1: Validate the reset token
-	claims, err := utils.VerifyResetToken(req.Token)
-	if err != nil || time.Now().After(claims.ExpiresAt.Time) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired token"})
-		return
-	}
+        // Step 2: Validate the reset token
+        claims, err := utils.VerifyResetToken(req.Token)
+        if err != nil || time.Now().After(time.Unix(claims.ExpiresAt, 0)) {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired token"})
+            return
+        }
 
-	// Step 2: Find the user associated with the token
-	var user models.User
-	if err := models.DB.Where("id = ?", claims.UserID).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
+        // Step 3: Find the user associated with the token
+        user, err := s.AuthRepository.FindUserByEmail(claims.Email)
+        if err != nil {
+            c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+            return
+        }
 
-	// Step 3: Hash the new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
-		return
-	}
+        // Step 4: Hash the new password
+        hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
+            return
+        }
 
-	// Step 4: Update the user's password in the database
-	user.Password = string(hashedPassword)
-	if err := models.DB.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update password"})
-		return
-	}
+		// Step 5: Update the user's password in the database
+		if err := s.AuthRepository.UpdateUserPassword(user, string(hashedPassword)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update password"})
+			return
+		}
 
-	// Step 5: Respond with success
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
+        // Step 6: Respond with success
+        c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
+    }
 }
 
 type TokenClaims struct {
@@ -121,7 +122,7 @@ func VerifyResetToken(tokenString string) (*TokenClaims, error) {
 
 	if claims, ok := token.Claims.(*TokenClaims); ok && token.Valid {
 		if claims.TokenType != "password_reset_token" {
-			return nil, errors.New("invalid token type")
+			return nil, errors.New("invalid token type", http.StatusAccepted)
 		}
 		return claims, nil
 	}
