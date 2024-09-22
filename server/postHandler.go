@@ -100,3 +100,49 @@ func (s *Server) handleCreatePost() gin.HandlerFunc {
     }
 }
 
+func (s *Server) handleGetPostsByUserID() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Get the access token from the authorization header
+        accessToken := getTokenFromHeader(c)
+        if accessToken == "" {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+            return
+        }
+
+        // Validate and decode the access token to get the userID
+        secret := s.Config.JWTSecret
+        accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+            return
+        }
+
+        var userID uint
+        switch userIDValue := accessClaims["id"].(type) {
+        case float64:
+            userID = uint(userIDValue)
+        default:
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
+            return
+        }
+
+        // Fetch all posts by the user from the database
+        posts, err := s.PostRepository.GetPostsByUserID(userID)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve posts"})
+            return
+        }
+
+        // Check if the user has no posts
+        if len(posts) == 0 {
+            c.JSON(http.StatusOK, gin.H{"message": "No posts found for this user"})
+            return
+        }
+
+        // Respond with the list of posts
+        c.JSON(http.StatusOK, gin.H{
+            "message": "Posts retrieved successfully",
+            "posts":   posts,
+        })
+    }
+}
