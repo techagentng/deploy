@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -188,14 +187,13 @@ func contains(slice []string, item string) bool {
 }
 
 func generateIDx() uuid.UUID {
-    id, err := uuid.NewUUID()
-    if err != nil {
-        log.Fatalf("Failed to generate UUID: %v", err)
-    }
-    return id
+	id, err := uuid.NewUUID()
+	if err != nil {
+		log.Fatalf("Failed to generate UUID: %v", err)
+	}
+	return id
 
 }
-
 
 func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*models.LGA, *models.State, *models.ReportType, string, string, error) {
 	apiKey := os.Getenv("GOOGLE_MAPS_API_KEY")
@@ -229,13 +227,13 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 	log.Printf("Fetched LGA: %s, State: %s", locality, state) // Add logging to verify fetched values
 
 	lga := &models.LGA{
-		ID:           generateIDx(),
-		Name:         locality,
+		ID:   generateIDx(),
+		Name: locality,
 	}
 
 	stateStruct := &models.State{
-		ID:       generateIDx(),
-		Name:     state,
+		ID:   generateIDx(),
+		Name: state,
 	}
 
 	userI, exists := c.Get("user")
@@ -258,108 +256,204 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 
 	return lga, stateStruct, reportType, locality, state, nil
 }
-		// Utility function to split URLs in a slice of strings if needed
-		func splitUrlSlice(urls []string) []string {
-			var result []string
-			for _, url := range urls {
-				result = append(result, strings.Split(url, ",")...)
-			}
-			return result
-		}
-		
-		func generateIDls() uuid.UUID {
-			id, err := uuid.NewUUID()
-			if err != nil {
-				log.Fatalf("Failed to generate UUID: %v", err)
-			}
-			return id
-		}
-// Handle the upload of media file
+
+// Utility function to split URLs in a slice of strings if needed
+func splitUrlSlice(urls []string) []string {
+	var result []string
+	for _, url := range urls {
+		result = append(result, strings.Split(url, ",")...)
+	}
+	return result
+}
+
+func generateIDls() uuid.UUID {
+	id, err := uuid.NewUUID()
+	if err != nil {
+		log.Fatalf("Failed to generate UUID: %v", err)
+	}
+	return id
+}
+
 func (s *Server) handleIncidentReport() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userI, exists := c.Get("user")
-		if !exists {
-			log.Println("User not found in context")
-			response.JSON(c, "", http.StatusUnauthorized, nil, errors.ErrNotFound)
-			return
-		}
-		userId := userI.(*models.User).ID
+    return func(c *gin.Context) {
+        // Retrieve user from the context
+        userI, exists := c.Get("user")
+        if !exists {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+            return
+        }
+
+        user, ok := userI.(*models.User)
+        if !ok {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type"})
+            return
+        }
+
+        userId := uint(user.ID)
+
+        // Retrieve fullName and username from context
         fullNameI, _ := c.Get("fullName")
         usernameI, _ := c.Get("username")
-		profileImageURLI, _ := c.Get("profile_image")
-		if !exists {
-			profileImageURLI = "default-profile-image-url" 
-		}
 
-			ProfileImageURL:= profileImageURLI.(string)
-		
+        // Get profile image URL from context with a fallback default value
+        profileImageURLI, exists := c.Get("profile_image")
+        if exists {
+            profileImageURLI, ok = profileImageURLI.(string)
+            if !ok {
+                log.Println("Invalid profile image URL type, using default")
+            }
+        }
 
-        fullName, ok := fullNameI.(string)
-        if !ok {
-            log.Println("Full name type assertion failed")
-            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
+        // Generate a unique report ID
+        reportID, err := generateID()
+        if err != nil {
+            log.Printf("Error generating ID: %v\n", err)
+            response.JSON(c, "Unable to generate report ID", http.StatusInternalServerError, nil, err)
             return
         }
 
-        usernameString, ok := usernameI.(string)
-        if !ok {
-            log.Println("Username type assertion failed")
-            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
+        // Set the reportID in the context for further use
+        c.Set("reportID", reportID)
+
+        // Parse latitude and longitude from the form
+        lat, lng, err := parseCoordinates(c)
+        if err != nil {
+            response.JSON(c, "Invalid latitude or longitude", http.StatusBadRequest, nil, err)
             return
         }
 
+        // Retrieve and parse media count from context, defaulting to 0 if not found or invalid
+        mediaCount := 0
+        mediaCountI, exists := c.Get("mediaCount")
+        if exists {
+            if mc, ok := mediaCountI.(int); ok {
+                mediaCount = mc
+            } else {
+                log.Println("Invalid type for media count, defaulting to 0")
+            }
+        }
+
+        // Create and populate the IncidentReport model with the data from the form
+        incidentReport := &models.IncidentReport{
+            ID:                   reportID,
+            UserFullname:         getStringOrFallback(fullNameI, ""),
+            DateOfIncidence:      c.PostForm("date_of_incidence"),
+            Description:          c.PostForm("description"),
+            FeedURLs:             "", // To be populated after media processing
+            ThumbnailURLs:        "", // To be populated after media processing
+            FullSizeURLs:         "", // To be populated after media processing
+            StateName:            c.PostForm("state_name"),
+            LGAName:              c.PostForm("lga_name"),
+            Latitude:             lat,
+            Longitude:            lng,
+            UserIsAnonymous:      false,
+            UserUsername:         getStringOrFallback(usernameI, ""),
+            Telephone:            c.PostForm("telephone"),
+            Email:                c.PostForm("email"),
+            Address:              c.PostForm("address"),
+            Landmark:             c.PostForm("landmark"),
+            LikeCount:            0,
+            ReportTypeID:         0, // Assuming reportTypeID should be set separately
+            ReportTypeName:       c.PostForm("report_type"),
+            Rating:               c.PostForm("rating"),
+            HospitalName:         c.PostForm("hospital_name"),
+            Department:           c.PostForm("department"),
+            DepartmentHeadName:   c.PostForm("department_head_name"),
+            AccidentCause:        c.PostForm("accident_cause"),
+            SchoolName:           c.PostForm("school_name"),
+            VicePrincipal:        c.PostForm("vice_principal"),
+            OutageLength:         c.PostForm("outage_length"),
+            AirportName:          c.PostForm("airport_name"),
+            Country:              c.PostForm("country"),
+            StateEmbassyLocation: c.PostForm("state_embassy_location"),
+            HospitalAddress:      c.PostForm("hospital_address"),
+            RoadName:             c.PostForm("road_name"),
+            AirlineName:          c.PostForm("airline_name"),
+            Category:             c.PostForm("category"),
+            Terminal:             c.PostForm("terminal"),
+            QueueTime:            c.PostForm("queue_time"),
+            NoWater:              c.PostForm("no_water") == "true",
+        }
+
+        // Process and save media files, if any, using the media service
+        feedURLs, thumbnailURLs, fullsizeURLs, _, err := s.processAndSaveMedia(c, userId)
+        if err != nil {
+            log.Printf("Error processing and saving media: %v\n", err)
+            response.JSON(c, "Unable to process media", http.StatusInternalServerError, nil, err)
+            return
+        }
+
+        // Update the incident report with media URLs
+        incidentReport.FeedURLs = strings.Join(feedURLs, ",")
+        incidentReport.ThumbnailURLs = strings.Join(thumbnailURLs, ",")
+        incidentReport.FullSizeURLs = strings.Join(fullsizeURLs, ",")
+
+        // Save the incident report to the database
+        savedIncidentReport, err := s.IncidentReportService.SaveReport(userId, lat, lng, incidentReport, reportID, mediaCount)
+        if err != nil {
+            log.Printf("Error saving incident report: %v\n", err)
+            response.JSON(c, "Unable to save incident report", http.StatusInternalServerError, nil, err)
+            return
+        }
+
+        // Respond with success and the saved incident report details
+        response.JSON(c, "Incident Report Submitted Successfully", http.StatusCreated, savedIncidentReport, nil)
+    }
+}
+
+// Helper function to parse coordinates from the request form
+func parseCoordinates(c *gin.Context) (float64, float64, error) {
+    lat, lng := 0.0, 0.0
+    var err error
+
+    if latStr := strings.TrimSpace(c.PostForm("latitude")); latStr != "" {
+        lat, err = strconv.ParseFloat(latStr, 64)
+        if err != nil {
+            return 0, 0, fmt.Errorf("invalid latitude: %v", err)
+        }
+    }
+
+    if lngStr := strings.TrimSpace(c.PostForm("longitude")); lngStr != "" {
+        lng, err = strconv.ParseFloat(lngStr, 64)
+        if err != nil {
+            return 0, 0, fmt.Errorf("invalid longitude: %v", err)
+        }
+    }
+
+    return lat, lng, nil
+}
+
+// Helper function to get a string from an interface{} or return a fallback value
+func getStringOrFallback(value interface{}, fallback string) string {
+    if str, ok := value.(string); ok {
+        return str
+    }
+    return fallback
+}
+
+
+func (s *Server) handleUploadMedia() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		const MaxFileSize = 32 << 20 // 32 MB
 
-		buf := new(bytes.Buffer)
-		_, err := io.CopyN(buf, c.Request.Body, int64(MaxFileSize))
-		if err != nil && err != io.EOF {
-			log.Printf("Error reading request body: %v\n", err)
-			response.JSON(c, "unable to read media", http.StatusInternalServerError, nil, errors.ErrInternalServerError)
-			return
-		}
-		
-		c.Request.Body = io.NopCloser(buf)
-
-		log.Println("About to parse multipart form")
 		if err := c.Request.ParseMultipartForm(MaxFileSize); err != nil {
 			log.Printf("Error parsing multipart form: %v\n", err)
-			response.JSON(c, "unable to parse media", http.StatusInternalServerError, nil, errors.ErrInternalServerError)
+			response.JSON(c, "Unable to parse media", http.StatusInternalServerError, nil, errors.ErrInternalServerError)
 			return
 		}
-		log.Println("Parsed multipart form successfully")
 
 		formMedia := c.Request.MultipartForm.File["mediaFiles"]
-		totalPoints := len(formMedia)
-		log.Printf("Number of files received: %d\n", len(formMedia))
-
-		reportID, err := generateID()
-		if err != nil {
-			log.Printf("Error generating ID: %v\n", err)
-			response.JSON(c, "Unable to generate report ID", http.StatusInternalServerError, nil, err)
-			return
-		}
+		mediaCount := len(formMedia)
 
 		results := make(chan mediaResult)
-		mediaTypeCounts := make(map[string]int)
-
 		var wg sync.WaitGroup
-		mu := &sync.Mutex{}
+
 		for _, fileHeader := range formMedia {
 			wg.Add(1)
 			go func(fileHeader *multipart.FileHeader) {
 				defer wg.Done()
+				// Call your saveChunk or similar method to handle the upload
 				s.saveChunk(fileHeader, results)
-
-				supported, fileType := CheckSupportedFile(fileHeader.Filename)
-				if !supported {
-					log.Printf("Unsupported file type: %s\n", fileHeader.Filename)
-					return
-				}
-
-				mu.Lock()
-				mediaTypeCounts[fileType]++
-				log.Printf("File type: %s, Count: %d\n", fileType, mediaTypeCounts[fileType])
-				mu.Unlock()
 			}(fileHeader)
 		}
 
@@ -368,222 +462,405 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			close(results)
 		}()
 
-		var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
-
+		// Handle the results
 		for result := range results {
 			if result.Error != nil {
 				log.Printf("Error processing media: %v\n", result.Error)
 				response.JSON(c, "Unable to process media", http.StatusInternalServerError, nil, result.Error)
 				return
 			}
-			feedURLs = append(feedURLs, result.FeedURL)
-			thumbnailURLs = append(thumbnailURLs, result.ThumbnailURL)
-			fullsizeURLs = append(fullsizeURLs, result.FullSizeURL)
-			fileTypes = append(fileTypes, result.FileType)
+			// Handle successful uploads (e.g., store URLs, etc.)
 		}
 
-		if len(feedURLs) > 0 {
-			processedFeedURLs, processedThumbnailURLs, processedFullsizeURLs, processedFileTypes, err := s.MediaService.ProcessMedia(c, formMedia, userId, reportID)
-			if err != nil {
-				log.Printf("Error processing media: %v\n", err)
-				response.JSON(c, "Unable to process media", http.StatusInternalServerError, nil, err)
-				return
-			}
-		
-			// If feedURLs is a slice of comma-separated URLs as strings, split them first
-			currentFeedURLs := splitUrlSlice(feedURLs)
-			currentThumbnailURLs := splitUrlSlice(thumbnailURLs)
-			currentFullsizeURLs := splitUrlSlice(fullsizeURLs)
-		
-			// Now, append the processed URLs to the existing arrays
-			feedURLs = append(currentFeedURLs, processedFeedURLs...)
-			thumbnailURLs = append(currentThumbnailURLs, processedThumbnailURLs...)
-			fullsizeURLs = append(currentFullsizeURLs, processedFullsizeURLs...)
-			fileTypes = append(fileTypes, processedFileTypes...)
-		}
-		wg.Wait()
-		
-		// Log media type counts and calculate totals
-		for fileType, count := range mediaTypeCounts {
-			log.Printf("File type: %s, Count: %d\n", fileType, count)
-		}
-		
-		imageCount, videoCount, audioCount := CreateMediaCount(mediaTypeCounts)
-		// totalPoints = calculateMediaPoints(mediaTypeCounts)
-		log.Println("Image count:", imageCount)
-		log.Println("Total points:", totalPoints)
-		
-		var feedURL, thumbnailURL, fullsizeURL, fileType string
-		if len(feedURLs) > 0 {
-			feedURL = strings.Join(feedURLs, ",")
-			thumbnailURL = strings.Join(thumbnailURLs, ",")
-			fullsizeURL = strings.Join(fullsizeURLs, ",")
-			fileType = fileTypes[0]
-		} else {
-			feedURL, thumbnailURL, fullsizeURL, fileType = "", "", "", "unknown"
-		}
+		// Store mediaCount in context for later use
+		c.Set("mediaCount", mediaCount)
 
-		media := models.Media{
-			UserID:       userId,
-			FeedURL:      feedURL,
-			ThumbnailURL: thumbnailURL,
-			FullSizeURL:  fullsizeURL,
-			FileType:     fileType,
-		}
-
-		if err := s.MediaService.SaveMedia(media, reportID, userId, imageCount, videoCount, audioCount, totalPoints); err != nil {
-			log.Printf("Error saving media: %v\n", err)
-			response.JSON(c, "Unable to save media", http.StatusInternalServerError, nil, err)
-			return
-		}
-
-		var lat, lng float64
-		if latStr := strings.TrimSpace(c.PostForm("latitude")); latStr != "" {
-			lat, err = strconv.ParseFloat(latStr, 64)
-			if err != nil {
-				response.JSON(c, "Invalid latitude", http.StatusBadRequest, nil, err)
-				return
-			}
-		}
-
-		if lngStr := strings.TrimSpace(c.PostForm("longitude")); lngStr != "" {
-			lng, err = strconv.ParseFloat(lngStr, 64)
-			if err != nil {
-				response.JSON(c, "Invalid longitude", http.StatusBadRequest, nil, err)
-				return
-			}
-		}
-
-		lga, stateStruct, reportType, locality, state, err := fetchGeocodingData(lat, lng, c, reportID)
-		if err != nil {
-			log.Printf("Error fetching geocoding data: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		log.Printf("Final State: %s, LGA: %s", reportType.StateName, reportType.LGAName) 
-
-		incidentReport := &models.IncidentReport{
-			ID:                   reportID,
-			CreatedAt:            0,
-			UserFullname:         fullName,
-			DateOfIncidence:      c.PostForm("date_of_incidence"),
-			Description:          c.PostForm("description"),
-			FeedURLs:             feedURL,
-			ThumbnailURLs:        ProfileImageURL,
-			FullSizeURLs:         fullsizeURL,
-			ProductName:          "",
-			StateName:            c.PostForm("state_name"),
-			LGAName:              c.PostForm("lga_name"),
-			Latitude:             lat,
-			Longitude:            lng,
-			UserIsAnonymous:      false,
-			Address:              "",
-			UserUsername:         usernameString,
-			Telephone:            "",
-			Email:                "",
-			View:                 0,
-			IsVerified:           false,
-			UserID:               userId,
-			ReportTypeID:         reportID,
-			AdminID:              0,
-			Landmark:             c.PostForm("landmark"),
-			LikeCount:            0,
-			IsResponse:           false,
-			TimeofIncidence:      time.Now(),
-			ReportStatus:         "Verified",
-			ReportTypeName:       c.PostForm("report_type"),
-			Rating:               c.PostForm("rating"),
-			HospitalName:         c.PostForm("hospital_name"),
-			Department:           c.PostForm("department"),
-			DepartmentHeadName:   c.PostForm("department_head_name"),
-			AccidentCause:        c.PostForm("accident_cause"),
-			SchoolName:           c.PostForm("school_name"),
-			VicePrincipal:        c.PostForm("vice_principal"),
-			OutageLength:         c.PostForm("outage_length"),
-			AirportName:          c.PostForm("airport_name"),
-			Country:              c.PostForm("country"),
-			StateEmbassyLocation: state,
-			NoWater:              true,
-			HospitalAddress:      c.PostForm("hospital_address"),
-			RoadName:             c.PostForm("road_name"),
-			AirlineName:          c.PostForm("airline_name"),
-			Category:             c.PostForm("category"),
-			Terminal:             c.PostForm("terminal"),
-			QueueTime:            c.PostForm("queue_time"),
-		}
-
-		uuidReportID, err := uuid.Parse(reportID)
-		if err != nil {
-			log.Fatalf("Failed to parse reportID: %v", err)
-		}
-
-		sub := &models.SubReport{
-			ID:                 uuidReportID,
-			ReportTypeID:       reportType.ID,
-			SubReportType: c.PostForm("sub_report_type"),
-		}
-
-		// Check if stateName and lgaName are empty, replace with statestring and lgastring if so
-		if c.PostForm("state_name") == "" && c.PostForm("lga_name") == "" {
-			reportType.StateName = state
-			reportType.LGAName = locality
-		}
-
-		// Call repo to save the report type
-		_, err = s.IncidentReportRepository.SaveReportType(reportType)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": "Unable to save report type",
-				"error":   err.Error(),
-			})
-			return
-		}
-
-		_, err = s.IncidentReportRepository.SaveSubReport(sub)
-		if err != nil {
-			return
-		}
-		stateID := generateIDls()
-		lgaID := generateIDls()
-		
-
-		stateStruct = &models.State{
-			ID:   stateID,
-			Name: c.PostForm("state_name"),
-		}
-    // Create LGA and State objects with generated IDs
-    lga = &models.LGA{
-    	ID:      lgaID,
-    	Name:    c.PostForm("lga_name"),
-    	StateID: stateID,
-    	State:   models.State{},
-    }
-
-
-
-	log.Printf("Generated LGA ID: %s", lga)
-log.Printf("Generated State ID: %s", stateStruct)
-
-		err = s.IncidentReportRepository.SaveStateLgaReportType(lga, stateStruct)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": "Unable to save LGA & State",
-				"error":   err.Error(),
-			})
-			return
-		}
-
-		savedIncidentReport, err := s.IncidentReportService.SaveReport(userId, lat, lng, incidentReport, reportID, totalPoints)
-		if err != nil {
-			log.Printf("Error saving incident report: %v\n", err)
-			response.JSON(c, "Unable to save incident report", http.StatusInternalServerError, nil, err)
-			return
-		}
-
-		response.JSON(c, "Incident Report Submitted Successfully", http.StatusCreated, savedIncidentReport, nil)
+		response.JSON(c, "Media Uploaded Successfully", http.StatusOK, nil, nil)
 	}
 }
+
+func (s *Server) processAndSaveMedia(c *gin.Context, userID uint) ([]string, []string, []string, []string, error) {
+    // Retrieve media files from the multipart form
+    formMedia := c.Request.MultipartForm.File["mediaFiles"]
+    if formMedia == nil {
+        return nil, nil, nil, nil, fmt.Errorf("no media files found in the request")
+    }
+
+    // Retrieve the reportID from the context
+    reportID, exists := c.Get("reportID")
+    if !exists {
+        log.Printf("Report ID not found in context")
+        response.JSON(c, "Unable to retrieve report ID", http.StatusInternalServerError, nil, nil)
+        return nil, nil, nil, nil, fmt.Errorf("unable to retrieve report ID")
+    }
+
+    // Type assertion to convert the interface{} type to string
+    reportIDStr, ok := reportID.(string)
+    if !ok {
+        log.Printf("Error asserting reportID to string")
+        response.JSON(c, "Invalid report ID format", http.StatusInternalServerError, nil, nil)
+        return nil, nil, nil, nil, fmt.Errorf("invalid report ID format")
+    }
+
+    // Initialize URL and file type slices
+    var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
+    var imageCount, videoCount, audioCount, totalPoints int 
+
+    // Process each media file in the form
+    for _, media := range formMedia {
+        processedFeedURLs, processedThumbnailURLs, processedFullsizeURLs, processedFileTypes, err := s.MediaService.ProcessMedia(c, media, userID, reportIDStr)
+        if err != nil {
+            log.Printf("Error processing media: %v\n", err)
+            return nil, nil, nil, nil, fmt.Errorf("error processing media: %v", err)
+        }
+
+        // Append the processed URLs and types to the respective slices
+        feedURLs = append(feedURLs, processedFeedURLs...)
+        thumbnailURLs = append(thumbnailURLs, processedThumbnailURLs...)
+        fullsizeURLs = append(fullsizeURLs, processedFullsizeURLs...)
+        fileTypes = append(fileTypes, processedFileTypes...)
+
+        // Update counters based on the processed file types
+        for _, fileType := range processedFileTypes {
+            switch fileType {
+            case "image":
+                imageCount++
+            case "video":
+                videoCount++
+            case "audio":
+                audioCount++
+            }
+        }
+    }
+
+    // Calculate total points (example logic, adjust as needed)
+    totalPoints = (imageCount * 5) + (videoCount * 10) + (audioCount * 8)
+
+    // Save each processed media to the database
+    for _, media := range formMedia {
+        mediaModel := models.Media{
+            FileName: media.Filename,
+            // Other fields as needed
+        }
+
+        // Save the processed media with the correct parameters
+        if err := s.MediaService.SaveMedia(mediaModel, reportIDStr, userID, imageCount, videoCount, audioCount, totalPoints); err != nil {
+            log.Printf("Error saving media: %v\n", err)
+            return nil, nil, nil, nil, fmt.Errorf("error saving media: %v", err)
+        }
+    }
+
+    return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
+}
+
+
+
+// Handle the upload of media file
+// func (s *Server) handleIncidentReport() gin.HandlerFunc {
+// 	return func(c *gin.Context) {
+// 		userI, exists := c.Get("user")
+// 		if !exists {
+// 			log.Println("User not found in context")
+// 			response.JSON(c, "", http.StatusUnauthorized, nil, errors.ErrNotFound)
+// 			return
+// 		}
+// 		userId := userI.(*models.User).ID
+//         fullNameI, _ := c.Get("fullName")
+//         usernameI, _ := c.Get("username")
+// 		profileImageURLI, _ := c.Get("profile_image")
+// 		if !exists {
+// 			profileImageURLI = "default-profile-image-url"
+// 		}
+
+// 			ProfileImageURL:= profileImageURLI.(string)
+
+//         fullName, ok := fullNameI.(string)
+//         if !ok {
+//             log.Println("Full name type assertion failed")
+//             response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
+//             return
+//         }
+
+//         usernameString, ok := usernameI.(string)
+//         if !ok {
+//             log.Println("Username type assertion failed")
+//             response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("Internal server error", http.StatusInternalServerError))
+//             return
+//         }
+
+// 		const MaxFileSize = 32 << 20 // 32 MB
+
+// 		buf := new(bytes.Buffer)
+// 		_, err := io.CopyN(buf, c.Request.Body, int64(MaxFileSize))
+// 		if err != nil && err != io.EOF {
+// 			log.Printf("Error reading request body: %v\n", err)
+// 			response.JSON(c, "unable to read media", http.StatusInternalServerError, nil, errors.ErrInternalServerError)
+// 			return
+// 		}
+
+// 		c.Request.Body = io.NopCloser(buf)
+
+// 		log.Println("About to parse multipart form")
+// 		if err := c.Request.ParseMultipartForm(MaxFileSize); err != nil {
+// 			log.Printf("Error parsing multipart form: %v\n", err)
+// 			response.JSON(c, "unable to parse media", http.StatusInternalServerError, nil, errors.ErrInternalServerError)
+// 			return
+// 		}
+// 		log.Println("Parsed multipart form successfully")
+
+// 		formMedia := c.Request.MultipartForm.File["mediaFiles"]
+// 		totalPoints := len(formMedia)
+// 		log.Printf("Number of files received: %d\n", len(formMedia))
+
+// 		reportID, err := generateID()
+// 		if err != nil {
+// 			log.Printf("Error generating ID: %v\n", err)
+// 			response.JSON(c, "Unable to generate report ID", http.StatusInternalServerError, nil, err)
+// 			return
+// 		}
+
+// 		results := make(chan mediaResult)
+// 		mediaTypeCounts := make(map[string]int)
+
+// 		var wg sync.WaitGroup
+// 		mu := &sync.Mutex{}
+// 		for _, fileHeader := range formMedia {
+// 			wg.Add(1)
+// 			go func(fileHeader *multipart.FileHeader) {
+// 				defer wg.Done()
+// 				s.saveChunk(fileHeader, results)
+
+// 				supported, fileType := CheckSupportedFile(fileHeader.Filename)
+// 				if !supported {
+// 					log.Printf("Unsupported file type: %s\n", fileHeader.Filename)
+// 					return
+// 				}
+
+// 				mu.Lock()
+// 				mediaTypeCounts[fileType]++
+// 				log.Printf("File type: %s, Count: %d\n", fileType, mediaTypeCounts[fileType])
+// 				mu.Unlock()
+// 			}(fileHeader)
+// 		}
+
+// 		go func() {
+// 			wg.Wait()
+// 			close(results)
+// 		}()
+
+// 		var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
+
+// 		for result := range results {
+// 			if result.Error != nil {
+// 				log.Printf("Error processing media: %v\n", result.Error)
+// 				response.JSON(c, "Unable to process media", http.StatusInternalServerError, nil, result.Error)
+// 				return
+// 			}
+// 			feedURLs = append(feedURLs, result.FeedURL)
+// 			thumbnailURLs = append(thumbnailURLs, result.ThumbnailURL)
+// 			fullsizeURLs = append(fullsizeURLs, result.FullSizeURL)
+// 			fileTypes = append(fileTypes, result.FileType)
+// 		}
+
+// 		if len(feedURLs) > 0 {
+// 			processedFeedURLs, processedThumbnailURLs, processedFullsizeURLs, processedFileTypes, err := s.MediaService.ProcessMedia(c, formMedia, userId, reportID)
+// 			if err != nil {
+// 				log.Printf("Error processing media: %v\n", err)
+// 				response.JSON(c, "Unable to process media", http.StatusInternalServerError, nil, err)
+// 				return
+// 			}
+
+// 			// If feedURLs is a slice of comma-separated URLs as strings, split them first
+// 			currentFeedURLs := splitUrlSlice(feedURLs)
+// 			currentThumbnailURLs := splitUrlSlice(thumbnailURLs)
+// 			currentFullsizeURLs := splitUrlSlice(fullsizeURLs)
+
+// 			// Now, append the processed URLs to the existing arrays
+// 			feedURLs = append(currentFeedURLs, processedFeedURLs...)
+// 			thumbnailURLs = append(currentThumbnailURLs, processedThumbnailURLs...)
+// 			fullsizeURLs = append(currentFullsizeURLs, processedFullsizeURLs...)
+// 			fileTypes = append(fileTypes, processedFileTypes...)
+// 		}
+// 		wg.Wait()
+
+// 		// Log media type counts and calculate totals
+// 		for fileType, count := range mediaTypeCounts {
+// 			log.Printf("File type: %s, Count: %d\n", fileType, count)
+// 		}
+
+// 		imageCount, videoCount, audioCount := CreateMediaCount(mediaTypeCounts)
+// 		// totalPoints = calculateMediaPoints(mediaTypeCounts)
+// 		log.Println("Image count:", imageCount)
+// 		log.Println("Total points:", totalPoints)
+
+// 		var feedURL, thumbnailURL, fullsizeURL, fileType string
+// 		if len(feedURLs) > 0 {
+// 			feedURL = strings.Join(feedURLs, ",")
+// 			thumbnailURL = strings.Join(thumbnailURLs, ",")
+// 			fullsizeURL = strings.Join(fullsizeURLs, ",")
+// 			fileType = fileTypes[0]
+// 		} else {
+// 			feedURL, thumbnailURL, fullsizeURL, fileType = "", "", "", "unknown"
+// 		}
+
+// 		media := models.Media{
+// 			UserID:       userId,
+// 			FeedURL:      feedURL,
+// 			ThumbnailURL: thumbnailURL,
+// 			FullSizeURL:  fullsizeURL,
+// 			FileType:     fileType,
+// 		}
+
+// 		if err := s.MediaService.SaveMedia(media, reportID, userId, imageCount, videoCount, audioCount, totalPoints); err != nil {
+// 			log.Printf("Error saving media: %v\n", err)
+// 			response.JSON(c, "Unable to save media", http.StatusInternalServerError, nil, err)
+// 			return
+// 		}
+
+// 		var lat, lng float64
+// 		if latStr := strings.TrimSpace(c.PostForm("latitude")); latStr != "" {
+// 			lat, err = strconv.ParseFloat(latStr, 64)
+// 			if err != nil {
+// 				response.JSON(c, "Invalid latitude", http.StatusBadRequest, nil, err)
+// 				return
+// 			}
+// 		}
+
+// 		if lngStr := strings.TrimSpace(c.PostForm("longitude")); lngStr != "" {
+// 			lng, err = strconv.ParseFloat(lngStr, 64)
+// 			if err != nil {
+// 				response.JSON(c, "Invalid longitude", http.StatusBadRequest, nil, err)
+// 				return
+// 			}
+// 		}
+
+// 		lga, stateStruct, reportType, locality, state, err := fetchGeocodingData(lat, lng, c, reportID)
+// 		if err != nil {
+// 			log.Printf("Error fetching geocoding data: %v\n", err)
+// 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// 			return
+// 		}
+
+// 		log.Printf("Final State: %s, LGA: %s", reportType.StateName, reportType.LGAName)
+
+// 		incidentReport := &models.IncidentReport{
+// 			ID:                   reportID,
+// 			CreatedAt:            0,
+// 			UserFullname:         fullName,
+// 			DateOfIncidence:      c.PostForm("date_of_incidence"),
+// 			Description:          c.PostForm("description"),
+// 			FeedURLs:             feedURL,
+// 			ThumbnailURLs:        ProfileImageURL,
+// 			FullSizeURLs:         fullsizeURL,
+// 			ProductName:          "",
+// 			StateName:            c.PostForm("state_name"),
+// 			LGAName:              c.PostForm("lga_name"),
+// 			Latitude:             lat,
+// 			Longitude:            lng,
+// 			UserIsAnonymous:      false,
+// 			Address:              "",
+// 			UserUsername:         usernameString,
+// 			Telephone:            "",
+// 			Email:                "",
+// 			View:                 0,
+// 			IsVerified:           false,
+// 			UserID:               userId,
+// 			ReportTypeID:         reportID,
+// 			AdminID:              0,
+// 			Landmark:             c.PostForm("landmark"),
+// 			LikeCount:            0,
+// 			IsResponse:           false,
+// 			TimeofIncidence:      time.Now(),
+// 			ReportStatus:         "Verified",
+// 			ReportTypeName:       c.PostForm("report_type"),
+// 			Rating:               c.PostForm("rating"),
+// 			HospitalName:         c.PostForm("hospital_name"),
+// 			Department:           c.PostForm("department"),
+// 			DepartmentHeadName:   c.PostForm("department_head_name"),
+// 			AccidentCause:        c.PostForm("accident_cause"),
+// 			SchoolName:           c.PostForm("school_name"),
+// 			VicePrincipal:        c.PostForm("vice_principal"),
+// 			OutageLength:         c.PostForm("outage_length"),
+// 			AirportName:          c.PostForm("airport_name"),
+// 			Country:              c.PostForm("country"),
+// 			StateEmbassyLocation: state,
+// 			NoWater:              true,
+// 			HospitalAddress:      c.PostForm("hospital_address"),
+// 			RoadName:             c.PostForm("road_name"),
+// 			AirlineName:          c.PostForm("airline_name"),
+// 			Category:             c.PostForm("category"),
+// 			Terminal:             c.PostForm("terminal"),
+// 			QueueTime:            c.PostForm("queue_time"),
+// 		}
+
+// 		uuidReportID, err := uuid.Parse(reportID)
+// 		if err != nil {
+// 			log.Fatalf("Failed to parse reportID: %v", err)
+// 		}
+
+// 		sub := &models.SubReport{
+// 			ID:                 uuidReportID,
+// 			ReportTypeID:       reportType.ID,
+// 			SubReportType: c.PostForm("sub_report_type"),
+// 		}
+
+// 		// Check if stateName and lgaName are empty, replace with statestring and lgastring if so
+// 		if c.PostForm("state_name") == "" && c.PostForm("lga_name") == "" {
+// 			reportType.StateName = state
+// 			reportType.LGAName = locality
+// 		}
+
+// 		// Call repo to save the report type
+// 		_, err = s.IncidentReportRepository.SaveReportType(reportType)
+// 		if err != nil {
+// 			c.JSON(http.StatusInternalServerError, gin.H{
+// 				"message": "Unable to save report type",
+// 				"error":   err.Error(),
+// 			})
+// 			return
+// 		}
+
+// 		_, err = s.IncidentReportRepository.SaveSubReport(sub)
+// 		if err != nil {
+// 			return
+// 		}
+// 		stateID := generateIDls()
+// 		lgaID := generateIDls()
+
+// 		stateStruct = &models.State{
+// 			ID:   stateID,
+// 			Name: c.PostForm("state_name"),
+// 		}
+//     // Create LGA and State objects with generated IDs
+//     lga = &models.LGA{
+//     	ID:      lgaID,
+//     	Name:    c.PostForm("lga_name"),
+//     	StateID: stateID,
+//     	State:   models.State{},
+//     }
+
+// 	log.Printf("Generated LGA ID: %s", lga)
+// log.Printf("Generated State ID: %s", stateStruct)
+
+// 		err = s.IncidentReportRepository.SaveStateLgaReportType(lga, stateStruct)
+// 		if err != nil {
+// 			c.JSON(http.StatusInternalServerError, gin.H{
+// 				"message": "Unable to save LGA & State",
+// 				"error":   err.Error(),
+// 			})
+// 			return
+// 		}
+
+// 		savedIncidentReport, err := s.IncidentReportService.SaveReport(userId, lat, lng, incidentReport, reportID, totalPoints)
+// 		if err != nil {
+// 			log.Printf("Error saving incident report: %v\n", err)
+// 			response.JSON(c, "Unable to save incident report", http.StatusInternalServerError, nil, err)
+// 			return
+// 		}
+
+// 		response.JSON(c, "Incident Report Submitted Successfully", http.StatusCreated, savedIncidentReport, nil)
+// 	}
+// }
 
 func (s *Server) handleGetAllReport() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -694,11 +971,11 @@ func getPageFromQuery(c *gin.Context) (int, error) {
 }
 
 func generateID() (string, error) {
-    newUUID, err := uuid.NewRandom()
-    if err != nil {
-        return "", err
-    }
-    return newUUID.String(), nil
+	newUUID, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
+	return newUUID.String(), nil
 }
 
 func (s *Server) handleApproveReportPoints() gin.HandlerFunc {
@@ -982,40 +1259,38 @@ func (s *Server) handleGetReportsByTypeAndLGA() gin.HandlerFunc {
 }
 
 func (s *Server) handleGetReportTypeCounts() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        state := strings.TrimSpace(c.Query("state"))
-        lga := strings.TrimSpace(c.Query("lga"))
-        startDate := strings.TrimSpace(c.Query("start_date"))
-        endDate := strings.TrimSpace(c.Query("end_date"))
+	return func(c *gin.Context) {
+		state := strings.TrimSpace(c.Query("state"))
+		lga := strings.TrimSpace(c.Query("lga"))
+		startDate := strings.TrimSpace(c.Query("start_date"))
+		endDate := strings.TrimSpace(c.Query("end_date"))
 
-        if state == "" || lga == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "State and LGA are required"})
-            return
-        }
+		if state == "" || lga == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "State and LGA are required"})
+			return
+		}
 
-        reportTypes, reportCounts, totalUsers, totalReports, topStates, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		reportTypes, reportCounts, totalUsers, totalReports, topStates, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        // Convert the slice of StateReportCount to a map
-        topStatesMap := make(map[string]int)
-        for _, stateReport := range topStates {
-            topStatesMap[stateReport.StateName] = stateReport.ReportCount
-        }
+		// Convert the slice of StateReportCount to a map
+		topStatesMap := make(map[string]int)
+		for _, stateReport := range topStates {
+			topStatesMap[stateReport.StateName] = stateReport.ReportCount
+		}
 
-        c.JSON(http.StatusOK, gin.H{
-            "report_types":   reportTypes,
-            "report_counts":  reportCounts,
-            "total_users":    totalUsers,
-            "total_reports":  totalReports,
-            "top_states":     topStatesMap,
-        })
-    }
+		c.JSON(http.StatusOK, gin.H{
+			"report_types":  reportTypes,
+			"report_counts": reportCounts,
+			"total_users":   totalUsers,
+			"total_reports": totalReports,
+			"top_states":    topStatesMap,
+		})
+	}
 }
-
-
 
 // Handler function to get LGAs in a state
 func (s *Server) handleGetLGAs() gin.HandlerFunc {
@@ -1253,74 +1528,74 @@ func (s *Server) handleGetAllReportsByStateAndLGA() gin.HandlerFunc {
 }
 
 func (s *Server) handleListAllStatesWithReportCounts() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        statesWithReports, err := s.IncidentReportService.ListAllStatesWithReportCounts()
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+	return func(c *gin.Context) {
+		statesWithReports, err := s.IncidentReportService.ListAllStatesWithReportCounts()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        c.JSON(http.StatusOK, gin.H{
-            "top_states": statesWithReports,
-        })
-    }
+		c.JSON(http.StatusOK, gin.H{
+			"top_states": statesWithReports,
+		})
+	}
 }
 
 // Define the handler function
 func (s *Server) handleGetTotalReportCount() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Call the service to get the total report count
-        totalCount, err := s.IncidentReportService.GetTotalReportCount()
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+	return func(c *gin.Context) {
+		// Call the service to get the total report count
+		totalCount, err := s.IncidentReportService.GetTotalReportCount()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        // Return the total count as JSON
-        c.JSON(http.StatusOK, gin.H{
-            "total_report_count": totalCount,
-        })
-    }
+		// Return the total count as JSON
+		c.JSON(http.StatusOK, gin.H{
+			"total_report_count": totalCount,
+		})
+	}
 }
 
 func (s *Server) handleGetNamesByCategory() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Retrieve parameters from query
-        stateName := c.Query("state_name")
-        lga := c.Query("lga")
-        reportTypeCategory := c.Query("category")
+	return func(c *gin.Context) {
+		// Retrieve parameters from query
+		stateName := c.Query("state_name")
+		lga := c.Query("lga")
+		reportTypeCategory := c.Query("category")
 
-        // Call the service method
-        names, err := s.IncidentReportService.GetNamesByCategory(stateName, lga, reportTypeCategory)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		// Call the service method
+		names, err := s.IncidentReportService.GetNamesByCategory(stateName, lga, reportTypeCategory)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        // Return the names as JSON response
-        c.JSON(http.StatusOK, gin.H{"names": names})
-    }
+		// Return the names as JSON response
+		c.JSON(http.StatusOK, gin.H{"names": names})
+	}
 }
 
 func (s *Server) HandleGetSubReportsByCategory() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Extract the category from query parameters
-        category := c.Query("category")
-        if category == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Category is required"})
-            return
-        }
+	return func(c *gin.Context) {
+		// Extract the category from query parameters
+		category := c.Query("category")
+		if category == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Category is required"})
+			return
+		}
 
-        // Fetch sub-reports from the repository
-        subReports, err := s.IncidentReportRepository.GetSubReportsByCategory(category)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		// Fetch sub-reports from the repository
+		subReports, err := s.IncidentReportRepository.GetSubReportsByCategory(category)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        // Respond with the sub-reports data
-        c.JSON(http.StatusOK, gin.H{"data": subReports})
-    }
+		// Respond with the sub-reports data
+		c.JSON(http.StatusOK, gin.H{"data": subReports})
+	}
 }
 
 func (s *Server) HandleGetAllReportsByUser() gin.HandlerFunc {
@@ -1360,19 +1635,19 @@ func (s *Server) HandleGetAllReportsByUser() gin.HandlerFunc {
 }
 
 func (s *Server) HandleGetVoteCounts() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        reportID := c.Param("reportID")
-        upvotes, downvotes, err := s.LikeService.GetVoteCounts(reportID)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+	return func(c *gin.Context) {
+		reportID := c.Param("reportID")
+		upvotes, downvotes, err := s.LikeService.GetVoteCounts(reportID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        c.JSON(http.StatusOK, gin.H{
-            "upvotes":   upvotes,
-            "downvotes": downvotes,
-        })
-    }
+		c.JSON(http.StatusOK, gin.H{
+			"upvotes":   upvotes,
+			"downvotes": downvotes,
+		})
+	}
 }
 
 func (s *Server) HandleBookmarkReport() gin.HandlerFunc {
@@ -1406,163 +1681,161 @@ func (s *Server) HandleBookmarkReport() gin.HandlerFunc {
 }
 
 func (s *Server) HandleGetBookmarkedReports() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Extract user ID from context
-        userIDCtx, ok := c.Get("userID")
-        if !ok {
-            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("userID not found in context", http.StatusInternalServerError))
-            return
-        }
+	return func(c *gin.Context) {
+		// Extract user ID from context
+		userIDCtx, ok := c.Get("userID")
+		if !ok {
+			response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("userID not found in context", http.StatusInternalServerError))
+			return
+		}
 
-        // Assert the type of userID as uint
-        userID, ok := userIDCtx.(uint)
-        if !ok {
-            response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("userID is not of type uint", http.StatusInternalServerError))
-            return
-        }
+		// Assert the type of userID as uint
+		userID, ok := userIDCtx.(uint)
+		if !ok {
+			response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("userID is not of type uint", http.StatusInternalServerError))
+			return
+		}
 
-        // Fetch bookmarked reports
-        bookmarkedReports, err := s.IncidentReportService.GetBookmarkedReports(userID)
-        if err != nil {
-            response.JSON(c, "", http.StatusInternalServerError, nil, err)
-            return
-        }
+		// Fetch bookmarked reports
+		bookmarkedReports, err := s.IncidentReportService.GetBookmarkedReports(userID)
+		if err != nil {
+			response.JSON(c, "", http.StatusInternalServerError, nil, err)
+			return
+		}
 
-        // Return the bookmarked reports
-        c.JSON(http.StatusOK, gin.H{
-            "bookmarked_reports": bookmarkedReports,
-        })
-    }
+		// Return the bookmarked reports
+		c.JSON(http.StatusOK, gin.H{
+			"bookmarked_reports": bookmarkedReports,
+		})
+	}
 }
 
 func (s *Server) HandleGetReportsByUserID() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Get user ID from context
-        userIDCtx, ok := c.Get("userID")
-        if !ok {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-            return
-        }
+	return func(c *gin.Context) {
+		// Get user ID from context
+		userIDCtx, ok := c.Get("userID")
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
 
-        // Assert userID as uint
-        userID, ok := userIDCtx.(uint)
-        if !ok {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
-            return
-        }
+		// Assert userID as uint
+		userID, ok := userIDCtx.(uint)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
+			return
+		}
 
-        // Fetch reports
-        reports, err := s.IncidentReportService.GetUserReports(userID)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports"})
-            return
-        }
+		// Fetch reports
+		reports, err := s.IncidentReportService.GetUserReports(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports"})
+			return
+		}
 
-        // Return reports
-        c.JSON(http.StatusOK, reports)
-    }
+		// Return reports
+		c.JSON(http.StatusOK, reports)
+	}
 }
 
 func (s *Server) GetReportTypeCountsByLGA() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        lga := c.Param("lga")
+	return func(c *gin.Context) {
+		lga := c.Param("lga")
 
-        // Get the result as a map from the service
-        result, err := s.IncidentReportService.GetReportTypeCountsByLGA(lga)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		// Get the result as a map from the service
+		result, err := s.IncidentReportService.GetReportTypeCountsByLGA(lga)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        // Send the result map as JSON
-        c.JSON(http.StatusOK, result)
-    }
+		// Send the result map as JSON
+		c.JSON(http.StatusOK, result)
+	}
 }
 
-
 func (s *Server) GetReportCountsByStateAndLGA() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        state := c.Param("state")
+	return func(c *gin.Context) {
+		state := c.Param("state")
 
-        lgas, reportCounts, err := s.IncidentReportRepository.GetReportCountsByState(state)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		lgas, reportCounts, err := s.IncidentReportRepository.GetReportCountsByState(state)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        c.JSON(http.StatusOK, gin.H{
-            "lgas":           lgas,
-            "report_counts":  reportCounts,
-        })
-    }
+		c.JSON(http.StatusOK, gin.H{
+			"lgas":          lgas,
+			"report_counts": reportCounts,
+		})
+	}
 }
 
 func (s *Server) handleGetTopCategories() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Call the repository function to get top categories and their counts
-        categories, counts, err := s.IncidentReportRepository.GetTopCategories()
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+	return func(c *gin.Context) {
+		// Call the repository function to get top categories and their counts
+		categories, counts, err := s.IncidentReportRepository.GetTopCategories()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        // Respond with the categories and their counts
-        c.JSON(http.StatusOK, gin.H{
-            "categories":   categories,
-            "report_counts": counts,
-        })
-    }
+		// Respond with the categories and their counts
+		c.JSON(http.StatusOK, gin.H{
+			"categories":    categories,
+			"report_counts": counts,
+		})
+	}
 }
 
 func (s *Server) GetReportsByCategory() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        category := c.Query("category")
+	return func(c *gin.Context) {
+		category := c.Query("category")
 
-        if category == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Category is required"})
-            return
-        }
+		if category == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Category is required"})
+			return
+		}
 
-        reports, err := s.IncidentReportRepository.GetReportsByCategory(category)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		reports, err := s.IncidentReportRepository.GetReportsByCategory(category)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        if len(reports) == 0 {
-            c.JSON(http.StatusOK, gin.H{"message": "No reports found for the specified category"})
-            return
-        }
+		if len(reports) == 0 {
+			c.JSON(http.StatusOK, gin.H{"message": "No reports found for the specified category"})
+			return
+		}
 
-        c.JSON(http.StatusOK, gin.H{
-            "reports": reports,
-        })
-    }
+		c.JSON(http.StatusOK, gin.H{
+			"reports": reports,
+		})
+	}
 }
 
 func (s *Server) handleGetReportsByFilters() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        category := c.Query("category")
-        state := c.Query("state")
-        lga := c.Query("lga")
+	return func(c *gin.Context) {
+		category := c.Query("category")
+		state := c.Query("state")
+		lga := c.Query("lga")
 
-        // Call the repository function with all filters
-        reports, filters, err := s.IncidentReportRepository.GetFilteredIncidentReports(category, state, lga)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		// Call the repository function with all filters
+		reports, filters, err := s.IncidentReportRepository.GetFilteredIncidentReports(category, state, lga)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
-        if len(reports) == 0 {
-            c.JSON(http.StatusOK, gin.H{"message": "No reports found for the specified filters"})
-            return
-        }
+		if len(reports) == 0 {
+			c.JSON(http.StatusOK, gin.H{"message": "No reports found for the specified filters"})
+			return
+		}
 
-        // Return the reports and the applied filters
-        c.JSON(http.StatusOK, gin.H{
-            "reports": reports,
-            "filters": filters,
-        })
-    }
+		// Return the reports and the applied filters
+		c.JSON(http.StatusOK, gin.H{
+			"reports": reports,
+			"filters": filters,
+		})
+	}
 }
-

@@ -80,17 +80,16 @@ func (repo *rewardRepo) GetCurrentRewardByUserID(userID uint) (int, error) {
 }
 
 func (r *rewardRepo) GetUserRewardBalance(userID uint) (int, error) {
-    var balance int
-    err := r.DB.Model(&models.Reward{}).
-        Where("user_id = ?", userID).
-        Select("COALESCE(SUM(balance), 0)"). // Use COALESCE to handle NULL values
-        Scan(&balance).Error
-    if err != nil {
-        return 0, err
-    }
-    return balance, nil
+	var balance int
+	err := r.DB.Model(&models.Reward{}).
+		Where("user_id = ?", userID).
+		Select("COALESCE(SUM(balance), 0)"). // Use COALESCE to handle NULL values
+		Scan(&balance).Error
+	if err != nil {
+		return 0, err
+	}
+	return balance, nil
 }
-
 
 func (r *rewardRepo) GetRewardPointByReportID(reportID string) (int, error) {
 	// Initialize a variable to store the reward point
@@ -125,30 +124,30 @@ func (r *rewardRepo) GetAllRewards() ([]models.Reward, error) {
 }
 
 func (r *rewardRepo) GetUserReward(userID uint) (models.Reward, error) {
-    var reward models.Reward
-    err := r.DB.Where("user_id = ?", userID).First(&reward).Error
+	var reward models.Reward
+	err := r.DB.Where("user_id = ?", userID).First(&reward).Error
 
-    if err != nil {
-        if err == gorm.ErrRecordNotFound {
-            // Record not found, initialize a new reward record with default values
-            reward = models.Reward{
-                UserID:        userID,
-                Point:         0,       // Default points
-                Balance:       0,       // Default balance
-                RewardType:    "default", // Set a default reward type or adjust as needed
-                AccountNumber: "",      // Default or empty account number
-            }
-            // Create a new record
-            err = r.DB.Create(&reward).Error
-            if err != nil {
-                return reward, err
-            }
-        } else {
-            return reward, err
-        }
-    }
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Record not found, initialize a new reward record with default values
+			reward = models.Reward{
+				UserID:        userID,
+				Point:         0,         // Default points
+				Balance:       0,         // Default balance
+				RewardType:    "default", // Set a default reward type or adjust as needed
+				AccountNumber: "",        // Default or empty account number
+			}
+			// Create a new record
+			err = r.DB.Create(&reward).Error
+			if err != nil {
+				return reward, err
+			}
+		} else {
+			return reward, err
+		}
+	}
 
-    return reward, nil
+	return reward, nil
 }
 
 func (r *rewardRepo) SumRewardBalanceByUserID(userID uint) (int, error) {
@@ -161,21 +160,21 @@ func (r *rewardRepo) SumRewardBalanceByUserID(userID uint) (int, error) {
 }
 
 func (r *rewardRepo) GetRewardByUserID(userID uint) (*models.Reward, error) {
-    var reward models.Reward
-    
-    // Query the database to find the reward for the given userID
-    err := r.DB.Where("user_id = ?", userID).First(&reward).Error
-    
-    // Error handling: check if the record is not found or there's another error
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            // No reward record exists for this user, return nil without error
-            return nil, nil
-        }
-        // Return an error if something went wrong with the query
-        return nil, fmt.Errorf("error fetching reward for user %d: %w", userID, err)
-    }
-    
-    // Return the reward record for the user
-    return &reward, nil
+	var reward models.Reward
+
+	// Query the database to find the reward for the given userID
+	err := r.DB.Where("user_id = ?", userID).First(&reward).Error
+
+	// Error handling: check if the record is not found or there's another error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// No reward record exists for this user, return nil without error
+			return nil, nil
+		}
+		// Return an error if something went wrong with the query
+		return nil, fmt.Errorf("error fetching reward for user %d: %w", userID, err)
+	}
+
+	// Return the reward record for the user
+	return &reward, nil
 }

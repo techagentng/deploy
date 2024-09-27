@@ -38,166 +38,165 @@ import (
 )
 
 func createS3Client() (*s3.Client, error) {
-    cfg, err := config.LoadDefaultConfig(context.Background(),
-        config.WithRegion(os.Getenv("AWS_REGION")),
-        config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-            os.Getenv("AWS_ACCESS_KEY_ID"),
-            os.Getenv("AWS_SECRET_ACCESS_KEY"),
-            "", 
-        )),
-    )
-    if err != nil {
-        return nil, fmt.Errorf("unable to load SDK config, %v", err)
-    }
+	cfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion(os.Getenv("AWS_REGION")),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			os.Getenv("AWS_ACCESS_KEY_ID"),
+			os.Getenv("AWS_SECRET_ACCESS_KEY"),
+			"",
+		)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load SDK config, %v", err)
+	}
 
-    return s3.NewFromConfig(cfg), nil
+	return s3.NewFromConfig(cfg), nil
 }
 
-
 func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key string) (string, error) {
-    defer file.Close()
+	defer file.Close()
 
-    // Read the file content
-    fileContent, err := io.ReadAll(file)
-    if err != nil {
-        fmt.Printf("Error reading file content: %v\n", err) // Log the error
-        return "", fmt.Errorf("failed to read file content: %v", err)
-    }
+	// Read the file content
+	fileContent, err := io.ReadAll(file)
+	if err != nil {
+		fmt.Printf("Error reading file content: %v\n", err) // Log the error
+		return "", fmt.Errorf("failed to read file content: %v", err)
+	}
 
-//     // Log bucket and key information
-    fmt.Printf("Uploading to bucket: %s\n", bucketName)
-    fmt.Printf("Uploading with key: %s\n", key)
+	//     // Log bucket and key information
+	fmt.Printf("Uploading to bucket: %s\n", bucketName)
+	fmt.Printf("Uploading with key: %s\n", key)
 
-    // Upload the file to S3
-    _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
-        Bucket: aws.String(bucketName),
-        Key:    aws.String(key),
-        Body:   bytes.NewReader(fileContent),
-        ACL:    types.ObjectCannedACLPublicRead, // Use proper type from SDK
-    })
-    if err != nil {
-        fmt.Printf("Error uploading file to S3: %v\n", err) // Log the error
-        return "", fmt.Errorf("failed to upload file to S3x: %v", err)
-    }
+	// Upload the file to S3
+	_, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+		Body:   bytes.NewReader(fileContent),
+		ACL:    types.ObjectCannedACLPublicRead,
+	})
+	if err != nil {
+		fmt.Printf("Error uploading file to S3: %v\n", err) // Log the error
+		return "", fmt.Errorf("failed to upload file to S3x: %v", err)
+	}
 
-    // Log successful upload
-    fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), key)
-    fmt.Printf("File uploaded successfully, URL: %s\n", fileURL) // Log the URL
+	// Log successful upload
+	fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), key)
+	fmt.Printf("File uploaded successfully, URL: %s\n", fileURL) // Log the URL
 
-    return fileURL, nil
+	return fileURL, nil
 }
 
 // Define allowed MIME types and max file size
 const (
-    MaxFileSize = 5 * 1024 * 1024 // 5 MB
-    AllowedMimeTypes = "image/jpeg,image/png,image/gif"
+	MaxFileSize      = 5 * 1024 * 1024 // 5 MB
+	AllowedMimeTypes = "image/jpeg,image/png,image/gif"
 )
 
 // validateFile checks the file type and size
 func validateFile(file *multipart.FileHeader) error {
-    // Check file size
-    if file.Size > MaxFileSize {
-        return fmt.Errorf("file size exceeds limit of %d bytes", MaxFileSize)
-    }
+	// Check file size
+	if file.Size > MaxFileSize {
+		return fmt.Errorf("file size exceeds limit of %d bytes", MaxFileSize)
+	}
 
-    // Check file MIME type
-    mimeType := file.Header.Get("Content-Type")
-    if !isValidMimeType(mimeType) {
-        return fmt.Errorf("invalid file type: %s", mimeType)
-    }
+	// Check file MIME type
+	mimeType := file.Header.Get("Content-Type")
+	if !isValidMimeType(mimeType) {
+		return fmt.Errorf("invalid file type: %s", mimeType)
+	}
 
-    return nil
+	return nil
 }
 
 // isValidMimeType checks if the MIME type is allowed
 func isValidMimeType(mimeType string) bool {
-    allowedTypes := strings.Split(AllowedMimeTypes, ",")
-    for _, allowedType := range allowedTypes {
-        if mimeType == allowedType {
-            return true
-        }
-    }
-    return false
+	allowedTypes := strings.Split(AllowedMimeTypes, ",")
+	for _, allowedType := range allowedTypes {
+		if mimeType == allowedType {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleUpdateUserImageUrl() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Handle file upload
-        file, fileHeader, err := c.Request.FormFile("profileImage")
-        if err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid file"})
-            return
-        }
+	return func(c *gin.Context) {
+		// Handle file upload
+		file, fileHeader, err := c.Request.FormFile("profileImage")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid file"})
+			return
+		}
 
-        // Validate file type and size
-        if err := validateFile(fileHeader); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-            return
-        }
+		// Validate file type and size
+		if err := validateFile(fileHeader); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
-        // Get the access token from the authorization header
-        accessToken := getTokenFromHeader(c)
-        if accessToken == "" {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-            return
-        }
+		// Get the access token from the authorization header
+		accessToken := getTokenFromHeader(c)
+		if accessToken == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
 
-        // Validate and decode the access token to get the userID
-        secret := s.Config.JWTSecret 
-        accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
-        if err != nil {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-            return
-        }
+		// Validate and decode the access token to get the userID
+		secret := s.Config.JWTSecret
+		accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
 
-        var userID uint
-        switch userIDValue := accessClaims["id"].(type) {
-        case float64:
-            userID = uint(userIDValue)
-        default:
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
-            return
-        }
+		var userID uint
+		switch userIDValue := accessClaims["id"].(type) {
+		case float64:
+			userID = uint(userIDValue)
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
+			return
+		}
 
-        // Create S3 client
-        s3Client, err := createS3Client()
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create S3 client"})
-            return
-        }
+		// Create S3 client
+		s3Client, err := createS3Client()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create S3 client"})
+			return
+		}
 
-        userIDString := strconv.FormatUint(uint64(userID), 10)
+		userIDString := strconv.FormatUint(uint64(userID), 10)
 
-        // Generate unique filename
-        filename := userIDString + "_" + fileHeader.Filename
+		// Generate unique filename
+		filename := userIDString + "_" + fileHeader.Filename
 
-        // Upload file to S3
-        filepath, err := uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3xx"})
-            return
-        }
+		// Upload file to S3
+		filepath, err := uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file to S3xx"})
+			return
+		}
 
-        // Retrieve user from service
-        user, err := s.AuthRepository.FindUserByID(userID)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
-            return
-        }
+		// Retrieve user from service
+		user, err := s.AuthRepository.FindUserByID(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+			return
+		}
 
-        // Update user image URL
-        user.ThumbNailURL = filepath
-        if err := s.AuthRepository.UpsertUserImage(user.ID, filepath); err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
-            return
-        }
+		// Update user image URL
+		user.ThumbNailURL = filepath
+		if err := s.AuthRepository.UpsertUserImage(user.ID, filepath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user profile"})
+			return
+		}
 
-        log.Println("Filepath:", filepath)
-        c.JSON(http.StatusOK, gin.H{
-            "message": "File uploaded and user profile updated successfully",
-            "url": filepath,
-        })
-    }
+		log.Println("Filepath:", filepath)
+		c.JSON(http.StatusOK, gin.H{
+			"message": "File uploaded and user profile updated successfully",
+			"url":     filepath,
+		})
+	}
 }
 
 func init() {
@@ -210,80 +209,80 @@ func init() {
 }
 
 func (s *Server) handleSignup() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Parse multipart form data
-        if err := c.Request.ParseMultipartForm(10 << 20); err != nil { // 10 MB max size
-            response.JSON(c, "", http.StatusBadRequest, nil, err)
-            return
-        }
+	return func(c *gin.Context) {
+		// Parse multipart form data
+		if err := c.Request.ParseMultipartForm(10 << 20); err != nil { // 10 MB max size
+			response.JSON(c, "", http.StatusBadRequest, nil, err)
+			return
+		}
 
-        var filePath string // This will hold the S3 URL
+		var filePath string // This will hold the S3 URL
 
-        // Get the profile image from the form
-        file, handler, err := c.Request.FormFile("profile_image")
-        if err == nil {
-            defer file.Close()
+		// Get the profile image from the form
+		file, handler, err := c.Request.FormFile("profile_image")
+		if err == nil {
+			defer file.Close()
 
-            // Create S3 client
-            s3Client, err := createS3Client()
-            if err != nil {
-                response.JSON(c, "", http.StatusInternalServerError, nil, err)
-                return
-            }
+			// Create S3 client
+			s3Client, err := createS3Client()
+			if err != nil {
+				response.JSON(c, "", http.StatusInternalServerError, nil, err)
+				return
+			}
 
-            // Generate unique filename
-            userID := c.PostForm("user_id") 
-            filename := fmt.Sprintf("%s_%s", userID, handler.Filename)
+			// Generate unique filename
+			userID := c.PostForm("user_id")
+			filename := fmt.Sprintf("%s_%s", userID, handler.Filename)
 
-            // Upload file to S3
-            filePath, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
-            if err != nil {
-                response.JSON(c, "", http.StatusInternalServerError, nil, err)
-                return
-            }
-        } else if err == http.ErrMissingFile {
-            filePath = "uploads/default-profile.png" // Adjust this to a default S3 URL if necessary
-        } else {
-            response.JSON(c, "", http.StatusBadRequest, nil, err)
-            return
-        }
+			// Upload file to S3
+			filePath, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
+			if err != nil {
+				response.JSON(c, "", http.StatusInternalServerError, nil, err)
+				return
+			}
+		} else if err == http.ErrMissingFile {
+			filePath = "uploads/default-profile.png" // Adjust this to a default S3 URL if necessary
+		} else {
+			response.JSON(c, "", http.StatusBadRequest, nil, err)
+			return
+		}
 
-        // Decode the other form data into the user struct
-        var user models.User
-        user.Fullname = c.PostForm("fullname")
-        user.Username = c.PostForm("username")
-        user.Telephone = c.PostForm("telephone")
-        user.Email = c.PostForm("email")
-        user.Password = c.PostForm("password")
-        user.ThumbNailURL = filePath // Set the S3 URL in the user struct
+		// Decode the other form data into the user struct
+		var user models.User
+		user.Fullname = c.PostForm("fullname")
+		user.Username = c.PostForm("username")
+		user.Telephone = c.PostForm("telephone")
+		user.Email = c.PostForm("email")
+		user.Password = c.PostForm("password")
+		user.ThumbNailURL = filePath // Set the S3 URL in the user struct
 
-        // Fetch the UUID for the role
-        role, err := s.AuthService.GetRoleByName("User") // Use a service method to fetch the role by name
-        if err != nil {
-            response.JSON(c, "", http.StatusInternalServerError, nil, err)
-            return
-        }
-        log.Printf("Fetched role ID for 'User': %s", role.ID.String())
+		// Fetch the UUID for the role
+		role, err := s.AuthService.GetRoleByName("User") // Use a service method to fetch the role by name
+		if err != nil {
+			response.JSON(c, "", http.StatusInternalServerError, nil, err)
+			return
+		}
+		log.Printf("Fetched role ID for 'User': %s", role.ID.String())
 
-        // Assign the role UUID directly to RoleID
-        user.RoleID = role.ID
+		// Assign the role UUID directly to RoleID
+		user.RoleID = role.ID
 
-        // Validate the user data using the validator package
-        validate := validator.New()
-        if err := validate.Struct(user); err != nil {
-            response.JSON(c, "", http.StatusBadRequest, nil, err)
-            return
-        }
+		// Validate the user data using the validator package
+		validate := validator.New()
+		if err := validate.Struct(user); err != nil {
+			response.JSON(c, "", http.StatusBadRequest, nil, err)
+			return
+		}
 
-        // Signup the user using the service
-        userResponse, err := s.AuthService.SignupUser(&user)
-        if err != nil {
-            response.HandleErrors(c, err) // Use HandleErrors to handle different error types
-            return
-        }
+		// Signup the user using the service
+		userResponse, err := s.AuthService.SignupUser(&user)
+		if err != nil {
+			response.HandleErrors(c, err) // Use HandleErrors to handle different error types
+			return
+		}
 
-        response.JSON(c, "Signup successful, check your email for verification", http.StatusCreated, userResponse, nil)
-    }
+		response.JSON(c, "Signup successful, check your email for verification", http.StatusCreated, userResponse, nil)
+	}
 }
 
 // Middleware to redirect non-credential users to sign-in page for certain actions
@@ -513,34 +512,34 @@ func AddRefreshTokenSessionEntry(c context.Context, duration time.Duration) func
 }
 
 func (s *Server) googleSignInUser(c *gin.Context, token string) (*AuthPayload, error) {
-    googleUserDetails, err := s.getUserInfoFromGoogle(token)
-    if err != nil {
-        return nil, fmt.Errorf("unable to get user details from google: %v", err)
-    }
+	googleUserDetails, err := s.getUserInfoFromGoogle(token)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get user details from google: %v", err)
+	}
 
-    // // Fetch user by email to get the role ID
-    // user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
-    // if err != nil {
-    //     return nil, fmt.Errorf("unable to fetch user by email: %v", err)
-    // }
+	// // Fetch user by email to get the role ID
+	// user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
+	// if err != nil {
+	//     return nil, fmt.Errorf("unable to fetch user by email: %v", err)
+	// }
 
-    // Fetch the role by ID
-    // role, err := s.AuthRepository.FindRoleByID(user.RoleID)
-    // if err != nil {
-    //     return nil, fmt.Errorf("unable to fetch role for user: %v", err)
-    // }
+	// Fetch the role by ID
+	// role, err := s.AuthRepository.FindRoleByID(user.RoleID)
+	// if err != nil {
+	//     return nil, fmt.Errorf("unable to fetch role for user: %v", err)
+	// }
 
-    // Call GetGoogleSignInToken with the googleUserDetails and the found role
-    authPayload, err := s.GetGoogleSignInToken(c, googleUserDetails)
-    if err != nil {
-        return nil, fmt.Errorf("unable to sign in user: %v", err)
-    }
+	// Call GetGoogleSignInToken with the googleUserDetails and the found role
+	authPayload, err := s.GetGoogleSignInToken(c, googleUserDetails)
+	if err != nil {
+		return nil, fmt.Errorf("unable to sign in user: %v", err)
+	}
 
-    // Log the Google user details and the authentication payload for debugging
-    fmt.Println("Google user details:", googleUserDetails)
-    fmt.Printf("Auth Payload: %+v\n", authPayload)
+	// Log the Google user details and the authentication payload for debugging
+	fmt.Println("Google user details:", googleUserDetails)
+	fmt.Printf("Auth Payload: %+v\n", authPayload)
 
-    return authPayload, nil
+	return authPayload, nil
 }
 
 // getUserInfoFromGoogle will return information of user which is fetched from Google
@@ -574,64 +573,62 @@ func (srv *Server) getUserInfoFromGoogle(token string) (*GoogleUser, error) {
 
 // GetGoogleSignInToken returns the signin access token and refresh token pair to the social user
 func (s *Server) GetGoogleSignInToken(c *gin.Context, googleUserDetails *GoogleUser) (*AuthPayload, error) {
-    log.Println("Starting Google sign-in process")
+	log.Println("Starting Google sign-in process")
 
-    if googleUserDetails == nil || googleUserDetails.Email == "" || googleUserDetails.Name == "" {
-        return nil, fmt.Errorf("error: google user details are incomplete")
-    }
+	if googleUserDetails == nil || googleUserDetails.Email == "" || googleUserDetails.Name == "" {
+		return nil, fmt.Errorf("error: google user details are incomplete")
+	}
 
-    log.Printf("Looking for existing user with email: %s", googleUserDetails.Email)
-    user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
-    if err != nil {
-        if err.Error() == "user not found" {
-            log.Printf("No existing user found with email: %s. Proceeding to sign-up.", googleUserDetails.Email)
-            user, err = s.signUpAndCreateUser(c, googleUserDetails)
-            if err != nil {
-                log.Printf("Error during sign-up for email %s: %v", googleUserDetails.Email, err)
-                return nil, fmt.Errorf("error signing up user: %v", err)
-            }
-        } else {
-            log.Printf("Error occurred while checking if email exists: %v", err)
-            return nil, fmt.Errorf("error checking if email exists: %v", err)
-        }
-    } else {
-        log.Printf("Existing user found: %+v", user)
-    }
+	log.Printf("Looking for existing user with email: %s", googleUserDetails.Email)
+	user, err := s.AuthRepository.FindUserByEmail(googleUserDetails.Email)
+	if err != nil {
+		if err.Error() == "user not found" {
+			log.Printf("No existing user found with email: %s. Proceeding to sign-up.", googleUserDetails.Email)
+			user, err = s.signUpAndCreateUser(c, googleUserDetails)
+			if err != nil {
+				log.Printf("Error during sign-up for email %s: %v", googleUserDetails.Email, err)
+				return nil, fmt.Errorf("error signing up user: %v", err)
+			}
+		} else {
+			log.Printf("Error occurred while checking if email exists: %v", err)
+			return nil, fmt.Errorf("error checking if email exists: %v", err)
+		}
+	} else {
+		log.Printf("Existing user found: %+v", user)
+	}
 
-    // Fetch the role by ID
-    role, err := s.AuthRepository.FindRoleByID(user.RoleID)
-    if err != nil {
-        log.Printf("Error fetching role for user: %v", err)
-        return nil, fmt.Errorf("unable to fetch role for user: %v", err)
-    }
+	// Fetch the role by ID
+	role, err := s.AuthRepository.FindRoleByID(user.RoleID)
+	if err != nil {
+		log.Printf("Error fetching role for user: %v", err)
+		return nil, fmt.Errorf("unable to fetch role for user: %v", err)
+	}
 
-    log.Printf("Generating token pair for user: %s", googleUserDetails.Email)
+	log.Printf("Generating token pair for user: %s", googleUserDetails.Email)
 
-    // Generate the token pair
-    accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(
-        user.Email,         // Use the user's email
-        s.Config.JWTSecret, // JWT secret from the server config
-        user.AdminStatus,   // Admin status from the user model
-        user.ID,            // Use the correct user ID
-        role.Name,          // Pass the role name
-    )
+	// Generate the token pair
+	accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(
+		user.Email,         // Use the user's email
+		s.Config.JWTSecret, // JWT secret from the server config
+		user.AdminStatus,   // Admin status from the user model
+		user.ID,            // Use the correct user ID
+		role.Name,          // Pass the role name
+	)
 
-    if err != nil {
-        log.Printf("Error generating token pair for email %s: %v", googleUserDetails.Email, err)
-        return nil, fmt.Errorf("error generating token pair: %v", err)
-    }
+	if err != nil {
+		log.Printf("Error generating token pair for email %s: %v", googleUserDetails.Email, err)
+		return nil, fmt.Errorf("error generating token pair: %v", err)
+	}
 
-    payload := &AuthPayload{
-        AccessToken:  accessToken,
-        RefreshToken: refreshToken,
-        TokenType:    "Bearer",
-        ExpiresIn:    int(AccessTokenDuration.Seconds()),
-    }
-    log.Printf("Auth payload generated for user %s: %+v", googleUserDetails.Email, payload)
-    return payload, nil
+	payload := &AuthPayload{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    int(AccessTokenDuration.Seconds()),
+	}
+	log.Printf("Auth payload generated for user %s: %+v", googleUserDetails.Email, payload)
+	return payload, nil
 }
-
-
 
 func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUser) (*models.User, error) {
 	log.Printf("Attempting to sign up user with email: %s", googleUserDetails.Email)
@@ -649,7 +646,7 @@ func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUs
 		Email:    googleUserDetails.Email,
 		IsSocial: true,
 		Fullname: googleUserDetails.Name,
-		RoleID:   role.ID, 
+		RoleID:   role.ID,
 	}
 
 	// Create the user using the repository
@@ -663,49 +660,48 @@ func (s *Server) signUpAndCreateUser(c *gin.Context, googleUserDetails *GoogleUs
 	return createdUser, nil
 }
 
-
 func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption func(*AuthPayload), c *gin.Context) (*AuthPayload, error) {
-    // Get the user ID from the context
-    userID, ok := c.Get("userID")
-    if !ok {
-        return nil, fmt.Errorf("userID not found in context")
-    }
+	// Get the user ID from the context
+	userID, ok := c.Get("userID")
+	if !ok {
+		return nil, fmt.Errorf("userID not found in context")
+	}
 
-    userIDUint, ok := userID.(uint)
-    if !ok {
-        log.Println("userID is not a uint")
-        return nil, fmt.Errorf("userID is not a valid uint")
-    }
+	userIDUint, ok := userID.(uint)
+	if !ok {
+		log.Println("userID is not a uint")
+		return nil, fmt.Errorf("userID is not a valid uint")
+	}
 
-    // Get email from authRequest
-    email := authRequest.email
+	// Get email from authRequest
+	email := authRequest.email
 
-    // Fetch the role from the repository based on userID
-    userRole, err := s.AuthRepository.GetUserRoleByUserID(userIDUint)
-    if err != nil {
-        return nil, fmt.Errorf("failed to retrieve role for user: %v", err)
-    }
+	// Fetch the role from the repository based on userID
+	userRole, err := s.AuthRepository.GetUserRoleByUserID(userIDUint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve role for user: %v", err)
+	}
 
-    // Determine if the user is an admin
-    isAdmin := userRole.Name == "admin"
+	// Determine if the user is an admin
+	isAdmin := userRole.Name == "admin"
 
-    // Pass the role name to GenerateTokenPair
-    accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(email, s.Config.GoogleClientSecret, isAdmin, userIDUint, userRole.Name)
-    if err != nil {
-        return nil, err
-    }
+	// Pass the role name to GenerateTokenPair
+	accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(email, s.Config.GoogleClientSecret, isAdmin, userIDUint, userRole.Name)
+	if err != nil {
+		return nil, err
+	}
 
-    // Construct AuthPayload and return
-    payload := &AuthPayload{
-        AccessToken:  accessToken,
-        RefreshToken: refreshToken,
-        TokenType:    "Bearer",
-        ExpiresIn:    int(AccessTokenDuration.Seconds()),
-    }
+	// Construct AuthPayload and return
+	payload := &AuthPayload{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    int(AccessTokenDuration.Seconds()),
+	}
 
-    authPayloadOption(payload)
+	authPayloadOption(payload)
 
-    return payload, nil
+	return payload, nil
 }
 
 // validateState checks the state string with the system jwt secret while also validating the state validity
@@ -891,7 +887,6 @@ func (s *Server) handleShowProfile() gin.HandlerFunc {
 	}
 }
 
-
 // Assuming you have imported necessary packages and defined your server and repository
 
 func (s *Server) handleGetOnlineUsers() gin.HandlerFunc {
@@ -925,31 +920,30 @@ func (s *Server) handleGetAllUsers() gin.HandlerFunc {
 }
 
 func (s *Server) handleDeleteUser() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Retrieve the userID from the context
-        userID, exists := c.Get("userID")
-        if !exists {
-            response.JSON(c, "User ID not found in context", http.StatusUnauthorized, nil, nil)
-            return
-        }
+	return func(c *gin.Context) {
+		// Retrieve the userID from the context
+		userID, exists := c.Get("userID")
+		if !exists {
+			response.JSON(c, "User ID not found in context", http.StatusUnauthorized, nil, nil)
+			return
+		}
 
-        // Type assert to uint
-        userIDUint, ok := userID.(uint)
-        if !ok {
-            response.JSON(c, "Invalid user ID type", http.StatusInternalServerError, nil, nil)
-            return
-        }
+		// Type assert to uint
+		userIDUint, ok := userID.(uint)
+		if !ok {
+			response.JSON(c, "Invalid user ID type", http.StatusInternalServerError, nil, nil)
+			return
+		}
 
-        // Perform the user deletion
-        if err := s.AuthService.DeleteUser(userIDUint); err != nil {
-            response.JSON(c, "Failed to delete user", http.StatusInternalServerError, nil, err)
-            return
-        }
+		// Perform the user deletion
+		if err := s.AuthService.DeleteUser(userIDUint); err != nil {
+			response.JSON(c, "Failed to delete user", http.StatusInternalServerError, nil, err)
+			return
+		}
 
-        response.JSON(c, "User deleted successfully", http.StatusOK, nil, nil)
-    }
+		response.JSON(c, "User deleted successfully", http.StatusOK, nil, nil)
+	}
 }
-
 
 // func (s *Server) SendPasswordResetEmail(token, email string) *apiError.Error {
 // 	link := fmt.Sprintf("%s/verifyEmail/%s", s.Config.BaseUrl, token)

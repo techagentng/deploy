@@ -65,4 +65,3 @@ func (s *Server) HandleDownvoteReport() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": "Downvoted successfully"})
 	}
 }
-
