@@ -2,12 +2,12 @@ package db
 
 import (
 	"fmt"
-	"log"
-	"strings"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
-	"github.com/google/uuid"
+	"log"
+	"strings"
 )
 
 type AuthRepository interface {
@@ -52,50 +52,49 @@ func NewAuthRepo(db *GormDB) AuthRepository {
 }
 
 func generateIDx2() uuid.UUID {
-    id := uuid.New() // Generates a UUIDv4
-    return id
+	id := uuid.New() // Generates a UUIDv4
+	return id
 }
 
 func (a *authRepo) CreateUser(user *models.User) (*models.User, error) {
-    if user == nil {
-        log.Println("CreateUser error: user is nil")
-        return nil, errors.New("user is nil")
-    }
+	if user == nil {
+		log.Println("CreateUser error: user is nil")
+		return nil, errors.New("user is nil")
+	}
 
-    // Assign a default role if the RoleID is not set
-    if user.RoleID == uuid.Nil {
-        // Fetch the default role by name
-        var defaultRole models.Role
-        if err := a.DB.Where("name = ?", models.RoleUser).First(&defaultRole).Error; err != nil {
-            if errors.Is(err, gorm.ErrRecordNotFound) {
-                // Role not found, create it
-                defaultRole = models.Role{
-                    ID:   generateIDx2(), // Use the updated function
-                    Name: models.RoleUser,
-                }
-                if err := a.DB.Create(&defaultRole).Error; err != nil {
-                    log.Printf("CreateUser error creating default role: %v", err)
-                    return nil, err
-                }
-            } else {
-                log.Printf("CreateUser error fetching default role: %v", err)
-                return nil, err
-            }
-        }
-        user.RoleID = defaultRole.ID
-    }
+	// Assign a default role if the RoleID is not set
+	if user.RoleID == uuid.Nil {
+		// Fetch the default role by name
+		var defaultRole models.Role
+		if err := a.DB.Where("name = ?", models.RoleUser).First(&defaultRole).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// Role not found, create it
+				defaultRole = models.Role{
+					ID:   generateIDx2(), // Use the updated function
+					Name: models.RoleUser,
+				}
+				if err := a.DB.Create(&defaultRole).Error; err != nil {
+					log.Printf("CreateUser error creating default role: %v", err)
+					return nil, err
+				}
+			} else {
+				log.Printf("CreateUser error fetching default role: %v", err)
+				return nil, err
+			}
+		}
+		user.RoleID = defaultRole.ID
+	}
 
-    // Create the user in the database
-    result := a.DB.Create(user)
-    if result.Error != nil {
-        log.Printf("CreateUser error: %v", result.Error)
-        return nil, result.Error
-    }
+	// Create the user in the database
+	result := a.DB.Create(user)
+	if result.Error != nil {
+		log.Printf("CreateUser error: %v", result.Error)
+		return nil, result.Error
+	}
 
-    // Return the created user
-    return user, nil
+	// Return the created user
+	return user, nil
 }
-
 
 // CreateUserWithMacAddress updates the MAC address field for an existing user or creates a new user with the provided MAC address
 func (a *authRepo) CreateUserWithMacAddress(user *models.LoginRequestMacAddress) (*models.LoginRequestMacAddress, error) {
@@ -251,28 +250,28 @@ func (a *authRepo) FindUserByMacAddress(macAddress string) (*models.LoginRequest
 }
 
 func (a *authRepo) UpsertUserImage(userID uint, filepath string) error {
-    var user models.User
-    // Find the user by ID
-    result := a.DB.Where("id = ?", userID).First(&user)
+	var user models.User
+	// Find the user by ID
+	result := a.DB.Where("id = ?", userID).First(&user)
 
-    if result.Error != nil {
-        if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-            // Record does not exist
-            return errors.New("user not found")
-        }
-        // Other errors
-        log.Printf("Error retrieving user record: %v", result.Error)
-        return result.Error
-    }
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			// Record does not exist
+			return errors.New("user not found")
+		}
+		// Other errors
+		log.Printf("Error retrieving user record: %v", result.Error)
+		return result.Error
+	}
 
-    // Update the user's thumbnail URL
-    user.ThumbNailURL = filepath
-    if err := a.DB.Save(&user).Error; err != nil {
-        log.Printf("Error updating user thumbnail URL: %v", err)
-        return err
-    }
+	// Update the user's thumbnail URL
+	user.ThumbNailURL = filepath
+	if err := a.DB.Save(&user).Error; err != nil {
+		log.Printf("Error updating user thumbnail URL: %v", err)
+		return err
+	}
 
-    return nil
+	return nil
 }
 
 // Repository method to update user profile in the database
@@ -362,90 +361,86 @@ func (a *authRepo) GetAllUsers() ([]models.User, error) {
 
 // FindRoleByID retrieves a role by its ID from the database.
 func (r *authRepo) FindRoleByID(roleID uuid.UUID) (*models.Role, error) {
-    var role *models.Role
-    if err := r.DB.Where("id = ?", roleID).First(&role).Error; err != nil {
-        return nil, err
-    }
-    return role, nil
+	var role *models.Role
+	if err := r.DB.Where("id = ?", roleID).First(&role).Error; err != nil {
+		return nil, err
+	}
+	return role, nil
 }
-
-
 
 // FindRoleByUserEmail retrieves the role of a user based on their email
 func (a *authRepo) FindRoleByUserEmail(email string) (*models.Role, error) {
-    // Define a User model to fetch the user's role by email
-    var user models.User
-    var role models.Role
+	// Define a User model to fetch the user's role by email
+	var user models.User
+	var role models.Role
 
-    // Find the user by email
-    if err := a.DB.Where("email = ?", email).First(&user).Error; err != nil {
-        if err == gorm.ErrRecordNotFound {
-            return nil, fmt.Errorf("user not found")
-        }
-        return nil, err
-    }
+	// Find the user by email
+	if err := a.DB.Where("email = ?", email).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("user not found")
+		}
+		return nil, err
+	}
 
-    // Find the role by the user's RoleID
-    if err := a.DB.Where("id = ?", user.Role).First(&role).Error; err != nil {
-        if err == gorm.ErrRecordNotFound {
-            return nil, fmt.Errorf("role not foundxx")
-        }
-        return nil, err
-    }
+	// Find the role by the user's RoleID
+	if err := a.DB.Where("id = ?", user.Role).First(&role).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("role not foundxx")
+		}
+		return nil, err
+	}
 
-    return &role, nil
+	return &role, nil
 }
-
 
 // FindRoleByName fetches a role by its name from the database.
 func (a *authRepo) FindRoleByName(name string) (*models.Role, error) {
-    var role models.Role
-    if err := a.DB.Where("name = ?", name).First(&role).Error; err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
+	var role models.Role
+	if err := a.DB.Where("name = ?", name).First(&role).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Println("Role not foundx-:", name)
-            return nil, errors.New("role not found--x")
-        }
-        return nil, err
-    }
-    return &role, nil
+			return nil, errors.New("role not found--x")
+		}
+		return nil, err
+	}
+	return &role, nil
 }
-
 
 // GetUserRoleByUserID fetches the role associated with a given user ID.
 func (a *authRepo) GetUserRoleByUserID(userID uint) (*models.Role, error) {
-    // Define a variable to hold the user's role.
-    var role models.Role
+	// Define a variable to hold the user's role.
+	var role models.Role
 
-    // Query the database to find the role associated with the userID.
-    // Assuming a join between the users and roles tables, or a direct relation.
-    err := a.DB.Table("roles").
-        Select("roles.*").
-        Joins("JOIN user_roles ON user_roles.role_id = roles.id").
-        Where("user_roles.user_id = ?", userID).
-        First(&role).Error
+	// Query the database to find the role associated with the userID.
+	// Assuming a join between the users and roles tables, or a direct relation.
+	err := a.DB.Table("roles").
+		Select("roles.*").
+		Joins("JOIN user_roles ON user_roles.role_id = roles.id").
+		Where("user_roles.user_id = ?", userID).
+		First(&role).Error
 
-    // Check if the role was found or if an error occurred during the query.
-    if err != nil {
-        if err == gorm.ErrRecordNotFound {
-            // If no role is found, return a nil role and a custom error.
-            return nil, fmt.Errorf("no role found for user with ID %d", userID)
-        }
-        // For any other error, return it.
-        return nil, err
-    }
+	// Check if the role was found or if an error occurred during the query.
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// If no role is found, return a nil role and a custom error.
+			return nil, fmt.Errorf("no role found for user with ID %d", userID)
+		}
+		// For any other error, return it.
+		return nil, err
+	}
 
-    // Return the role if found, otherwise return nil and an error.
-    return &role, nil
+	// Return the role if found, otherwise return nil and an error.
+	return &role, nil
 }
 
 func (a *authRepo) SoftDeleteUser(userID uint) error {
-    var user models.User
-    if err := a.DB.First(&user, userID).Error; err != nil {
-        return err
-    }
+	var user models.User
+	if err := a.DB.First(&user, userID).Error; err != nil {
+		return err
+	}
 
-    // Perform soft delete
-    return a.DB.Delete(&user).Error
+	// Perform soft delete
+	return a.DB.Delete(&user).Error
 }
 
 // UpdateUserPassword updates the password for a given user

@@ -56,11 +56,11 @@ func (s *Server) setupRouter() *gin.Engine {
 
 	// allowedOrigins := []string{"http://localhost:3001"}
 	// if os.Getenv("GIN_MODE") == "release" {
-	// 	allowedOrigins = []string{"https://citizenx-dashboard-sbqx.onrender.com"} 
+	// 	allowedOrigins = []string{"https://citizenx-dashboard-sbqx.onrender.com"}
 	// }
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
-		AllowAllOrigins: true,
+		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		AllowCredentials: true,
@@ -120,7 +120,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/count/all/rewards", s.handleSumAllRewardsBalance())
 	authorized.GET("/users/lga/:lga/report-type/:reportType", s.handleGetReportsByTypeAndLGA())
 	authorized.GET("/rewards/list", s.handleGetAllRewardsList())
-	authorized.GET("/report/type/count", s.handleGetReportTypeCounts()) 
+	authorized.GET("/report/type/count", s.handleGetReportTypeCounts())
 	authorized.GET("/lgas", s.handleGetLGAs())
 	authorized.GET("/lgas/lat/lng", s.IncidentMarkersHandler())
 	authorized.DELETE("/incident-report/:id", s.DeleteIncidentReportHandler())
@@ -146,7 +146,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("reports/filters", s.handleGetReportsByFilters())
 	authorized.POST("posts/create", s.handleCreatePost())
 	authorized.GET("/all/posts/:userID", s.handleGetPostsByUserID())
-	
+
 	// authorized.GET("/api/v1/report/counts/state/:state/lga", s.GetReportTypeCountsByLGA)
 	// authorized.GET("/api/v1/report/counts/lga/:lga", s.GetReportCountsByStateAndLGA)
 

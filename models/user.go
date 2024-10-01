@@ -22,29 +22,29 @@ import (
 // User represents a user of the application
 type User struct {
 	Model
-	Fullname       string         `json:"fullname" binding:"required,min=2"`
-	Username       string         `json:"username" binding:"required,min=2"`
-	Telephone      string         `json:"telephone" gorm:"unique;default:null" binding:"required"`
-	Email          string         `json:"email" gorm:"unique;not null" binding:"required,email"`
-	Password       string         `json:"password,omitempty" gorm:"-"`
-	HashedPassword string         `json:"-"`
-	IsEmailActive  bool           `json:"-"`
-	IsSocial       bool           `json:"-"`
-	AccessToken    string         `json:"-"`
-	IsVerified     bool           `json:"is_verified"`
-	IsAnonymous    bool           `json:"is_anonymous"`
-	IsJournalist   bool           `json:"is_journalist"`
-	AdminStatus    bool           `json:"is_admin" gorm:"foreignKey:Status"` // admin
-	Notifications  []Notification `gorm:"foreignKey:UserID"`
-	ThumbNailURL   string         `json:"thumbnail_url,omitempty"`
-	MacAddress     string         `json:"mac_address"`
-	LGAName        string         `gorm:"foreignKey:Name"`
-	Online         bool           `json:"online"`
-	Upvotes        int             `json:"up_vote"`
-    Downvotes      int             `json:"down_vote"`
-	RoleID      uuid.UUID `gorm:"type:uuid" json:"role_id"`
-	Role        Role      `gorm:"foreignKey:RoleID" json:"role"`  
-	BookmarkedReports  []*IncidentReport `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
+	Fullname          string            `json:"fullname" binding:"required,min=2"`
+	Username          string            `json:"username" binding:"required,min=2"`
+	Telephone         string            `json:"telephone" gorm:"unique;default:null" binding:"required"`
+	Email             string            `json:"email" gorm:"unique;not null" binding:"required,email"`
+	Password          string            `json:"password,omitempty" gorm:"-"`
+	HashedPassword    string            `json:"-"`
+	IsEmailActive     bool              `json:"-"`
+	IsSocial          bool              `json:"-"`
+	AccessToken       string            `json:"-"`
+	IsVerified        bool              `json:"is_verified"`
+	IsAnonymous       bool              `json:"is_anonymous"`
+	IsJournalist      bool              `json:"is_journalist"`
+	AdminStatus       bool              `json:"is_admin" gorm:"foreignKey:Status"` // admin
+	Notifications     []Notification    `gorm:"foreignKey:UserID"`
+	ThumbNailURL      string            `json:"thumbnail_url,omitempty"`
+	MacAddress        string            `json:"mac_address"`
+	LGAName           string            `gorm:"foreignKey:Name"`
+	Online            bool              `json:"online"`
+	Upvotes           int               `json:"up_vote"`
+	Downvotes         int               `json:"down_vote"`
+	RoleID            uuid.UUID         `gorm:"type:uuid" json:"role_id"`
+	Role              Role              `gorm:"foreignKey:RoleID" json:"role"`
+	BookmarkedReports []*IncidentReport `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
 }
 
 type Admin struct {
@@ -107,23 +107,23 @@ type UserResponse struct {
 	Telephone string `json:"telephone"`
 	Email     string `json:"email"`
 	LGA       string `json:"LGA" gorm:"foreignkey:LGA(id)"`
-	RoleName      string             `json:"role_name"`
+	RoleName  string `json:"role_name"`
 }
 
 type UserImage struct {
-    ID           uint `gorm:"primaryKey"`
-    UserID       uint
-    ThumbNailURL string
-    CreatedAt    time.Time
+	ID           uint `gorm:"primaryKey"`
+	UserID       uint
+	ThumbNailURL string
+	CreatedAt    time.Time
 }
 
 type EditProfileResponse struct {
-	ID          uint   `json:"id"`
-	FullName    string `json:"fullname"`
-	Username    string `json:"username"`
-	Phone string `json:"phone"`
-	State       string `json:"state"`
-	Lga    string `json:"lga"`
+	ID       uint   `json:"id"`
+	FullName string `json:"fullname"`
+	Username string `json:"username"`
+	Phone    string `json:"phone"`
+	State    string `json:"state"`
+	Lga      string `json:"lga"`
 }
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
@@ -133,7 +133,7 @@ type LoginRequest struct {
 type LoginRequestMacAddress struct {
 	Model
 	MacAddress string `json:"mac_address"`
-	Token string `json:"token"`
+	Token      string `json:"token"`
 }
 type ForgotPassword struct {
 	Email string `json:"email" binding:"required,email"`
@@ -165,7 +165,7 @@ type LoginResponse struct {
 	UserResponse
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	RoleID      string             `json:"role_id"`
+	RoleID       string `json:"role_id"`
 }
 
 // VerifyPassword verifies the collected password with the user's hashed password

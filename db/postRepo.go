@@ -7,8 +7,8 @@ import (
 
 // LikeRepository interface
 type PostRepository interface {
-    CreatePost(post *models.Post) error
-    GetPostsByUserID(userID uint) ([]models.Post, error)
+	CreatePost(post *models.Post) error
+	GetPostsByUserID(userID uint) ([]models.Post, error)
 }
 
 // likeRepo struct
@@ -22,19 +22,19 @@ func NewPostRepo(db *GormDB) PostRepository {
 }
 
 func (r *postRepo) CreatePost(post *models.Post) error {
-    if err := r.DB.Create(post).Error; err != nil {
-        return err
-    }
-    return nil
+	if err := r.DB.Create(post).Error; err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetPostsByUserID fetches all posts created by a specific user based on userID
 func (r *postRepo) GetPostsByUserID(userID uint) ([]models.Post, error) {
-    var posts []models.Post
-    // Fetch posts where the userID matches
-    err := r.DB.Where("user_id = ?", userID).Find(&posts).Error
-    if err != nil {
-        return nil, err
-    }
-    return posts, nil
+	var posts []models.Post
+	// Fetch posts where the userID matches
+	err := r.DB.Where("user_id = ?", userID).Find(&posts).Error
+	if err != nil {
+		return nil, err
+	}
+	return posts, nil
 }

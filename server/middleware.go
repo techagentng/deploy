@@ -24,72 +24,71 @@ import (
 )
 
 func (s *Server) Authorize() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        accessToken := getTokenFromHeader(c)
-        if accessToken == "" {
-            respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
-            return
-        }
+	return func(c *gin.Context) {
+		accessToken := getTokenFromHeader(c)
+		if accessToken == "" {
+			respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
+			return
+		}
 
-        if s.AuthRepository.IsTokenInBlacklist(accessToken) {
-            respondAndAbort(c, "Access token is blacklisted", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
-            return
-        }
+		if s.AuthRepository.IsTokenInBlacklist(accessToken) {
+			respondAndAbort(c, "Access token is blacklisted", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
+			return
+		}
 
-        secret := s.Config.JWTSecret
-        accessClaims, err := jwt.ValidateAndGetClaims(accessToken, secret)
-        if err != nil {
-            respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
-            return
-        }
+		secret := s.Config.JWTSecret
+		accessClaims, err := jwt.ValidateAndGetClaims(accessToken, secret)
+		if err != nil {
+			respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
+			return
+		}
 
-        userIDValue := accessClaims["id"]
-        var userID uint
-        switch v := userIDValue.(type) {
-        case float64:
-            userID = uint(v)
-        default:
-            respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("Invalid userID format", http.StatusBadRequest))
-            return
-        }
+		userIDValue := accessClaims["id"]
+		var userID uint
+		switch v := userIDValue.(type) {
+		case float64:
+			userID = uint(v)
+		default:
+			respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("Invalid userID format", http.StatusBadRequest))
+			return
+		}
 
-        user, err := s.AuthRepository.FindUserByID(userID)
-        if err != nil {
-            switch {
-            case errors.Is(err, errs.InActiveUserError):
-                respondAndAbort(c, "inactive user", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
-                return
-            case errors.Is(err, gorm.ErrRecordNotFound):
-                respondAndAbort(c, "user not found", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
-                return
-            default:
-                respondAndAbort(c, "unable to find entity", http.StatusInternalServerError, nil, errs.New("internal server error", http.StatusInternalServerError))
-                return
-            }
-        }
+		user, err := s.AuthRepository.FindUserByID(userID)
+		if err != nil {
+			switch {
+			case errors.Is(err, errs.InActiveUserError):
+				respondAndAbort(c, "inactive user", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
+				return
+			case errors.Is(err, gorm.ErrRecordNotFound):
+				respondAndAbort(c, "user not found", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
+				return
+			default:
+				respondAndAbort(c, "unable to find entity", http.StatusInternalServerError, nil, errs.New("internal server error", http.StatusInternalServerError))
+				return
+			}
+		}
 
-				// Extract role from claims
-				role, ok := accessClaims["role"].(string)
-				if !ok {
-					respondAndAbort(c, "invalid role information", http.StatusBadRequest, nil, errs.New("Invalid role in token", http.StatusBadRequest))
-					return
-				}
+		// Extract role from claims
+		role, ok := accessClaims["role"].(string)
+		if !ok {
+			respondAndAbort(c, "invalid role information", http.StatusBadRequest, nil, errs.New("Invalid role in token", http.StatusBadRequest))
+			return
+		}
 
-        c.Set("user", user)
-        c.Set("userID", userID)
-        c.Set("access_token", accessToken)
-        c.Set("fullName", user.Fullname)
-        c.Set("username", user.Username)
+		c.Set("user", user)
+		c.Set("userID", userID)
+		c.Set("access_token", accessToken)
+		c.Set("fullName", user.Fullname)
+		c.Set("username", user.Username)
 		c.Set("profile_image", user.ThumbNailURL)
 		c.Set("user_role", role)
 		// Log to check if values are set
 		log.Printf("Username in middleware: %v", c.Value("username"))
 		log.Printf("FullName in middleware: %v", c.Value("fullName"))
 		log.Printf("Profile image in middleware: %v", c.Value("profileImage"))
-        c.Next()
-    }
+		c.Next()
+	}
 }
-
 
 func limitRateForPasswordReset(store ratelimit.Store) gin.HandlerFunc {
 	// Initialize rate limiter using the provided store

@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/disintegration/imaging"
@@ -77,69 +78,128 @@ func generateUniqueFilename(extension string) string {
 	return fmt.Sprintf("%d_%s%s", timestamp, randomUUID, extension)
 }
 
-func (m *mediaService) ProcessMedia(c *gin.Context, formMedia []*multipart.FileHeader, userID uint, reportID string) ([]string, []string, []string, []string, error) {
-    var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
-    bucketName := os.Getenv("AWS_BUCKET") // Replace with your actual bucket name
-
-    for _, fileHeader := range formMedia {
-        file, err := fileHeader.Open()
-        if err != nil {
-            return nil, nil, nil, nil, fmt.Errorf("failed to open file: %v", err)
-        }
-
-        // Read the file content
-        fileBytes, err := ioutil.ReadAll(file)
-        if err != nil {
-            return nil, nil, nil, nil, fmt.Errorf("failed to read file: %v", err)
-        }
-
-		// Reset file pointer to the beginning after reading it
-		file.Seek(0, io.SeekStart)
-
-        fileType := getFileType(fileBytes)
-        var feedURL, thumbnailURL, fullsizeURL string
-
-        // Define the folder name based on the file type
-        folderName := ""
-        switch fileType {
-        case "image":
-            folderName = "images"
-            feedURL, thumbnailURL, fullsizeURL, err = processAndStoreImage(fileBytes)
-            if err != nil {
-                return nil, nil, nil, nil, fmt.Errorf("failed to process and store image: %v", err)
-            }
-        case "video":
-            folderName = "videos"
-            feedURL, thumbnailURL, fullsizeURL, err = processAndStoreVideo(fileBytes)
-            if err != nil {
-                return nil, nil, nil, nil, fmt.Errorf("failed to process and store video: %v", err)
-            }
-        case "audio":
-            folderName = "audio"
-            feedURL, thumbnailURL, err = processAndStoreAudio(fileBytes)
-            if err != nil {
-                return nil, nil, nil, nil, fmt.Errorf("failed to process and store audio: %v", err)
-            }
-        default:
-            return nil, nil, nil, nil, fmt.Errorf("unsupported file type")
-        }
-
-        // Upload the processed media to S3
-        feedURL, err = m.mediaRepo.UploadMediaToS3(file, fileHeader, bucketName, folderName)
-        if err != nil {
-            return nil, nil, nil, nil, fmt.Errorf("failed to upload media to S3: %v", err)
-        }
-
-        // Append the URLs and file type to their respective slices
-        feedURLs = append(feedURLs, feedURL)
-        thumbnailURLs = append(thumbnailURLs, thumbnailURL)
-        fullsizeURLs = append(fullsizeURLs, fullsizeURL)
-        fileTypes = append(fileTypes, fileType)
-    }
-
-    return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
+// Define a struct to hold the results of each goroutine
+type ProcessResult struct {
+	FeedURL      string
+	ThumbnailURL string
+	FullSizeURL  string
+	FileType     string
+	Error        error
 }
 
+// Change the parameter type to []*multipart.FileHeader to handle multiple files
+func (m *mediaService) ProcessMedia(c *gin.Context, formMedia []*multipart.FileHeader, userID uint, reportID string) ([]string, []string, []string, []string, error) {
+	var (
+		feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
+		mu                                               sync.Mutex
+		wg                                               sync.WaitGroup
+		bucketName                                       = os.Getenv("AWS_BUCKET")
+		results                                          = make(chan *ProcessResult, len(formMedia)) // len is valid now as formMedia is a slice
+	)
+
+	// Launch a goroutine for each file to process it concurrently
+	for _, fileHeader := range formMedia {
+		wg.Add(1)
+		go func(fileHeader *multipart.FileHeader) {
+			defer wg.Done()
+
+			// Open the file
+			file, err := fileHeader.Open()
+			if err != nil {
+				results <- &ProcessResult{Error: fmt.Errorf("failed to open file: %v", err)}
+				return
+			}
+			defer file.Close()
+
+			// Read the file content
+			fileBytes, err := ioutil.ReadAll(file)
+			if err != nil {
+				results <- &ProcessResult{Error: fmt.Errorf("failed to read file: %v", err)}
+				return
+			}
+
+			// Reset file pointer to the beginning after reading it
+			_, err = file.Seek(0, io.SeekStart)
+			if err != nil {
+				results <- &ProcessResult{Error: fmt.Errorf("failed to seek file: %v", err)}
+				return
+			}
+
+			fileType := getFileType(fileBytes)
+			var feedURL, thumbnailURL, fullsizeURL string
+
+			// Define the folder name based on the file type
+			folderName := ""
+			switch fileType {
+			case "image":
+				folderName = "images"
+				feedURL, thumbnailURL, fullsizeURL, err = processAndStoreImage(fileBytes)
+				if err != nil {
+					results <- &ProcessResult{Error: fmt.Errorf("failed to process and store image: %v", err)}
+					return
+				}
+			case "video":
+				folderName = "videos"
+				feedURL, thumbnailURL, fullsizeURL, err = processAndStoreVideo(fileBytes)
+				if err != nil {
+					results <- &ProcessResult{Error: fmt.Errorf("failed to process and store video: %v", err)}
+					return
+				}
+			case "audio":
+				folderName = "audio"
+				feedURL, thumbnailURL, err = processAndStoreAudio(fileBytes)
+				if err != nil {
+					results <- &ProcessResult{Error: fmt.Errorf("failed to process and store audio: %v", err)}
+					return
+				}
+			default:
+				results <- &ProcessResult{Error: fmt.Errorf("unsupported file type: %s", fileType)}
+				return
+			}
+
+			// Upload the processed media to S3
+			feedURL, err = m.mediaRepo.UploadMediaToS3(file, fileHeader, bucketName, folderName)
+			if err != nil {
+				results <- &ProcessResult{Error: fmt.Errorf("failed to upload media to S3: %v", err)}
+				return
+			}
+
+			// Return the results through the channel
+			results <- &ProcessResult{
+				FeedURL:      feedURL,
+				ThumbnailURL: thumbnailURL,
+				FullSizeURL:  fullsizeURL,
+				FileType:     fileType,
+				Error:        nil,
+			}
+		}(fileHeader)
+	}
+
+	// Close the results channel when all goroutines are done
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results from the channel
+	for result := range results {
+		if result.Error != nil {
+			return nil, nil, nil, nil, fmt.Errorf("error processing media: %v", result.Error)
+		}
+		mu.Lock()
+		feedURLs = append(feedURLs, result.FeedURL)
+		if result.ThumbnailURL != "" {
+			thumbnailURLs = append(thumbnailURLs, result.ThumbnailURL)
+		}
+		if result.FullSizeURL != "" {
+			fullsizeURLs = append(fullsizeURLs, result.FullSizeURL)
+		}
+		fileTypes = append(fileTypes, result.FileType)
+		mu.Unlock()
+	}
+
+	return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
+}
 
 func getFileType(fileBytes []byte) string {
 	// Determine the file type based on the file signature (magic number)
@@ -377,61 +437,60 @@ func getImageDimensions(file []byte) (int, int, error) {
 }
 
 func (m *mediaService) SaveMedia(media models.Media, reportID string, userID uint, imageCount int, videoCount int, audioCount int, totalPoints int) error {
-    // Generate a new UUID for the media ID
-    ID := uuid.New()
-    media.ID = ID.String()
-    media.UserID = userID
+	// Generate a new UUID for the media ID
+	ID := uuid.New()
+	media.ID = ID.String()
+	media.UserID = userID
 
-    // Multiply totalPoints by 10
-    rewardPoints := totalPoints * 10
+	// Multiply totalPoints by 10
+	rewardPoints := totalPoints * 10
 
-    // Set the points on the media (remove the redundant assignment)
-    media.Points = rewardPoints
+	// Set the points on the media (remove the redundant assignment)
+	media.Points = rewardPoints
 
-    fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxT", rewardPoints)
+	fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxT", rewardPoints)
 
-    // Save the media to the database
-    err := m.mediaRepo.SaveMedia(media, reportID, userID)
-    if err != nil {
-        return err
-    }
+	// Save the media to the database
+	err := m.mediaRepo.SaveMedia(media, reportID, userID)
+	if err != nil {
+		return err
+	}
 
-    // Create and save the media count for the report
-    var mcount models.MediaCount
-    mcount.Images = imageCount
-    mcount.Videos = videoCount
-    mcount.Audios = audioCount
-    mcount.IncidentReportID = reportID
-    mcount.UserID = userID
+	// Create and save the media count for the report
+	var mcount models.MediaCount
+	mcount.Images = imageCount
+	mcount.Videos = videoCount
+	mcount.Audios = audioCount
+	mcount.IncidentReportID = reportID
+	mcount.UserID = userID
 
-    // Get the user's reward record
-    reward, err := m.rewardRepo.GetRewardByUserID(userID)
-    if err != nil {
-        return err
-    }
+	// Get the user's reward record
+	reward, err := m.rewardRepo.GetRewardByUserID(userID)
+	if err != nil {
+		return err
+	}
 
-    // If no reward record exists, create a new one
-    if reward == nil {
-        reward = &models.Reward{
-            UserID:  userID,
-            Balance: 0,
-            Point:   0,
-        }
-    }
+	// If no reward record exists, create a new one
+	if reward == nil {
+		reward = &models.Reward{
+			UserID:  userID,
+			Balance: 0,
+			Point:   0,
+		}
+	}
 
-    // Update the reward balance and points
-    reward.Balance += rewardPoints
-    reward.Point += rewardPoints
+	// Update the reward balance and points
+	reward.Balance += rewardPoints
+	reward.Point += rewardPoints
 
-    // Save the updated reward record
-    err = m.rewardRepo.SaveReward(reward)
-    if err != nil {
-        return err
-    }
+	// Save the updated reward record
+	err = m.rewardRepo.SaveReward(reward)
+	if err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
-
 
 func processAndStoreVideo(fileBytes []byte) (string, string, string, error) {
 	videoFilename := generateUniqueFilename(".mp4")

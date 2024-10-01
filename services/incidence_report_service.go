@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
@@ -28,6 +29,7 @@ type IncidentReportService interface {
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 	GetUserReports(userID uint) ([]models.ReportType, error)
 	GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error)
+	AddMediaToReport(reportID string, feedURLs []string, thumbnailURLs []string, fullsizeURLs []string) error
 }
 
 type IncidentService struct {
@@ -134,9 +136,9 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		HospitalAddress:      report.HospitalAddress,
 		RoadName:             report.RoadName,
 		AirlineName:          report.AirlineName,
-		Category: report.Category,
-		UserFullname: report.UserFullname,
-		UserUsername: report.UserUsername,
+		Category:             report.Category,
+		UserFullname:         report.UserFullname,
+		UserUsername:         report.UserUsername,
 	}
 
 	// Save the report to the database
@@ -185,28 +187,28 @@ func (s *IncidentService) GetReportsByTypeAndLGA(reportType string, lga string) 
 }
 
 func (s *IncidentService) GetReportTypeCounts(state string, lga string, startDate, endDate *string) ([]string, []int, int, int, []models.StateReportCount, error) {
-    reportTypes, counts, totalUsers, totalReports, topStates, err := s.incidentRepo.GetReportTypeCounts(state, lga, startDate, endDate)
-    if err != nil {
-        return nil, nil, 0, 0, nil, err
-    }
-    return reportTypes, counts, totalUsers, totalReports, topStates, nil
+	reportTypes, counts, totalUsers, totalReports, topStates, err := s.incidentRepo.GetReportTypeCounts(state, lga, startDate, endDate)
+	if err != nil {
+		return nil, nil, 0, 0, nil, err
+	}
+	return reportTypes, counts, totalUsers, totalReports, topStates, nil
 }
 
 func (s *IncidentService) ListAllStatesWithReportCounts() ([]models.StateReportCount, error) {
-    return s.incidentRepo.ListAllStatesWithReportCounts()
+	return s.incidentRepo.ListAllStatesWithReportCounts()
 }
 
 func (s *IncidentService) GetTotalReportCount() (int64, error) {
-    return s.incidentRepo.GetTotalReportCount()
+	return s.incidentRepo.GetTotalReportCount()
 }
 
 func (s *IncidentService) GetNamesByCategory(stateName string, lgaID string, reportTypeCategory string) ([]string, error) {
-    // Call the repository method with the correct parameters
-    names, err := s.incidentRepo.GetNamesByCategory(stateName, lgaID, reportTypeCategory)
-    if err != nil {
-        return nil, fmt.Errorf("error getting names by category: %v", err)
-    }
-    return names, nil
+	// Call the repository method with the correct parameters
+	names, err := s.incidentRepo.GetNamesByCategory(stateName, lgaID, reportTypeCategory)
+	if err != nil {
+		return nil, fmt.Errorf("error getting names by category: %v", err)
+	}
+	return names, nil
 }
 
 func (s *IncidentService) BookmarkReport(userID uint, reportID string) error {
@@ -229,14 +231,57 @@ func (s *IncidentService) BookmarkReport(userID uint, reportID string) error {
 }
 
 func (s *IncidentService) GetBookmarkedReports(userID uint) ([]models.IncidentReport, error) {
-    // Call the repository method to get the bookmarked reports
-    return s.incidentRepo.GetBookmarkedReports(userID)
+	// Call the repository method to get the bookmarked reports
+	return s.incidentRepo.GetBookmarkedReports(userID)
 }
 
 func (s *IncidentService) GetUserReports(userID uint) ([]models.ReportType, error) {
-    return s.incidentRepo.GetReportsByUserID(userID)
+	return s.incidentRepo.GetReportsByUserID(userID)
 }
 
 func (s *IncidentService) GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error) {
-    return s.incidentRepo.GetReportTypeCountsByLGA(lga)
+	return s.incidentRepo.GetReportTypeCountsByLGA(lga)
+}
+
+// AddMediaToReport associates media URLs (feed, thumbnail, fullsize) with an incident report.
+func (s *IncidentService) AddMediaToReport(reportID string, feedURLs []string, thumbnailURLs []string, fullsizeURLs []string) error {
+	// Fetch the existing report from the database using the report ID.
+	report, err := s.incidentRepo.GetIncidentReportByID(reportID)
+	if err != nil {
+		return fmt.Errorf("error retrieving report with ID %s: %v", reportID, err)
+	}
+
+	// Append the new media URLs to the report's existing URLs
+	if report.FeedURLs != "" {
+		report.FeedURLs = report.FeedURLs + "," + strings.Join(feedURLs, ",")
+	} else {
+		report.FeedURLs = strings.Join(feedURLs, ",")
+	}
+
+	if report.ThumbnailURLs != "" {
+		report.ThumbnailURLs = report.ThumbnailURLs + "," + strings.Join(thumbnailURLs, ",")
+	} else {
+		report.ThumbnailURLs = strings.Join(thumbnailURLs, ",")
+	}
+
+	if report.FullSizeURLs != "" {
+		report.FullSizeURLs = report.FullSizeURLs + "," + strings.Join(fullsizeURLs, ",")
+	} else {
+		report.FullSizeURLs = strings.Join(fullsizeURLs, ",")
+	}
+
+
+	// Update the incident report in the database with the new media URLs.
+	err = s.incidentRepo.UpdateIncidentReport(report)
+	if err != nil {
+		return fmt.Errorf("error updating incident report with media URLs: %v", err)
+	}
+
+	// Also update the related report type information.
+	err = s.incidentRepo.UpdateReportTypeWithIncidentReport(report)
+	if err != nil {
+		return fmt.Errorf("error updating report type for incident report ID %s: %v", reportID, err)
+	}
+
+	return nil
 }

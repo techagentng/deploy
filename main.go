@@ -52,7 +52,7 @@ func main() {
 		RewardRepository:         rewardRepo,
 		LikeService:              likeService,
 		PostService:              postService,
-		PostRepository:           postRepo, 
+		PostRepository:           postRepo,
 		DB:                       db.GormDB{},
 	}
 

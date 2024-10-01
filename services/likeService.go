@@ -40,10 +40,9 @@ func (lk *likeService) DownVoteReport(userID uint, reportID string) error {
 }
 
 func (lk *likeService) GetVoteCounts(reportID string) (int, int, error) {
-    upvotes, downvotes, err := lk.likeRepo.GetUpvoteAndDownvoteCounts(reportID)
-    if err != nil {
-        return 0, 0, err
-    }
-    return upvotes, downvotes, nil
+	upvotes, downvotes, err := lk.likeRepo.GetUpvoteAndDownvoteCounts(reportID)
+	if err != nil {
+		return 0, 0, err
+	}
+	return upvotes, downvotes, nil
 }
-
