@@ -39,7 +39,7 @@ type IncidentReportRepository interface {
 	GetReportPercentageByState() ([]models.StateReportPercentage, error)
 	Save(report *models.IncidentReport) error
 	GetReportStatusByID(reportID string) (string, error)
-	UpdateIncidentReport(report *models.IncidentReport) (*models.IncidentReport, error)
+	UpdateIncidentReport(report *models.IncidentReport) error
 	GetReportsPostedTodayCount() (int64, error)
 	GetTotalUserCount() (int64, error)
 	GetRegisteredUsersCountByLGA(lga string) (int64, error)
@@ -73,6 +73,8 @@ type IncidentReportRepository interface {
 	GetReportsByCategoryAndReportID(category string, reportID string) ([]models.ReportType, error)
 	GetReportsByCategory(category string) ([]models.ReportType, error)
 	GetFilteredIncidentReports(category, state, lga string) ([]models.IncidentReport, []string, error)
+	GetIncidentReportByID(reportID string) (*models.IncidentReport, error)
+	UpdateReportTypeWithIncidentReport(report *models.IncidentReport) error
 }
 
 type incidentReportRepo struct {
@@ -306,15 +308,6 @@ func (repo *incidentReportRepo) GetReportStatusByID(reportID string) (string, er
 		return "", err
 	}
 	return report.ReportStatus, nil
-}
-
-func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport) (*models.IncidentReport, error) {
-	// Update the existing report in the database
-	if err := i.DB.Save(report).Error; err != nil {
-		return nil, fmt.Errorf("failed to update report: %v", err)
-	}
-
-	return report, nil
 }
 
 func (repo *incidentReportRepo) GetReportsPostedTodayCount() (int64, error) {
@@ -1120,4 +1113,155 @@ func (i *incidentReportRepo) GetFilteredIncidentReports(category, state, lga str
 
 	// Return the incident reports and the filters that were applied
 	return reports, filters, nil
+}
+
+// GetIncidentReportByID retrieves an incident report by its ID from the database.
+func (i *incidentReportRepo) GetIncidentReportByID(reportID string) (*models.IncidentReport, error) {
+	var report models.IncidentReport
+	if err := i.DB.Where("id = ?", reportID).First(&report).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("no report found with ID %s: %w", reportID, err)
+		}
+		return nil, fmt.Errorf("error retrieving report with ID %s: %w", reportID, err)
+	}
+	return &report, nil
+}
+
+func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport) error {
+	// Use a transaction to ensure atomicity of the operation.
+	return i.DB.Transaction(func(tx *gorm.DB) error {
+		// Fetch the existing incident report from the database.
+		var existingReport models.IncidentReport
+		if err := tx.Where("id = ?", report.ID).First(&existingReport).Error; err != nil {
+			return fmt.Errorf("error retrieving existing report with ID %s: %w", report.ID, err)
+		}
+
+		// Perform any necessary validation or data preparation on the new report data.
+		if err := validateIncidentReport(report); err != nil {
+			return fmt.Errorf("invalid incident report data: %w", err)
+		}
+
+		// Update the existing report's fields with the new data.
+		existingReport.Description = report.Description
+		existingReport.FeedURLs = report.FeedURLs
+		existingReport.ThumbnailURLs = report.ThumbnailURLs
+		existingReport.FullSizeURLs = report.FullSizeURLs
+		existingReport.StateName = report.StateName
+		existingReport.LGAName = report.LGAName
+		existingReport.Latitude = report.Latitude
+		existingReport.Longitude = report.Longitude
+		existingReport.UserIsAnonymous = report.UserIsAnonymous
+		existingReport.Address = report.Address
+		existingReport.UserUsername = report.UserUsername
+		existingReport.Email = report.Email
+		existingReport.View = report.View
+		existingReport.IsVerified = report.IsVerified
+		existingReport.UserID = report.UserID
+		existingReport.ReportTypeID = report.ReportTypeID
+		existingReport.AdminID = report.AdminID
+		existingReport.Landmark = report.Landmark
+		existingReport.LikeCount = report.LikeCount
+		existingReport.IsResponse = report.IsResponse
+		existingReport.TimeofIncidence = report.TimeofIncidence
+		existingReport.ReportStatus = report.ReportStatus
+		existingReport.RewardPoint = report.RewardPoint
+		existingReport.RewardAccountNumber = report.RewardAccountNumber
+		existingReport.ActionTypeName = report.ActionTypeName
+		existingReport.ReportTypeName = report.ReportTypeName
+		existingReport.IsState = report.IsState
+		existingReport.Rating = report.Rating
+		existingReport.HospitalName = report.HospitalName
+		existingReport.Department = report.Department
+		existingReport.DepartmentHeadName = report.DepartmentHeadName
+		existingReport.AccidentCause = report.AccidentCause
+		existingReport.SchoolName = report.SchoolName
+		existingReport.VicePrincipal = report.VicePrincipal
+		existingReport.OutageLength = report.OutageLength
+		existingReport.AirportName = report.AirportName
+		existingReport.Country = report.Country
+		existingReport.StateEmbassyLocation = report.StateEmbassyLocation
+		existingReport.NoWater = report.NoWater
+		existingReport.AmbassedorsName = report.AmbassedorsName
+		existingReport.HospitalAddress = report.HospitalAddress
+		existingReport.RoadName = report.RoadName
+		existingReport.AirlineName = report.AirlineName
+		existingReport.Category = report.Category
+		existingReport.Terminal = report.Terminal
+		existingReport.QueueTime = report.QueueTime
+		existingReport.SubReportType = report.SubReportType
+		existingReport.UpvoteCount = report.UpvoteCount
+		existingReport.DownvoteCount = report.DownvoteCount
+
+		// Save the updated report to the database.
+		if err := tx.Save(&existingReport).Error; err != nil {
+			return fmt.Errorf("error updating incident report in the database: %w", err)
+		}
+
+		// If needed, update related entities like ReportType here.
+		if err := updateRelatedReportType(tx, existingReport); err != nil {
+			return fmt.Errorf("error updating related report type: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// Example validation function for IncidentReport.
+func validateIncidentReport(report *models.IncidentReport) error {
+	// Validate FeedURLs
+	if len(report.FeedURLs) == 0 {
+		return fmt.Errorf("feed URLs cannot be empty")
+	}
+
+	// Add more validation logic as needed.
+	return nil
+}
+
+// Update related ReportType entity if needed.
+func updateRelatedReportType(tx *gorm.DB, report models.IncidentReport) error {
+	var reportType models.ReportType
+	// Fetch the associated ReportType.
+	if err := tx.Where("id = ?", report.ReportTypeID).First(&reportType).Error; err != nil {
+		return fmt.Errorf("could not find associated report type with ID %s: %w", report.ReportTypeID, err)
+	}
+
+	// Update relevant fields in ReportType.
+	reportType.StateName = report.StateName
+	reportType.LGAName = report.LGAName
+	reportType.IncidentReportRating = report.Rating
+
+	// Save the updated ReportType.
+	if err := tx.Save(&reportType).Error; err != nil {
+		return fmt.Errorf("error saving updated report type: %w", err)
+	}
+
+	return nil
+}
+func (i *incidentReportRepo) fetchSubReportsByType(subReportType string) ([]models.SubReport, error) {
+	var subReports []models.SubReport
+
+	// Query the database for sub-reports matching the given sub-report type.
+	err := i.DB.Where("sub_report_type = ?", subReportType).Find(&subReports).Error
+	if err != nil {
+		return nil, fmt.Errorf("error finding sub-reports of type %s: %w", subReportType, err)
+	}
+
+	return subReports, nil
+}
+
+// Inside db.IncidentReportRepository
+func (i *incidentReportRepo) UpdateReportTypeWithIncidentReport(report *models.IncidentReport) error {
+	// Assuming you have a method to find the report type based on the report ID
+	var reportType models.ReportType
+	if err := i.DB.First(&reportType, "report_id = ?", report.ID).Error; err != nil {
+		return err // Handle the error, e.g., report type not found
+	}
+
+	// Update fields as necessary
+	reportType.IncidentReportRating = report.Rating
+	reportType.DateOfIncidence = report.TimeofIncidence
+	reportType.UserID = report.UserID
+
+	// Save the updated report type
+	return i.DB.Save(&reportType).Error
 }

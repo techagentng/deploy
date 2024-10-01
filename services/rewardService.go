@@ -42,9 +42,11 @@ func (s *rewardService) ApproveReportPoints(reportID string, userID uint) error 
 	if err != nil {
 		return err
 	}
-	//update reward balance with the points value
+	// Update reward balance with the points value
 	report.ReportStatus = "approved"
-	if _, err := s.incidentRepo.UpdateIncidentReport(report); err != nil {
+
+	// Call UpdateIncidentReport and handle the error
+	if err := s.incidentRepo.UpdateIncidentReport(report); err != nil {
 		return fmt.Errorf("error updating report status: %v", err)
 	}
 
@@ -72,9 +74,11 @@ func (s *rewardService) RejectReportPoints(reportID string, userID uint) error {
 		return fmt.Errorf("error fetching report: %v", err)
 	}
 
-	//update reward balance with the points value
+	// Update reward balance with the points value
 	report.ReportStatus = "rejected"
-	if _, err := s.incidentRepo.UpdateIncidentReport(report); err != nil {
+
+	// Call UpdateIncidentReport and check for errors
+	if err := s.incidentRepo.UpdateIncidentReport(report); err != nil {
 		return fmt.Errorf("error updating report status: %v", err)
 	}
 
@@ -87,9 +91,11 @@ func (s *rewardService) AcceptReportPoints(reportID string, userID uint) error {
 		return fmt.Errorf("error fetching report: %v", err)
 	}
 
-	//update reward balance with the points value
+	// Update reward balance with the points value
 	report.ReportStatus = "accepted"
-	if _, err := s.incidentRepo.UpdateIncidentReport(report); err != nil {
+
+	// Call UpdateIncidentReport and handle the error properly
+	if err := s.incidentRepo.UpdateIncidentReport(report); err != nil {
 		return fmt.Errorf("error updating report status: %v", err)
 	}
 

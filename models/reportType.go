@@ -23,6 +23,7 @@ type SubReport struct {
 	ID            uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
 	ReportTypeID  uuid.UUID `json:"report_type_id"` // Foreign key referring to ReportType table
 	SubReportType string    `json:"sub_report_type"`
+	Description   string    `json:"description"`
 }
 
 type RatingPercentage struct {

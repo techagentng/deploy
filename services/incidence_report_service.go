@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
@@ -28,6 +29,7 @@ type IncidentReportService interface {
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 	GetUserReports(userID uint) ([]models.ReportType, error)
 	GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error)
+	AddMediaToReport(reportID string, feedURLs []string, thumbnailURLs []string, fullsizeURLs []string) error
 }
 
 type IncidentService struct {
@@ -239,4 +241,47 @@ func (s *IncidentService) GetUserReports(userID uint) ([]models.ReportType, erro
 
 func (s *IncidentService) GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error) {
 	return s.incidentRepo.GetReportTypeCountsByLGA(lga)
+}
+
+// AddMediaToReport associates media URLs (feed, thumbnail, fullsize) with an incident report.
+func (s *IncidentService) AddMediaToReport(reportID string, feedURLs []string, thumbnailURLs []string, fullsizeURLs []string) error {
+	// Fetch the existing report from the database using the report ID.
+	report, err := s.incidentRepo.GetIncidentReportByID(reportID)
+	if err != nil {
+		return fmt.Errorf("error retrieving report with ID %s: %v", reportID, err)
+	}
+
+	// Append the new media URLs to the report's existing URLs
+	if report.FeedURLs != "" {
+		report.FeedURLs = report.FeedURLs + "," + strings.Join(feedURLs, ",")
+	} else {
+		report.FeedURLs = strings.Join(feedURLs, ",")
+	}
+
+	if report.ThumbnailURLs != "" {
+		report.ThumbnailURLs = report.ThumbnailURLs + "," + strings.Join(thumbnailURLs, ",")
+	} else {
+		report.ThumbnailURLs = strings.Join(thumbnailURLs, ",")
+	}
+
+	if report.FullSizeURLs != "" {
+		report.FullSizeURLs = report.FullSizeURLs + "," + strings.Join(fullsizeURLs, ",")
+	} else {
+		report.FullSizeURLs = strings.Join(fullsizeURLs, ",")
+	}
+
+
+	// Update the incident report in the database with the new media URLs.
+	err = s.incidentRepo.UpdateIncidentReport(report)
+	if err != nil {
+		return fmt.Errorf("error updating incident report with media URLs: %v", err)
+	}
+
+	// Also update the related report type information.
+	err = s.incidentRepo.UpdateReportTypeWithIncidentReport(report)
+	if err != nil {
+		return fmt.Errorf("error updating report type for incident report ID %s: %v", reportID, err)
+	}
+
+	return nil
 }
