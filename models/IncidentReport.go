@@ -36,7 +36,6 @@ type IncidentReport struct {
 	RewardPoint          int       `json:"reward_point"`
 	RewardAccountNumber  string    `json:"reward_account_number"`
 	ActionTypeName       string    `json:"action_type_name"`
-	ReportTypeName       string    `json:"report_type_name"`
 	IsState              bool      `json:"is_state"`
 	Rating               string    `json:"rating"`
 	HospitalName         string    `json:"hospital_name"`

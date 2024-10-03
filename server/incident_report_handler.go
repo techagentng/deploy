@@ -296,7 +296,16 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
+		// Generate a unique report ID
+		reportID, err := generateID()
+		if err != nil {
+			log.Printf("Error generating ID: %v\n", err)
+			response.JSON(c, "Unable to generate report ID", http.StatusInternalServerError, nil, err)
+			return
+		}
 
+		// Set the reportID in the context for further use
+		c.Set("reportID", reportID)
 
 		// Parse latitude and longitude from the form
 		lat, lng, err := parseCoordinates(c)
@@ -305,10 +314,36 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
+		// Retrieve fullName from context
+		fullNameInterface, exists := c.Get("fullName")
+		if !exists {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Full name not found"})
+			return
+		}
+
+		fullName, ok := fullNameInterface.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid type for full name"})
+			return
+		}
+
+		// Retrieve profile image URL from context, with fallback to default
+		profileImageURLI, exists := c.Get("profile_image")
+		var profileImageURL string
+		if exists {
+			profileImageURL, ok = profileImageURLI.(string)
+			if !ok {
+				log.Println("Invalid profile image URL type, using default")
+				profileImageURL = "default_profile_image_url"
+			}
+		} else {
+			profileImageURL = "default_profile_image_url" // Fallback default URL if key doesn't exist
+		}
+
 		// Create and populate the IncidentReport model
 		incidentReport := &models.IncidentReport{
 			ID:              reportID,
-			UserFullname:    c.PostForm("full_name"),
+			UserFullname:    fullName,
 			DateOfIncidence: c.PostForm("date_of_incidence"),
 			Description:     c.PostForm("description"),
 			StateName:       c.PostForm("state_name"),
@@ -319,8 +354,40 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			Telephone:       c.PostForm("telephone"),
 			Email:           c.PostForm("email"),
 			Address:         c.PostForm("address"),
-			ReportTypeName:  c.PostForm("report_type"),
 			Rating:          c.PostForm("rating"),
+			Category:        c.PostForm("category"),
+			ThumbnailURLs:   profileImageURL, // Correctly set the profile image URL here
+		}
+
+		// Handle ReportType
+		reportTypeName := c.PostForm("category")
+		_, err = s.IncidentReportRepository.GetReportTypeByCategory(reportTypeName)
+
+		// Check if the report type already exists
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				// Create a new ReportType if it does not exist
+				newReportType := &models.ReportType{
+					ID:              uuid.New(),
+					UserID:          user.ID,
+					Category:        reportTypeName,
+					StateName:       incidentReport.StateName,
+					LGAName:         incidentReport.LGAName,
+					DateOfIncidence: time.Now(),
+				}
+
+				_, err = s.IncidentReportRepository.SaveReportType(newReportType)
+				if err != nil {
+					log.Printf("Error saving new report type: %v\n", err)
+					response.JSON(c, "Unable to save report type", http.StatusInternalServerError, nil, err)
+					return
+				}
+			} else {
+				// Handle other errors from GetReportTypeByCategory
+				log.Printf("Error fetching report type: %v\n", err)
+				response.JSON(c, "Unable to fetch report type", http.StatusInternalServerError, nil, err)
+				return
+			}
 		}
 
 		// Save the incident report to the database (without media)
@@ -335,7 +402,6 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		response.JSON(c, "Incident Report Submitted Successfully", http.StatusCreated, savedIncidentReport, nil)
 	}
 }
-
 
 // Helper function to parse coordinates from the request form
 func parseCoordinates(c *gin.Context) (float64, float64, error) {
@@ -1510,5 +1576,3 @@ func (s *Server) handleGetReportsByFilters() gin.HandlerFunc {
 		})
 	}
 }
-
-

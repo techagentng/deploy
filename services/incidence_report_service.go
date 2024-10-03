@@ -3,12 +3,11 @@ package services
 import (
 	"errors"
 	"fmt"
-	"math"
-	"strings"
-
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
 	"github.com/techagentng/citizenx/models"
+	"math"
+	"strings"
 )
 
 type IncidentReportService interface {
@@ -50,11 +49,11 @@ func NewIncidentReportService(incidentReportRepo db.IncidentReportRepository, re
 }
 
 func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error) {
+
+	// Initialize reward and points calculation
 	var reward *models.Reward
-	// Calculate points based on media counts and other factors
 	mediaPoints := totalPoints * 10
-	var descPoint int
-	var locationPoint int
+	var descPoint, locationPoint int
 
 	if report.Description != "" {
 		descPoint += 10
@@ -64,11 +63,14 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 	}
 
 	reportPoints := locationPoint + descPoint + mediaPoints
-	hasRardPoints, err := s.incidentRepo.HasPreviousReports(userID)
+
+	// Check if the user has previous reports for rewards
+	hasRewardPoints, err := s.incidentRepo.HasPreviousReports(userID)
 	if err != nil {
 		return nil, err
 	}
-	if !hasRardPoints {
+
+	if !hasRewardPoints {
 		reward = &models.Reward{
 			UserID:           userID,
 			RewardType:       "New entry",
@@ -77,7 +79,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 			Balance:          10,
 		}
 	} else {
-		// Award a reward for the new report
 		reward = &models.Reward{
 			UserID:           userID,
 			RewardType:       "Another entry",
@@ -85,66 +86,66 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 			IncidentReportID: reportID,
 		}
 	}
-	// Save the reward to the database
+
+	// Update the user's rewards
 	if err := s.incidentRepo.UpdateReward(userID, reward); err != nil {
 		return nil, fmt.Errorf("error creating reward: %v", err)
 	}
 
+	// Set the report points for the incident report
 	report.RewardPoint = reportPoints
+
+	savedReport, err := s.incidentRepo.SaveIncidentReport(report)
+	if err != nil {
+		return nil, fmt.Errorf("error saving report: %v", err)
+	}
+
+	// Prepare the report response
 	reportResponse := &models.IncidentReport{
-		ID:                   report.ID,
-		DateOfIncidence:      report.DateOfIncidence,
-		Description:          report.Description,
-		FeedURLs:             report.FeedURLs,
-		ThumbnailURLs:        report.ThumbnailURLs,
-		FullSizeURLs:         report.FullSizeURLs,
-		ProductName:          report.ProductName,
-		StateName:            report.StateName,
-		LGAName:              report.LGAName,
+		ID:                   savedReport.ID,
+		DateOfIncidence:      savedReport.DateOfIncidence,
+		Description:          savedReport.Description,
+		FeedURLs:             savedReport.FeedURLs,
+		ThumbnailURLs:        savedReport.ThumbnailURLs,
+		FullSizeURLs:         savedReport.FullSizeURLs,
+		ProductName:          savedReport.ProductName,
+		StateName:            savedReport.StateName,
+		LGAName:              savedReport.LGAName,
 		Latitude:             lat,
 		Longitude:            lng,
 		UserIsAnonymous:      false,
-		Address:              report.Address,
+		Address:              savedReport.Address,
 		IsVerified:           false,
-		UserID:               report.UserID,
-		ReportTypeID:         reportID,
+		UserID:               savedReport.UserID,
+		ReportTypeID:         savedReport.ReportTypeID,
 		AdminID:              0,
-		Landmark:             report.Landmark,
-		LikeCount:            report.LikeCount,
+		Landmark:             savedReport.Landmark,
+		LikeCount:            savedReport.LikeCount,
 		BookmarkedReports:    []*models.User{},
-		IsResponse:           report.IsResponse,
-		TimeofIncidence:      report.TimeofIncidence,
-		ReportStatus:         report.ReportStatus,
-		RewardPoint:          report.RewardPoint,
-		RewardAccountNumber:  "",
-		ActionTypeName:       report.ActionTypeName,
-		ReportTypeName:       report.ReportTypeName,
-		IsState:              false,
-		Rating:               report.Rating,
-		HospitalName:         report.HospitalName,
-		Department:           report.Department,
-		DepartmentHeadName:   report.DepartmentHeadName,
-		AccidentCause:        report.AccidentCause,
-		SchoolName:           report.SchoolName,
-		VicePrincipal:        report.VicePrincipal,
-		OutageLength:         report.OutageLength,
-		AirportName:          report.AirlineName,
-		Country:              report.Country,
-		StateEmbassyLocation: report.StateEmbassyLocation,
-		NoWater:              report.NoWater,
-		AmbassedorsName:      report.AmbassedorsName,
-		HospitalAddress:      report.HospitalAddress,
-		RoadName:             report.RoadName,
-		AirlineName:          report.AirlineName,
-		Category:             report.Category,
-		UserFullname:         report.UserFullname,
-		UserUsername:         report.UserUsername,
-	}
-
-	// Save the report to the database
-	_, err = s.incidentRepo.SaveIncidentReport(report)
-	if err != nil {
-		return nil, fmt.Errorf("error saving report: %v", err)
+		IsResponse:           savedReport.IsResponse,
+		TimeofIncidence:      savedReport.TimeofIncidence,
+		ReportStatus:         savedReport.ReportStatus,
+		RewardPoint:          savedReport.RewardPoint,
+		ActionTypeName:       savedReport.ActionTypeName,
+		Rating:               savedReport.Rating,
+		HospitalName:         savedReport.HospitalName,
+		Department:           savedReport.Department,
+		DepartmentHeadName:   savedReport.DepartmentHeadName,
+		AccidentCause:        savedReport.AccidentCause,
+		SchoolName:           savedReport.SchoolName,
+		VicePrincipal:        savedReport.VicePrincipal,
+		OutageLength:         savedReport.OutageLength,
+		AirportName:          savedReport.AirportName,
+		Country:              savedReport.Country,
+		StateEmbassyLocation: savedReport.StateEmbassyLocation,
+		NoWater:              savedReport.NoWater,
+		AmbassedorsName:      savedReport.AmbassedorsName,
+		HospitalAddress:      savedReport.HospitalAddress,
+		RoadName:             savedReport.RoadName,
+		AirlineName:          savedReport.AirlineName,
+		Category:             savedReport.Category,
+		UserFullname:         savedReport.UserFullname,
+		UserUsername:         savedReport.UserUsername,
 	}
 
 	return reportResponse, nil
@@ -269,7 +270,6 @@ func (s *IncidentService) AddMediaToReport(reportID string, feedURLs []string, t
 	} else {
 		report.FullSizeURLs = strings.Join(fullsizeURLs, ",")
 	}
-
 
 	// Update the incident report in the database with the new media URLs.
 	err = s.incidentRepo.UpdateIncidentReport(report)

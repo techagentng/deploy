@@ -25,17 +25,20 @@ import (
 
 func (s *Server) Authorize() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Extract token from header
 		accessToken := getTokenFromHeader(c)
 		if accessToken == "" {
 			respondAndAbort(c, "", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
 			return
 		}
 
+		// Check if the token is blacklisted
 		if s.AuthRepository.IsTokenInBlacklist(accessToken) {
 			respondAndAbort(c, "Access token is blacklisted", http.StatusUnauthorized, nil, errs.New("Unauthorized", http.StatusUnauthorized))
 			return
 		}
 
+		// Validate token and get claims
 		secret := s.Config.JWTSecret
 		accessClaims, err := jwt.ValidateAndGetClaims(accessToken, secret)
 		if err != nil {
@@ -43,6 +46,7 @@ func (s *Server) Authorize() gin.HandlerFunc {
 			return
 		}
 
+		// Extract user ID from claims
 		userIDValue := accessClaims["id"]
 		var userID uint
 		switch v := userIDValue.(type) {
@@ -53,6 +57,7 @@ func (s *Server) Authorize() gin.HandlerFunc {
 			return
 		}
 
+		// Fetch the user from the database by ID
 		user, err := s.AuthRepository.FindUserByID(userID)
 		if err != nil {
 			switch {
@@ -68,6 +73,18 @@ func (s *Server) Authorize() gin.HandlerFunc {
 			}
 		}
 
+		// Handle empty fullname scenario
+		if user.Fullname == "" {
+			log.Printf("Fullname is empty for user: %v", userID)
+			user.Fullname = "Anonymous" // Set default value if fullname is empty
+		}
+
+		// Handle empty ThumbnailURL scenario
+		if user.ThumbNailURL == "" {
+			log.Printf("ThumbnailURL is empty for user: %v", userID)
+			user.ThumbNailURL = "https://default-thumbnail-url.com/default.png" // Set a default thumbnail URL
+		}
+
 		// Extract role from claims
 		role, ok := accessClaims["role"].(string)
 		if !ok {
@@ -75,6 +92,7 @@ func (s *Server) Authorize() gin.HandlerFunc {
 			return
 		}
 
+		// Set user-related values in the context for further handlers
 		c.Set("user", user)
 		c.Set("userID", userID)
 		c.Set("access_token", accessToken)
@@ -82,10 +100,14 @@ func (s *Server) Authorize() gin.HandlerFunc {
 		c.Set("username", user.Username)
 		c.Set("profile_image", user.ThumbNailURL)
 		c.Set("user_role", role)
-		// Log to check if values are set
+
+		// Log details for debugging purposes
 		log.Printf("Username in middleware: %v", c.Value("username"))
 		log.Printf("FullName in middleware: %v", c.Value("fullName"))
-		log.Printf("Profile image in middleware: %v", c.Value("profileImage"))
+		log.Printf("Profile image in middleware: %v", c.Value("profile_image"))
+		log.Printf("User found: %+v", user)
+
+		// Continue to the next middleware or handler
 		c.Next()
 	}
 }

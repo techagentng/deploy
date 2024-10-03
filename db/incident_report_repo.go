@@ -75,6 +75,8 @@ type IncidentReportRepository interface {
 	GetFilteredIncidentReports(category, state, lga string) ([]models.IncidentReport, []string, error)
 	GetIncidentReportByID(reportID string) (*models.IncidentReport, error)
 	UpdateReportTypeWithIncidentReport(report *models.IncidentReport) error
+	FindReportTypeByCategory(category string, reportType *models.ReportType) error
+	GetReportTypeByCategory(category string) (*models.ReportType, error)
 }
 
 type incidentReportRepo struct {
@@ -835,13 +837,11 @@ func uploadFileToS3(client *s3.Client, file multipart.File, bucketName, key stri
 	return fileURL, nil
 }
 
-func (i *incidentReportRepo) SaveReportType(reportType *models.ReportType) (*models.ReportType, error) {
-	// Save the new ReportType to the database
-	if err := i.DB.Create(&reportType).Error; err != nil {
-		return nil, fmt.Errorf("failed to save report type: %v", err)
+func (repo *incidentReportRepo) SaveReportType(reportType *models.ReportType) (*models.ReportType, error) {
+	if err := repo.DB.Create(reportType).Error; err != nil {
+		return nil, err // Return nil and the error
 	}
-
-	return reportType, nil
+	return reportType, nil // Return the created reportType and nil error
 }
 
 // SaveSubReport saves the sub report to the database.
@@ -1167,7 +1167,6 @@ func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport)
 		existingReport.RewardPoint = report.RewardPoint
 		existingReport.RewardAccountNumber = report.RewardAccountNumber
 		existingReport.ActionTypeName = report.ActionTypeName
-		existingReport.ReportTypeName = report.ReportTypeName
 		existingReport.IsState = report.IsState
 		existingReport.Rating = report.Rating
 		existingReport.HospitalName = report.HospitalName
@@ -1264,4 +1263,31 @@ func (i *incidentReportRepo) UpdateReportTypeWithIncidentReport(report *models.I
 
 	// Save the updated report type
 	return i.DB.Save(&reportType).Error
+}
+
+func (i *incidentReportRepo) FindReportTypeByCategory(category string, reportType *models.ReportType) error {
+	// Query the ReportType based on the Category
+	err := i.DB.Where("category = ?", category).First(reportType).Error
+
+	if err != nil {
+		// If the record is not found, return gorm.ErrRecordNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return gorm.ErrRecordNotFound
+		}
+		// Return other errors encountered during the query
+		return fmt.Errorf("error fetching report type: %w", err)
+	}
+	return nil
+}
+
+func (i *incidentReportRepo) GetReportTypeByCategory(category string) (*models.ReportType, error) {
+	var reportType models.ReportType
+	err := i.DB.Where("category = ?", category).First(&reportType).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil // No report type found, return nil without error
+		}
+		return nil, err // Return any other error
+	}
+	return &reportType, nil // Return the found report type
 }
