@@ -252,24 +252,10 @@ func (s *IncidentService) AddMediaToReport(reportID string, feedURLs []string, t
 		return fmt.Errorf("error retrieving report with ID %s: %v", reportID, err)
 	}
 
-	// Append the new media URLs to the report's existing URLs
-	if report.FeedURLs != "" {
-		report.FeedURLs = report.FeedURLs + "," + strings.Join(feedURLs, ",")
-	} else {
-		report.FeedURLs = strings.Join(feedURLs, ",")
-	}
-
-	if report.ThumbnailURLs != "" {
-		report.ThumbnailURLs = report.ThumbnailURLs + "," + strings.Join(thumbnailURLs, ",")
-	} else {
-		report.ThumbnailURLs = strings.Join(thumbnailURLs, ",")
-	}
-
-	if report.FullSizeURLs != "" {
-		report.FullSizeURLs = report.FullSizeURLs + "," + strings.Join(fullsizeURLs, ",")
-	} else {
-		report.FullSizeURLs = strings.Join(fullsizeURLs, ",")
-	}
+	// Append the new media URLs to the report's existing URLs, checking for empty strings.
+	report.FeedURLs = appendURLs(report.FeedURLs, feedURLs)
+	report.ThumbnailURLs = appendURLs(report.ThumbnailURLs, thumbnailURLs)
+	report.FullSizeURLs = appendURLs(report.FullSizeURLs, fullsizeURLs)
 
 	// Update the incident report in the database with the new media URLs.
 	err = s.incidentRepo.UpdateIncidentReport(report)
@@ -277,11 +263,26 @@ func (s *IncidentService) AddMediaToReport(reportID string, feedURLs []string, t
 		return fmt.Errorf("error updating incident report with media URLs: %v", err)
 	}
 
-	// Also update the related report type information.
-	err = s.incidentRepo.UpdateReportTypeWithIncidentReport(report)
-	if err != nil {
-		return fmt.Errorf("error updating report type for incident report ID %s: %v", reportID, err)
+	// Check if the report type ID is valid (not empty) before attempting to update.
+	if report.ReportTypeID != "" {
+		err = s.incidentRepo.UpdateReportTypeWithIncidentReport(report)
+		if err != nil {
+			return fmt.Errorf("error updating report type for incident report ID %s: %v", reportID, err)
+		}
+	} else {
+		// Log a message or handle the case where ReportTypeID is empty
+		fmt.Printf("Skipping report type update because ReportTypeID is empty for report ID: %s\n", reportID)
 	}
 
 	return nil
 }
+
+
+// appendURLs ensures that the new URLs are appended correctly to the existing string of URLs
+func appendURLs(existingURLs string, newURLs []string) string {
+	if existingURLs != "" {
+		return existingURLs + "," + strings.Join(newURLs, ",")
+	}
+	return strings.Join(newURLs, ",")
+}
+

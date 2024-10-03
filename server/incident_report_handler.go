@@ -437,17 +437,10 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		const MaxFileSize = 32 << 20 // 32 MB
 
-		// Retrieve the reportID from the context
-		reportID, exists := c.Get("reportID")
-		if !exists {
+		// Retrieve the reportID from the query parameters
+		reportIDStr := c.Query("reportID")
+		if reportIDStr == "" {
 			response.JSON(c, "Report ID is required", http.StatusBadRequest, nil, errors.ErrBadRequest)
-			return
-		}
-
-		// Ensure the reportID is of the correct type (string)
-		reportIDStr, ok := reportID.(string)
-		if !ok || reportIDStr == "" {
-			response.JSON(c, "Invalid Report ID", http.StatusBadRequest, nil, errors.ErrBadRequest)
 			return
 		}
 
@@ -458,12 +451,15 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 			return
 		}
 
-		// Ensure the userID is of the correct type (string)
-		userIDStr, ok := userID.(string)
-		if !ok || userIDStr == "" {
+		// Ensure the userID is of the correct type (uint)
+		userIDUint, ok := userID.(uint)
+		if !ok {
 			response.JSON(c, "Invalid User ID", http.StatusBadRequest, nil, errors.ErrBadRequest)
 			return
 		}
+
+		// Convert userIDUint to a string (if needed for later processes)
+		userIDStr := strconv.FormatUint(uint64(userIDUint), 10)
 
 		// Parse the multipart form data
 		if err := c.Request.ParseMultipartForm(MaxFileSize); err != nil {
@@ -515,6 +511,7 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 			response.JSON(c, "Unable to associate media with report", http.StatusInternalServerError, nil, err)
 			return
 		}
+		
 
 		// Store mediaCount in context for later use
 		c.Set("mediaCount", mediaCount)
@@ -523,6 +520,7 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 		response.JSON(c, "Media Uploaded and Associated with Report Successfully", http.StatusOK, nil, nil)
 	}
 }
+
 
 func (s *Server) processAndSaveMedia(c *gin.Context, userID uint) ([]string, []string, []string, []string, error) {
 	// Retrieve media files from the multipart form

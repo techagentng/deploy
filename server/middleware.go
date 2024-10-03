@@ -46,14 +46,30 @@ func (s *Server) Authorize() gin.HandlerFunc {
 			return
 		}
 
-		// Extract user ID from claims
-		userIDValue := accessClaims["id"]
+		// Extract userID from claims
+		userIDValue, ok := accessClaims["id"]
+		if !ok {
+			respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("User ID not found in token", http.StatusBadRequest))
+			return
+		}
+
+		// Convert userID to uint, typically claims store numbers as float64
 		var userID uint
 		switch v := userIDValue.(type) {
 		case float64:
 			userID = uint(v)
+		case int:
+			userID = uint(v)
+		case string:
+			// If userID is provided as a string, try to convert it to uint
+			parsedID, err := strconv.ParseUint(v, 10, 32)
+			if err != nil {
+				respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("Invalid User ID format", http.StatusBadRequest))
+				return
+			}
+			userID = uint(parsedID)
 		default:
-			respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("Invalid userID format", http.StatusBadRequest))
+			respondAndAbort(c, "", http.StatusBadRequest, nil, errs.New("Invalid User ID type", http.StatusBadRequest))
 			return
 		}
 
@@ -62,34 +78,15 @@ func (s *Server) Authorize() gin.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, errs.InActiveUserError):
-				respondAndAbort(c, "inactive user", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
+				respondAndAbort(c, "Inactive user", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
 				return
 			case errors.Is(err, gorm.ErrRecordNotFound):
-				respondAndAbort(c, "user not found", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
+				respondAndAbort(c, "User not found", http.StatusUnauthorized, nil, errs.New(err.Error(), http.StatusUnauthorized))
 				return
 			default:
-				respondAndAbort(c, "unable to find entity", http.StatusInternalServerError, nil, errs.New("internal server error", http.StatusInternalServerError))
+				respondAndAbort(c, "Unable to find entity", http.StatusInternalServerError, nil, errs.New("Internal server error", http.StatusInternalServerError))
 				return
 			}
-		}
-
-		// Handle empty fullname scenario
-		if user.Fullname == "" {
-			log.Printf("Fullname is empty for user: %v", userID)
-			user.Fullname = "Anonymous" // Set default value if fullname is empty
-		}
-
-		// Handle empty ThumbnailURL scenario
-		if user.ThumbNailURL == "" {
-			log.Printf("ThumbnailURL is empty for user: %v", userID)
-			user.ThumbNailURL = "https://default-thumbnail-url.com/default.png" // Set a default thumbnail URL
-		}
-
-		// Extract role from claims
-		role, ok := accessClaims["role"].(string)
-		if !ok {
-			respondAndAbort(c, "invalid role information", http.StatusBadRequest, nil, errs.New("Invalid role in token", http.StatusBadRequest))
-			return
 		}
 
 		// Set user-related values in the context for further handlers
@@ -99,13 +96,7 @@ func (s *Server) Authorize() gin.HandlerFunc {
 		c.Set("fullName", user.Fullname)
 		c.Set("username", user.Username)
 		c.Set("profile_image", user.ThumbNailURL)
-		c.Set("user_role", role)
-
-		// Log details for debugging purposes
-		log.Printf("Username in middleware: %v", c.Value("username"))
-		log.Printf("FullName in middleware: %v", c.Value("fullName"))
-		log.Printf("Profile image in middleware: %v", c.Value("profile_image"))
-		log.Printf("User found: %+v", user)
+		c.Set("user_role", accessClaims["role"].(string))
 
 		// Continue to the next middleware or handler
 		c.Next()
