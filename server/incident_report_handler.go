@@ -296,31 +296,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
-		userId := uint(user.ID)
 
-		// Retrieve fullName and username from context
-		fullNameI, _ := c.Get("fullName")
-		usernameI, _ := c.Get("username")
-
-		// Get profile image URL from context with a fallback default value
-		profileImageURLI, exists := c.Get("profile_image")
-		if exists {
-			profileImageURLI, ok = profileImageURLI.(string)
-			if !ok {
-				log.Println("Invalid profile image URL type, using default")
-			}
-		}
-
-		// Generate a unique report ID
-		reportID, err := generateID()
-		if err != nil {
-			log.Printf("Error generating ID: %v\n", err)
-			response.JSON(c, "Unable to generate report ID", http.StatusInternalServerError, nil, err)
-			return
-		}
-
-		// Set the reportID in the context for further use
-		c.Set("reportID", reportID)
 
 		// Parse latitude and longitude from the form
 		lat, lng, err := parseCoordinates(c)
@@ -329,87 +305,37 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
-		// Retrieve and parse media count from context, defaulting to 0 if not found or invalid
-		mediaCount := 0
-		mediaCountI, exists := c.Get("mediaCount")
-		if exists {
-			if mc, ok := mediaCountI.(int); ok {
-				mediaCount = mc
-			} else {
-				log.Println("Invalid type for media count, defaulting to 0")
-			}
-		}
-
-		// Create and populate the IncidentReport model with the data from the form
+		// Create and populate the IncidentReport model
 		incidentReport := &models.IncidentReport{
 			ID:              reportID,
-			UserFullname:    getStringOrFallback(fullNameI, ""),
+			UserFullname:    c.PostForm("full_name"),
 			DateOfIncidence: c.PostForm("date_of_incidence"),
 			Description:     c.PostForm("description"),
-			// FeedURLs:             "", // To be populated after media processing
-			// ThumbnailURLs:        "", // To be populated after media processing
-			// FullSizeURLs:         "", // To be populated after media processing
-			StateName:            c.PostForm("state_name"),
-			LGAName:              c.PostForm("lga_name"),
-			Latitude:             lat,
-			Longitude:            lng,
-			UserIsAnonymous:      false,
-			UserUsername:         getStringOrFallback(usernameI, ""),
-			Telephone:            c.PostForm("telephone"),
-			Email:                c.PostForm("email"),
-			Address:              c.PostForm("address"),
-			Landmark:             c.PostForm("landmark"),
-			LikeCount:            0,
-			ReportTypeName:       c.PostForm("report_type"),
-			Rating:               c.PostForm("rating"),
-			HospitalName:         c.PostForm("hospital_name"),
-			Department:           c.PostForm("department"),
-			DepartmentHeadName:   c.PostForm("department_head_name"),
-			AccidentCause:        c.PostForm("accident_cause"),
-			SchoolName:           c.PostForm("school_name"),
-			VicePrincipal:        c.PostForm("vice_principal"),
-			OutageLength:         c.PostForm("outage_length"),
-			AirportName:          c.PostForm("airport_name"),
-			Country:              c.PostForm("country"),
-			StateEmbassyLocation: c.PostForm("state_embassy_location"),
-			HospitalAddress:      c.PostForm("hospital_address"),
-			RoadName:             c.PostForm("road_name"),
-			AirlineName:          c.PostForm("airline_name"),
-			Category:             c.PostForm("category"),
-			Terminal:             c.PostForm("terminal"),
-			QueueTime:            c.PostForm("queue_time"),
-			NoWater:              c.PostForm("no_water") == "true",
-		}
-		// Process and save media files, if any, using the media service
-		feedURLs, thumbnailURLs, fullsizeURLs, _, err := s.processAndSaveMedia(c, userId)
-		if err != nil {
-			log.Printf("Error processing and saving media: %v\n", err)
-			response.JSON(c, "Unable to process media", http.StatusInternalServerError, nil, err)
-			return
+			StateName:       c.PostForm("state_name"),
+			LGAName:         c.PostForm("lga_name"),
+			Latitude:        lat,
+			Longitude:       lng,
+			UserUsername:    c.PostForm("username"),
+			Telephone:       c.PostForm("telephone"),
+			Email:           c.PostForm("email"),
+			Address:         c.PostForm("address"),
+			ReportTypeName:  c.PostForm("report_type"),
+			Rating:          c.PostForm("rating"),
 		}
 
-		// Join the slices into comma-separated strings
-		feedURLsStr := strings.Join(feedURLs, ",")
-		thumbnailURLsStr := strings.Join(thumbnailURLs, ",")
-		fullsizeURLsStr := strings.Join(fullsizeURLs, ",")
-
-		// Update the incident report with the concatenated media URLs
-		incidentReport.FeedURLs = feedURLsStr
-		incidentReport.ThumbnailURLs = thumbnailURLsStr
-		incidentReport.FullSizeURLs = fullsizeURLsStr
-
-		// Save the incident report to the database
-		savedIncidentReport, err := s.IncidentReportService.SaveReport(userId, lat, lng, incidentReport, reportID, mediaCount)
+		// Save the incident report to the database (without media)
+		savedIncidentReport, err := s.IncidentReportService.SaveReport(user.ID, lat, lng, incidentReport, reportID, 0)
 		if err != nil {
 			log.Printf("Error saving incident report: %v\n", err)
 			response.JSON(c, "Unable to save incident report", http.StatusInternalServerError, nil, err)
 			return
 		}
 
-		// Respond with success and the saved incident report details
+		// Respond with success
 		response.JSON(c, "Incident Report Submitted Successfully", http.StatusCreated, savedIncidentReport, nil)
 	}
 }
+
 
 // Helper function to parse coordinates from the request form
 func parseCoordinates(c *gin.Context) (float64, float64, error) {
@@ -1584,3 +1510,5 @@ func (s *Server) handleGetReportsByFilters() gin.HandlerFunc {
 		})
 	}
 }
+
+
