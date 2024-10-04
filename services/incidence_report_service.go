@@ -277,7 +277,6 @@ func (s *IncidentService) AddMediaToReport(reportID string, feedURLs []string, t
 	return nil
 }
 
-
 // appendURLs ensures that the new URLs are appended correctly to the existing string of URLs
 func appendURLs(existingURLs string, newURLs []string) string {
 	if existingURLs != "" {
@@ -285,4 +284,3 @@ func appendURLs(existingURLs string, newURLs []string) string {
 	}
 	return strings.Join(newURLs, ",")
 }
-
