@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
@@ -77,6 +78,10 @@ type IncidentReportRepository interface {
 	UpdateReportTypeWithIncidentReport(report *models.IncidentReport) error
 	FindReportTypeByCategory(category string, reportType *models.ReportType) error
 	GetReportTypeByCategory(category string) (*models.ReportType, error)
+	GetIncidentReportByReportTypeID(reportTypeID string) (*models.IncidentReport, error)
+	FindIncidentReportByReportTypeID(reportTypeID string) (*models.IncidentReport, error)
+	SaveMedia(media *models.Media) error
+	GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error)
 }
 
 type incidentReportRepo struct {
@@ -1290,4 +1295,64 @@ func (i *incidentReportRepo) GetReportTypeByCategory(category string) (*models.R
 		return nil, err // Return any other error
 	}
 	return &reportType, nil // Return the found report type
+}
+
+// GetIncidentReportByReportTypeID fetches the incident report associated with the given reportTypeID.
+func (i *incidentReportRepo) GetIncidentReportByReportTypeID(reportTypeID string) (*models.IncidentReport, error) {
+	// Initialize an empty IncidentReport object
+	var incidentReport models.IncidentReport
+
+	// Use GORM to query the database for the incident report with the given reportTypeID
+	err := i.DB.
+		Where("report_type_id = ?", reportTypeID).
+		Preload("ReportType"). // If you want to preload the associated ReportType details
+		Find(&incidentReport).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("could not find associated incident report with report type ID %s: %v", reportTypeID, err)
+	}
+
+	return &incidentReport, nil
+}
+
+// Fetch IncidentReport by reportTypeID with preloading ReportType
+func (i *incidentReportRepo) FindIncidentReportByReportTypeID(reportTypeID string) (*models.IncidentReport, error) {
+	var incidentReport models.IncidentReport
+	// Preload ReportType and fetch the IncidentReport by reportTypeID
+	err := i.DB.Preload("ReportType").Where("report_type_id = ?", reportTypeID).First(&incidentReport).Error
+	if err != nil {
+		return nil, fmt.Errorf("could not find associated incident report with report type ID %v: %v", reportTypeID, err)
+	}
+
+	return &incidentReport, nil
+}
+
+// SaveMedia saves a media record to the database
+func (i *incidentReportRepo) SaveMedia(media *models.Media) error {
+	// Save the media record to the database
+	if err := i.DB.Create(media).Error; err != nil {
+		return fmt.Errorf("error saving media: %v", err)
+	}
+	return nil
+}
+
+// Repository method to get reportID based on userID
+func (i *incidentReportRepo) GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error) {
+	var reportType models.ReportType
+
+	// Query the database to find the report that matches userID
+	err := i.DB.WithContext(ctx).
+		Where("user_id = ?", userID).
+		First(&reportType).Error
+
+	// If record not found or other error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, fmt.Errorf("report not found for user")
+		}
+		return uuid.Nil, fmt.Errorf("error querying report ID: %w", err)
+	}
+
+	// Return the report's ID
+	return reportType.ID, nil
 }

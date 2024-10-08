@@ -28,7 +28,7 @@ type IncidentReportService interface {
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 	GetUserReports(userID uint) ([]models.ReportType, error)
 	GetReportTypeCountsByLGA(lga string) (map[string]interface{}, error)
-	AddMediaToReport(reportID string, feedURLs []string, thumbnailURLs []string, fullsizeURLs []string) error
+	AddMediaToReport(reportTypeID string, feedURLs, thumbnailURLs, fullsizeURLs []string) error
 }
 
 type IncidentService struct {
@@ -49,8 +49,8 @@ func NewIncidentReportService(incidentReportRepo db.IncidentReportRepository, re
 }
 
 func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error) {
+	fmt.Println("Report ID:", reportID)
 
-	// Initialize reward and points calculation
 	var reward *models.Reward
 	mediaPoints := totalPoints * 10
 	var descPoint, locationPoint int
@@ -64,7 +64,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 
 	reportPoints := locationPoint + descPoint + mediaPoints
 
-	// Check if the user has previous reports for rewards
 	hasRewardPoints, err := s.incidentRepo.HasPreviousReports(userID)
 	if err != nil {
 		return nil, err
@@ -87,44 +86,31 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		}
 	}
 
-	// Update the user's rewards
 	if err := s.incidentRepo.UpdateReward(userID, reward); err != nil {
 		return nil, fmt.Errorf("error creating reward: %v", err)
 	}
 
-	// Set the report points for the incident report
 	report.RewardPoint = reportPoints
+
+	// Fetch the ReportTypeID based on category
+	reportType, err := s.incidentRepo.GetReportTypeByCategory(report.Category)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching report type: %v", err)
+	}
+
+	// Assign the fetched ReportTypeID
+	report.ReportTypeID = reportType.ID
 
 	savedReport, err := s.incidentRepo.SaveIncidentReport(report)
 	if err != nil {
 		return nil, fmt.Errorf("error saving report: %v", err)
 	}
 
-	// Prepare the report response
 	reportResponse := &models.IncidentReport{
-		ID:                   savedReport.ID,
 		DateOfIncidence:      savedReport.DateOfIncidence,
 		Description:          savedReport.Description,
 		FeedURLs:             savedReport.FeedURLs,
-		ThumbnailURLs:        savedReport.ThumbnailURLs,
-		FullSizeURLs:         savedReport.FullSizeURLs,
-		ProductName:          savedReport.ProductName,
-		StateName:            savedReport.StateName,
-		LGAName:              savedReport.LGAName,
-		Latitude:             lat,
-		Longitude:            lng,
-		UserIsAnonymous:      false,
-		Address:              savedReport.Address,
-		IsVerified:           false,
-		UserID:               savedReport.UserID,
 		ReportTypeID:         savedReport.ReportTypeID,
-		AdminID:              0,
-		Landmark:             savedReport.Landmark,
-		LikeCount:            savedReport.LikeCount,
-		BookmarkedReports:    []*models.User{},
-		IsResponse:           savedReport.IsResponse,
-		TimeofIncidence:      savedReport.TimeofIncidence,
-		ReportStatus:         savedReport.ReportStatus,
 		RewardPoint:          savedReport.RewardPoint,
 		ActionTypeName:       savedReport.ActionTypeName,
 		Rating:               savedReport.Rating,
@@ -245,33 +231,31 @@ func (s *IncidentService) GetReportTypeCountsByLGA(lga string) (map[string]inter
 }
 
 // AddMediaToReport associates media URLs (feed, thumbnail, fullsize) with an incident report.
-func (s *IncidentService) AddMediaToReport(reportID string, feedURLs []string, thumbnailURLs []string, fullsizeURLs []string) error {
-	// Fetch the existing report from the database using the report ID.
-	report, err := s.incidentRepo.GetIncidentReportByID(reportID)
+func (s *IncidentService) AddMediaToReport(reportTypeID string, feedURLs, thumbnailURLs, fullsizeURLs []string) error {
+	// Fetch the incident report by reportTypeID using the repository function
+	incidentReport, err := s.incidentRepo.FindIncidentReportByReportTypeID(reportTypeID)
 	if err != nil {
-		return fmt.Errorf("error retrieving report with ID %s: %v", reportID, err)
+		return fmt.Errorf("failed to find incident report by report type ID: %v", err)
 	}
 
-	// Append the new media URLs to the report's existing URLs, checking for empty strings.
-	report.FeedURLs = appendURLs(report.FeedURLs, feedURLs)
-	report.ThumbnailURLs = appendURLs(report.ThumbnailURLs, thumbnailURLs)
-	report.FullSizeURLs = appendURLs(report.FullSizeURLs, fullsizeURLs)
-
-	// Update the incident report in the database with the new media URLs.
-	err = s.incidentRepo.UpdateIncidentReport(report)
-	if err != nil {
-		return fmt.Errorf("error updating incident report with media URLs: %v", err)
+	// Check if the incident report is valid
+	if incidentReport == nil {
+		return fmt.Errorf("invalid incident report ID: %s", reportTypeID)
 	}
 
-	// Check if the report type ID is valid (not empty) before attempting to update.
-	if report.ReportTypeID != "" {
-		err = s.incidentRepo.UpdateReportTypeWithIncidentReport(report)
-		if err != nil {
-			return fmt.Errorf("error updating report type for incident report ID %s: %v", reportID, err)
+	// Iterate through media URLs and create media records associated with the incident report
+	for i := 0; i < len(feedURLs); i++ {
+		media := models.Media{
+			IncidentReportID: incidentReport.ID,
+			FeedURL:          feedURLs[i],
+			ThumbnailURL:     thumbnailURLs[i],
+			FullSizeURL:      fullsizeURLs[i],
 		}
-	} else {
-		// Log a message or handle the case where ReportTypeID is empty
-		fmt.Printf("Skipping report type update because ReportTypeID is empty for report ID: %s\n", reportID)
+
+		// Use the repository to save the media record
+		if err := s.incidentRepo.SaveMedia(&media); err != nil {
+			return fmt.Errorf("error saving media: %v", err)
+		}
 	}
 
 	return nil
