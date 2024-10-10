@@ -16,7 +16,7 @@ type IncidentReport struct {
 	FeedURLs             string     `json:"feed_urls"`
 	ThumbnailURLs        string     `json:"thumbnail_urls"`
 	FullSizeURLs         string     `json:"full_size_urls"`
-	ReportTypeID         uuid.UUID  `gorm:"not null" json:"report_type_id"` // UUID for foreign key
+	ReportTypeID         uuid.UUID  `gorm:"" json:"report_type_id"` 
 	ReportType           ReportType `gorm:"foreignKey:ReportTypeID"`
 	ProductName          string     `json:"product_name"`
 	StateName            string     `json:"state_name"`
