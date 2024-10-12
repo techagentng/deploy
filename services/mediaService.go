@@ -448,8 +448,6 @@ func (m *mediaService) SaveMedia(media models.Media, reportID string, userID uin
 	// Set the points on the media (remove the redundant assignment)
 	media.Points = rewardPoints
 
-	fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxT", rewardPoints)
-
 	// Save the media to the database
 	err := m.mediaRepo.SaveMedia(media, reportID, userID)
 	if err != nil {

@@ -17,6 +17,7 @@ type ReportType struct {
 	DateOfIncidence      time.Time        `json:"date_of_incidence"`
 	SubReports           []SubReport      `gorm:"foreignKey:ReportTypeID"`
 	IncidentReports      []IncidentReport `gorm:"foreignKey:ReportTypeID"`
+	CreatedAt            time.Time        `gorm:"autoCreateTime" json:"created_at"` 
 }
 type SubReport struct {
 	ID            uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`

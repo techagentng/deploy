@@ -82,6 +82,8 @@ type IncidentReportRepository interface {
 	FindIncidentReportByReportTypeID(reportTypeID string) (*models.IncidentReport, error)
 	SaveMedia(media *models.Media) error
 	GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error)
+	GetReportTypeeByID(reportTypeID string) (*models.ReportType, error)
+	GetLatestIncidentReportByUser(ctx context.Context, userID uint) (*models.IncidentReport, error)
 }
 
 type incidentReportRepo struct {
@@ -1132,6 +1134,18 @@ func (i *incidentReportRepo) GetIncidentReportByID(reportID string) (*models.Inc
 	return &report, nil
 }
 
+func(i *incidentReportRepo) GetReportTypeeByID(reportTypeID string) (*models.ReportType, error) {
+	var reportType models.ReportType
+	if err := i.DB.Where("id = ?", reportTypeID).First(&reportType).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("no report type found with ID %s: %w", reportTypeID, err)
+		}
+		return nil, fmt.Errorf("error retrieving report type with ID %s: %w", reportTypeID, err)
+	}
+	return &reportType, nil
+}
+
+
 func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport) error {
 	// Use a transaction to ensure atomicity of the operation.
 	return i.DB.Transaction(func(tx *gorm.DB) error {
@@ -1338,21 +1352,43 @@ func (i *incidentReportRepo) SaveMedia(media *models.Media) error {
 
 // Repository method to get reportID based on userID
 func (i *incidentReportRepo) GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error) {
-	var reportType models.ReportType
+    var incidentReport models.IncidentReport
 
-	// Query the database to find the report that matches userID
-	err := i.DB.WithContext(ctx).
-		Where("user_id = ?", userID).
-		First(&reportType).Error
+    // Query the database to find the most recent report that matches userID, ordering by creation time or ID
+    err := i.DB.WithContext(ctx).
+        Where("user_id = ?", userID).
+        Order("created_at desc").  // Ensure you get the most recent entry
+        Last(&incidentReport).Error  // Use Last() to pick the most recent record
 
-	// If record not found or other error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return uuid.Nil, fmt.Errorf("report not found for user")
-		}
-		return uuid.Nil, fmt.Errorf("error querying report ID: %w", err)
-	}
+    // If record not found or other error
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return uuid.Nil, fmt.Errorf("no report found for user")
+        }
+        return uuid.Nil, fmt.Errorf("error querying report ID: %w", err)
+    }
 
-	// Return the report's ID
-	return reportType.ID, nil
+    fmt.Println("Most recent report ID:", incidentReport.ID)
+    // Return the most recent report's ID
+    return incidentReport.ID, nil
 }
+
+func (i *incidentReportRepo) GetLatestIncidentReportByUser(ctx context.Context, userID uint) (*models.IncidentReport, error) {
+    var incidentReport models.IncidentReport
+
+    // Query to get the latest incident report entry based on user_id, ordered by created_at
+    err := i.DB.WithContext(ctx).
+        Where("user_id = ?", userID).
+        Order("created_at desc").
+        First(&incidentReport).Error
+
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, fmt.Errorf("no incident report found for user")
+        }
+        return nil, fmt.Errorf("error retrieving incident report: %w", err)
+    }
+
+    return &incidentReport, nil
+}
+
