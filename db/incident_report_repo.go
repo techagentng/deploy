@@ -83,7 +83,7 @@ type IncidentReportRepository interface {
 	SaveMedia(media *models.Media) error
 	GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error)
 	GetReportTypeeByID(reportTypeID string) (*models.ReportType, error)
-	GetLatestIncidentReportByUser(ctx context.Context, userID uint) (*models.IncidentReport, error)
+	GetLastReportIDByUserID(userID uint) (string, error)
 }
 
 type incidentReportRepo struct {
@@ -1357,24 +1357,11 @@ func (i *incidentReportRepo) GetReportIDByUser(ctx context.Context, userID uint)
     return incidentReport.ID, nil
 }
 
-func (i *incidentReportRepo) GetLatestIncidentReportByUser(ctx context.Context, userID uint) (*models.IncidentReport, error) {
-    var incidentReport models.IncidentReport
-
-    // Query to get the latest incident report entry based on user_id, ordered by created_at
-    err := i.DB.WithContext(ctx).
-        Where("user_id = ?", userID).
-        Order("created_at desc").
-        First(&incidentReport).Error
-
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            return nil, fmt.Errorf("no incident report found for user")
-        }
-        return nil, fmt.Errorf("error retrieving incident report: %w", err)
+func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error) {
+    var reportType models.ReportType
+    result := i.DB.Order("created_at DESC").First(&reportType, "user_id = ?", userID)
+    if result.Error != nil {
+        return "", result.Error
     }
-
-    return &incidentReport, nil
+    return reportType.IncidentReportID.String(), nil
 }
-
-
-

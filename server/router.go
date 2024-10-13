@@ -146,11 +146,4 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.POST("posts/create", s.handleCreatePost())
 	authorized.GET("/all/posts/:userID", s.handleGetPostsByUserID())
 
-	// authorized.GET("/api/v1/report/counts/state/:state/lga", s.GetReportTypeCountsByLGA)
-	// authorized.GET("/api/v1/report/counts/lga/:lga", s.GetReportCountsByStateAndLGA)
-
-	// authorized.PUT("/user/medication-history/:id", s.handleUpdateMedicationHistory())
-	// authorized.GET("/user/medication-history", s.handleGetAllMedicationHistoryByUser())
-	// authorized.POST("/notifications/add-token", s.authorizeNotificationsForDevice())
-
 }

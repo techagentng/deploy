@@ -481,7 +481,12 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 
     userIDUint := userID.(uint)
 
-	reportIDStr := c.PostForm("report_id")  
+// Fetch the last report ID of the current user
+reportIDStr, err := s.IncidentReportRepository.GetLastReportIDByUserID(userIDUint)
+if err != nil {
+    log.Printf("Error fetching last report ID: %v\n", err)
+    return nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
+}
     processedFeedURLs, processedThumbnailURLs, processedFullsizeURLs, processedFileTypes, err := s.MediaService.ProcessMedia(c, formMedia, userIDUint, reportIDStr)
     if err != nil {
         log.Printf("Error processing media: %v\n", err)
