@@ -1176,7 +1176,6 @@ func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport)
 		existingReport.View = report.View
 		existingReport.IsVerified = report.IsVerified
 		existingReport.UserID = report.UserID
-		existingReport.ReportTypeID = report.ReportTypeID
 		existingReport.AdminID = report.AdminID
 		existingReport.Landmark = report.Landmark
 		existingReport.LikeCount = report.LikeCount
@@ -1238,10 +1237,6 @@ func validateIncidentReport(report *models.IncidentReport) error {
 // Update related ReportType entity if needed.
 func updateRelatedReportType(tx *gorm.DB, report models.IncidentReport) error {
 	var reportType models.ReportType
-	// Fetch the associated ReportType.
-	if err := tx.Where("id = ?", report.ReportTypeID).First(&reportType).Error; err != nil {
-		return fmt.Errorf("could not find associated report type with ID %s: %w", report.ReportTypeID, err)
-	}
 
 	// Update relevant fields in ReportType.
 	reportType.StateName = report.StateName
@@ -1254,17 +1249,6 @@ func updateRelatedReportType(tx *gorm.DB, report models.IncidentReport) error {
 	}
 
 	return nil
-}
-func (i *incidentReportRepo) fetchSubReportsByType(subReportType string) ([]models.SubReport, error) {
-	var subReports []models.SubReport
-
-	// Query the database for sub-reports matching the given sub-report type.
-	err := i.DB.Where("sub_report_type = ?", subReportType).Find(&subReports).Error
-	if err != nil {
-		return nil, fmt.Errorf("error finding sub-reports of type %s: %w", subReportType, err)
-	}
-
-	return subReports, nil
 }
 
 // Inside db.IncidentReportRepository
@@ -1391,4 +1375,6 @@ func (i *incidentReportRepo) GetLatestIncidentReportByUser(ctx context.Context, 
 
     return &incidentReport, nil
 }
+
+
 

@@ -110,7 +110,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		DateOfIncidence:      savedReport.DateOfIncidence,
 		Description:          savedReport.Description,
 		FeedURLs:             savedReport.FeedURLs,
-		ReportTypeID:         savedReport.ReportTypeID,
 		RewardPoint:          savedReport.RewardPoint,
 		ActionTypeName:       savedReport.ActionTypeName,
 		Rating:               savedReport.Rating,

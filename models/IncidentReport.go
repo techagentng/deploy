@@ -5,8 +5,6 @@ import (
 
 	"github.com/google/uuid"
 )
-
-// IncidentReport represents an incident report filed by a user
 type IncidentReport struct {
 	ID                   uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"` // Update to UUID type
 	CreatedAt            int64      `json:"created_at"`
@@ -16,8 +14,6 @@ type IncidentReport struct {
 	FeedURLs             string     `json:"feed_urls"`
 	ThumbnailURLs        string     `json:"thumbnail_urls"`
 	FullSizeURLs         string     `json:"full_size_urls"`
-	ReportTypeID         uuid.UUID  `gorm:"" json:"report_type_id"` 
-	ReportType           ReportType `gorm:"foreignKey:ReportTypeID"`
 	ProductName          string     `json:"product_name"`
 	StateName            string     `json:"state_name"`
 	LGAName              string     `json:"lga_name"`
@@ -64,6 +60,8 @@ type IncidentReport struct {
 	SubReportType        string     `json:"sub_report_type"`
 	UpvoteCount          int        `json:"upvote_count" gorm:"default:0"`
 	DownvoteCount        int        `json:"downvote_count" gorm:"default:0"`
+	ReportTypeID      uuid.UUID   `json:"report_type_id" gorm:"not null"` 
+	ReportType        ReportType  `gorm:"foreignKey:ReportTypeID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"` 
 }
 type ReportCount struct {
 	StateName string

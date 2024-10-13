@@ -340,7 +340,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid type for profile image"})
             return
         }
-fmt.Println("xxxxxxx", profileImage)
+
         // Create and populate the IncidentReport model
         incidentReport := &models.IncidentReport{
             ID:              reportID,
@@ -357,12 +357,12 @@ fmt.Println("xxxxxxx", profileImage)
             Address:         c.PostForm("address"),
             Rating:          c.PostForm("rating"),
             Category:        c.PostForm("category"),
-            ThumbnailURLs:   profileImage,  // Set the thumbnail/profile image here
+            ThumbnailURLs:   profileImage,
         }
 
         // Create and populate the ReportType model
         reportType := &models.ReportType{
-            ID:                   uuid.New(), // Generate new UUID for ReportType
+            ID:                   uuid.New(),
             UserID:               user.ID,
             IncidentReportID:     reportID,
             Category:             incidentReport.Category,
@@ -379,6 +379,21 @@ fmt.Println("xxxxxxx", profileImage)
             return
         }
 
+        // Create and populate the SubReport model
+        subReport := &models.SubReport{
+            ID:            uuid.New(),
+            ReportTypeID:  reportType.ID,
+            SubReportType: c.PostForm("sub_report_type"),
+        }
+
+        // Save SubReport
+        savedSubReport, err := s.IncidentReportRepository.SaveSubReport(subReport)
+        if err != nil {
+            log.Printf("Error saving sub-report: %v\n", err)
+            response.JSON(c, "Unable to save sub-report", http.StatusInternalServerError, nil, err)
+            return
+        }
+
         // Save the incident report to the database
         savedIncidentReport, err := s.IncidentReportService.SaveReport(user.ID, lat, lng, incidentReport, reportID.String(), 0)
         if err != nil {
@@ -387,14 +402,16 @@ fmt.Println("xxxxxxx", profileImage)
             return
         }
 
-        // Return reportID and reportTypeID in the response to the client
+        // Return reportID, reportTypeID, and subReportID in the response
         response.JSON(c, "Incident Report Submitted Successfully", http.StatusCreated, gin.H{
             "reportID":            reportID.String(),
             "reportTypeID":        reportType.ID.String(),
+            "subReportID":         savedSubReport.ID.String(),
             "savedIncidentReport": savedIncidentReport,
         }, nil)
     }
 }
+
 
 // Helper function to parse coordinates from the request form
 func parseCoordinates(c *gin.Context) (float64, float64, error) {
