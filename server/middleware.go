@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -97,7 +98,7 @@ func (s *Server) Authorize() gin.HandlerFunc {
 		c.Set("username", user.Username)
 		c.Set("profile_image", user.ThumbNailURL)
 		c.Set("user_role", accessClaims["role"].(string))
-
+		fmt.Println("Username set in context:", user.Username)
 		// Continue to the next middleware or handler
 		c.Next()
 	}

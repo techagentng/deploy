@@ -211,9 +211,9 @@ func (repo *incidentReportRepo) GetAllReports(page int) ([]models.IncidentReport
 	// Calculate the offset
 	offset := (page - 1) * 20
 
-	// Fetch reports ordered by the latest 'timeof_incidence' (descending order)
+	// Fetch reports ordered by 'created_at' in descending order
 	err := repo.DB.
-		Order("timeof_incidence DESC"). // Ensure newest first
+		Order("created_at DESC"). // Change to descending order
 		Limit(20).
 		Offset(offset).
 		Find(&reports).Error
@@ -227,8 +227,6 @@ func (repo *incidentReportRepo) GetAllReports(page int) ([]models.IncidentReport
 
 	return reports, nil
 }
-
-
 
 func (repo *incidentReportRepo) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
 	var reports []models.IncidentReport

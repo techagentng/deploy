@@ -328,7 +328,17 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid type for full name"})
             return
         }
+        userNameInterface, exists := c.Get("username")
+        if !exists {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Full name not found"})
+            return
+        }
 
+		username, ok := userNameInterface.(string)
+        if !ok {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid type for full name"})
+            return
+        }
         profileImageInterface, exists := c.Get("profile_image")
         if !exists {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Profile image not found"})
@@ -345,13 +355,13 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
         incidentReport := &models.IncidentReport{
             ID:              reportID,
             UserFullname:    fullName,
+			UserUsername: username,
             DateOfIncidence: c.PostForm("date_of_incidence"),
             Description:     c.PostForm("description"),
             StateName:       c.PostForm("state_name"),
             LGAName:         c.PostForm("lga_name"),
             Latitude:        lat,
             Longitude:       lng,
-            UserUsername:    c.PostForm("username"),
             Telephone:       c.PostForm("telephone"),
             Email:           c.PostForm("email"),
             Address:         c.PostForm("address"),
