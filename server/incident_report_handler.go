@@ -481,12 +481,13 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 
     userIDUint := userID.(uint)
 
-// Fetch the last report ID of the current user
-reportIDStr, err := s.IncidentReportRepository.GetLastReportIDByUserID(userIDUint)
-if err != nil {
-    log.Printf("Error fetching last report ID: %v\n", err)
-    return nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
-}
+    // Fetch the last report ID of the current user
+    reportIDStr, err := s.IncidentReportRepository.GetLastReportIDByUserID(userIDUint)
+    if err != nil {
+        log.Printf("Error fetching last report ID: %v\n", err)
+        return nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
+    }
+
     processedFeedURLs, processedThumbnailURLs, processedFullsizeURLs, processedFileTypes, err := s.MediaService.ProcessMedia(c, formMedia, userIDUint, reportIDStr)
     if err != nil {
         log.Printf("Error processing media: %v\n", err)
@@ -506,7 +507,17 @@ if err != nil {
         return nil, nil, nil, nil, fmt.Errorf("error retrieving report: %v", err)
     }
 
-    // Update the fields in the incident report with the processed URLs
+    // Check if the incident report has an associated ReportType
+    if incidentReport.ReportTypeID != uuid.Nil {
+        log.Printf("Incident report has an associated ReportType: %v", incidentReport.ReportTypeID)
+        // We are not updating or creating a new ReportType since it already exists
+    } else {
+        // If for some reason, the report doesn't have an associated ReportType, handle that here
+        log.Printf("Incident report is missing a ReportType, which is unexpected")
+        return nil, nil, nil, nil, fmt.Errorf("incident report is missing a ReportType")
+    }
+
+    // Update the fields in the incident report with the processed media URLs
     incidentReport.FeedURLs = strings.Join(feedURLs, ",")
     incidentReport.ThumbnailURLs = strings.Join(thumbnailURLs, ",")
     incidentReport.FullSizeURLs = strings.Join(fullsizeURLs, ",")
@@ -551,6 +562,7 @@ if err != nil {
 
     return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
 }
+
 
 func (s *Server) handleGetAllReport() gin.HandlerFunc {
 	return func(c *gin.Context) {

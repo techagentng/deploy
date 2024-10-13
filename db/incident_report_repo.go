@@ -202,18 +202,33 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 
 func (repo *incidentReportRepo) GetAllReports(page int) ([]models.IncidentReport, error) {
 	var reports []models.IncidentReport
+
+	// Ensure page is valid (default to page 1 if invalid)
+	if page < 1 {
+		page = 1
+	}
+
 	// Calculate the offset
 	offset := (page - 1) * 20
 
-	err := repo.DB.Limit(20).Offset(offset).Order("timeof_incidence DESC").Find(&reports).Error
+	// Fetch reports ordered by the latest 'timeof_incidence' (descending order)
+	err := repo.DB.
+		Order("timeof_incidence DESC"). // Ensure newest first
+		Limit(20).
+		Offset(offset).
+		Find(&reports).Error
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("no incident reports found")
 		}
 		return nil, err
 	}
+
 	return reports, nil
 }
+
+
 
 func (repo *incidentReportRepo) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
 	var reports []models.IncidentReport
@@ -1214,14 +1229,44 @@ func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport)
 			return fmt.Errorf("error updating incident report in the database: %w", err)
 		}
 
-		// If needed, update related entities like ReportType here.
-		if err := updateRelatedReportType(tx, existingReport); err != nil {
+		// Check and update related entities like ReportType if needed.
+		if err := updateRelatedReportType(tx, &existingReport, report.ReportTypeID); err != nil {
 			return fmt.Errorf("error updating related report type: %w", err)
 		}
 
 		return nil
 	})
 }
+
+// updateRelatedReportType updates or creates a ReportType if needed.
+func updateRelatedReportType(tx *gorm.DB, report *models.IncidentReport, newReportTypeID uuid.UUID) error {
+	// Check if the report already has an associated ReportType and if it's the same as the new one.
+	if report.ReportTypeID == newReportTypeID {
+		// If the ReportType is already associated with the report, no update is needed.
+		return nil
+	}
+
+	// If the ReportType is different, update it to the new one.
+	var reportType models.ReportType
+	if err := tx.Where("id = ?", newReportTypeID).First(&reportType).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Handle case where ReportType is not found, or create a new one as needed.
+			return fmt.Errorf("report type with ID %v not found", newReportTypeID)
+		}
+		return fmt.Errorf("error retrieving report type: %w", err)
+	}
+
+	// Associate the new ReportType with the report.
+	report.ReportTypeID = newReportTypeID
+
+	// Save the updated report with the new ReportType.
+	if err := tx.Save(report).Error; err != nil {
+		return fmt.Errorf("error saving report with updated ReportType: %w", err)
+	}
+
+	return nil
+}
+
 
 // Example validation function for IncidentReport.
 func validateIncidentReport(report *models.IncidentReport) error {
@@ -1233,30 +1278,15 @@ func validateIncidentReport(report *models.IncidentReport) error {
 	// Add more validation logic as needed.
 	return nil
 }
-
-// Update related ReportType entity if needed.
-func updateRelatedReportType(tx *gorm.DB, report models.IncidentReport) error {
-	var reportType models.ReportType
-
-	// Update relevant fields in ReportType.
-	reportType.StateName = report.StateName
-	reportType.LGAName = report.LGAName
-	reportType.IncidentReportRating = report.Rating
-
-	// Save the updated ReportType.
-	if err := tx.Save(&reportType).Error; err != nil {
-		return fmt.Errorf("error saving updated report type: %w", err)
-	}
-
-	return nil
-}
-
 // Inside db.IncidentReportRepository
 func (i *incidentReportRepo) UpdateReportTypeWithIncidentReport(report *models.IncidentReport) error {
 	// Assuming you have a method to find the report type based on the report ID
 	var reportType models.ReportType
 	if err := i.DB.First(&reportType, "report_id = ?", report.ID).Error; err != nil {
-		return err // Handle the error, e.g., report type not found
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("report type not found for report ID %s: %w", report.ID, err)
+		}
+		return fmt.Errorf("error retrieving report type for report ID %s: %w", report.ID, err)
 	}
 
 	// Update fields as necessary
@@ -1265,8 +1295,13 @@ func (i *incidentReportRepo) UpdateReportTypeWithIncidentReport(report *models.I
 	reportType.UserID = report.UserID
 
 	// Save the updated report type
-	return i.DB.Save(&reportType).Error
+	if err := i.DB.Save(&reportType).Error; err != nil {
+		return fmt.Errorf("error saving updated report type for report ID %s: %w", report.ID, err)
+	}
+
+	return nil
 }
+
 
 func (i *incidentReportRepo) FindReportTypeByCategory(category string, reportType *models.ReportType) error {
 	// Query the ReportType based on the Category
