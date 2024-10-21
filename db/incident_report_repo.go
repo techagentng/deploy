@@ -896,22 +896,24 @@ func (repo *incidentReportRepo) GetSubReportsByCategory(category string) ([]mode
 }
 
 func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error) {
-	var reports []models.IncidentReport
+    var reports []models.IncidentReport
 
-	// Directly query the IncidentReports based on the UserID from the ReportType
-	err := repo.DB.Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
-		Where("report_types.user_id = ?", userID).
-		Find(&reports).Error
+    // Query to get reports ordered by date_of_incidence
+    err := repo.DB.Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
+        Where("report_types.user_id = ?", userID).
+        Order("incident_reports.date_of_incidence DESC"). 
+        Find(&reports).Error
 
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("no incident reports found for this user")
-		}
-		return nil, err
-	}
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, errors.New("no incident reports found for this user")
+        }
+        return nil, err
+    }
 
-	return reports, nil
+    return reports, nil
 }
+
 
 func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID string, bookmark *models.Bookmark) error {
 	return repo.DB.Where("user_id = ? AND report_id = ?", userID, reportID).First(bookmark).Error
