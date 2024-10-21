@@ -1326,16 +1326,8 @@ func (s *Server) HandleGetAllReportsByUser() gin.HandlerFunc {
 			return
 		}
 
-		// Get the page number from query parameters
-		pageQuery := c.DefaultQuery("page", "1")
-		page, err := strconv.Atoi(pageQuery)
-		if err != nil || page < 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page number"})
-			return
-		}
-
 		// Fetch reports for the user
-		reports, err := s.IncidentReportRepository.GetAllReportsByUser(userID, page)
+		reports, err := s.IncidentReportRepository.GetAllIncidentReportsByUser(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

@@ -63,7 +63,6 @@ type IncidentReportRepository interface {
 	SaveReportType(reportType *models.ReportType) (*models.ReportType, error)
 	SaveSubReport(subReport *models.SubReport) (*models.SubReport, error)
 	GetSubReportsByCategory(category string) ([]models.SubReport, error)
-	GetAllReportsByUser(userID uint, page int) ([]models.IncidentReport, error)
 	IsBookmarked(userID uint, reportID string, bookmark *models.Bookmark) error
 	SaveBookmark(bookmark *models.Bookmark) error
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
@@ -84,11 +83,13 @@ type IncidentReportRepository interface {
 	GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error)
 	GetReportTypeeByID(reportTypeID string) (*models.ReportType, error)
 	GetLastReportIDByUserID(userID uint) (string, error)
+	GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error)
 }
 
 type incidentReportRepo struct {
 	DB *gorm.DB
 }
+
 
 func NewIncidentReportRepo(db *GormDB) IncidentReportRepository {
 	return &incidentReportRepo{db.DB}
@@ -894,19 +895,21 @@ func (repo *incidentReportRepo) GetSubReportsByCategory(category string) ([]mode
 	return subReports, nil
 }
 
-func (repo *incidentReportRepo) GetAllReportsByUser(userID uint, page int) ([]models.IncidentReport, error) {
+func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error) {
 	var reports []models.IncidentReport
-	// Calculate the offset
-	offset := (page - 1) * 20
 
-	// Query the reports by user ID with pagination
-	err := repo.DB.Where("user_id = ?", userID).Limit(20).Offset(offset).Order("timeof_incidence DESC").Find(&reports).Error
+	// Directly query the IncidentReports based on the UserID from the ReportType
+	err := repo.DB.Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
+		Where("report_types.user_id = ?", userID).
+		Find(&reports).Error
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("no incident reports found for this user")
 		}
 		return nil, err
 	}
+
 	return reports, nil
 }
 
@@ -1147,7 +1150,7 @@ func (i *incidentReportRepo) GetIncidentReportByID(reportID string) (*models.Inc
 	return &report, nil
 }
 
-func(i *incidentReportRepo) GetReportTypeeByID(reportTypeID string) (*models.ReportType, error) {
+func (i *incidentReportRepo) GetReportTypeeByID(reportTypeID string) (*models.ReportType, error) {
 	var reportType models.ReportType
 	if err := i.DB.Where("id = ?", reportTypeID).First(&reportType).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1157,7 +1160,6 @@ func(i *incidentReportRepo) GetReportTypeeByID(reportTypeID string) (*models.Rep
 	}
 	return &reportType, nil
 }
-
 
 func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport) error {
 	// Use a transaction to ensure atomicity of the operation.
@@ -1265,7 +1267,6 @@ func updateRelatedReportType(tx *gorm.DB, report *models.IncidentReport, newRepo
 	return nil
 }
 
-
 // Example validation function for IncidentReport.
 func validateIncidentReport(report *models.IncidentReport) error {
 	// Validate FeedURLs
@@ -1276,6 +1277,7 @@ func validateIncidentReport(report *models.IncidentReport) error {
 	// Add more validation logic as needed.
 	return nil
 }
+
 // Inside db.IncidentReportRepository
 func (i *incidentReportRepo) UpdateReportTypeWithIncidentReport(report *models.IncidentReport) error {
 	// Assuming you have a method to find the report type based on the report ID
@@ -1299,7 +1301,6 @@ func (i *incidentReportRepo) UpdateReportTypeWithIncidentReport(report *models.I
 
 	return nil
 }
-
 
 func (i *incidentReportRepo) FindReportTypeByCategory(category string, reportType *models.ReportType) error {
 	// Query the ReportType based on the Category
@@ -1369,32 +1370,50 @@ func (i *incidentReportRepo) SaveMedia(media *models.Media) error {
 
 // Repository method to get reportID based on userID
 func (i *incidentReportRepo) GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error) {
-    var incidentReport models.IncidentReport
+	var incidentReport models.IncidentReport
 
-    // Query the database to find the most recent report that matches userID, ordering by creation time or ID
-    err := i.DB.WithContext(ctx).
-        Where("user_id = ?", userID).
-        Order("created_at desc").  // Ensure you get the most recent entry
-        Last(&incidentReport).Error  // Use Last() to pick the most recent record
+	// Query the database to find the most recent report that matches userID, ordering by creation time or ID
+	err := i.DB.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at desc").   // Ensure you get the most recent entry
+		Last(&incidentReport).Error // Use Last() to pick the most recent record
 
-    // If record not found or other error
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            return uuid.Nil, fmt.Errorf("no report found for user")
-        }
-        return uuid.Nil, fmt.Errorf("error querying report ID: %w", err)
-    }
+	// If record not found or other error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return uuid.Nil, fmt.Errorf("no report found for user")
+		}
+		return uuid.Nil, fmt.Errorf("error querying report ID: %w", err)
+	}
 
-    fmt.Println("Most recent report ID:", incidentReport.ID)
-    // Return the most recent report's ID
-    return incidentReport.ID, nil
+	fmt.Println("Most recent report ID:", incidentReport.ID)
+	// Return the most recent report's ID
+	return incidentReport.ID, nil
 }
 
 func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error) {
-    var reportType models.ReportType
-    result := i.DB.Order("created_at DESC").First(&reportType, "user_id = ?", userID)
-    if result.Error != nil {
-        return "", result.Error
-    }
-    return reportType.IncidentReportID.String(), nil
+	var reportType models.ReportType
+	result := i.DB.Order("created_at DESC").First(&reportType, "user_id = ?", userID)
+	if result.Error != nil {
+		return "", result.Error
+	}
+	return reportType.IncidentReportID.String(), nil
 }
+
+// func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error) {
+//     var reports []models.IncidentReport
+
+//     // Directly query the IncidentReports based on the UserID from the ReportType
+//     err := repo.DB.Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
+//         Where("report_types.user_id = ?", userID).
+//         Find(&reports).Error
+
+//     if err != nil {
+//         if errors.Is(err, gorm.ErrRecordNotFound) {
+//             return nil, errors.New("no incident reports found for this user")
+//         }
+//         return nil, err
+//     }
+
+//     return reports, nil
+// }
