@@ -1,6 +1,8 @@
 package db
 
 import (
+	"fmt"
+
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
 )
@@ -10,6 +12,7 @@ type PostRepository interface {
 	CreatePost(post *models.Post) error
 	GetPostsByUserID(userID uint) ([]models.Post, error)
 	GetAllPosts() ([]models.Post, error)
+	GetPostByID(id string) (*models.Post, error)
 }
 
 // likeRepo struct
@@ -48,4 +51,12 @@ func (r *postRepo) GetAllPosts() ([]models.Post, error) {
 	}
 
 	return posts, nil
+}
+
+func (r *postRepo) GetPostByID(id string) (*models.Post, error) {
+	var post models.Post
+	if err := r.DB.Where("id = ?", id).First(&post).Error; err != nil {
+		return nil, fmt.Errorf("error retrieving post with ID %s: %w", id, err)
+	}
+	return &post, nil
 }

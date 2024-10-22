@@ -161,3 +161,17 @@ func (s *Server) HandleGetAllPosts() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"posts": posts})
 	}
 }
+
+func (s *Server) GetPostByID() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		postID := c.Param("id")
+
+		post, err := s.PostRepository.GetPostByID(postID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, post)
+	}
+}

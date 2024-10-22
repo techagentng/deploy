@@ -93,6 +93,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.POST("/password/reset/:token", s.HandleForgotPassword())
 	apirouter.POST("/report-type/states", s.HandleGetVariadicBarChart())
 	apirouter.GET("/all/publications", s.HandleGetAllPosts())
+	apirouter.GET("/api/v1/publication/:id", s.GetPostByID())
 
 	authorized := apirouter.Group("/")
 	authorized.Use(s.Authorize())
