@@ -146,3 +146,18 @@ func (s *Server) handleGetPostsByUserID() gin.HandlerFunc {
 		})
 	}
 }
+
+// server.go or where you define your handlers
+func (s *Server) HandleGetAllPosts() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Call the repository method to retrieve all posts
+		posts, err := s.PostRepository.GetAllPosts()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve posts"})
+			return
+		}
+
+		// Return the posts as a JSON response
+		c.JSON(http.StatusOK, gin.H{"posts": posts})
+	}
+}

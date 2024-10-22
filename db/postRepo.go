@@ -9,6 +9,7 @@ import (
 type PostRepository interface {
 	CreatePost(post *models.Post) error
 	GetPostsByUserID(userID uint) ([]models.Post, error)
+	GetAllPosts() ([]models.Post, error)
 }
 
 // likeRepo struct
@@ -36,5 +37,15 @@ func (r *postRepo) GetPostsByUserID(userID uint) ([]models.Post, error) {
 	if err != nil {
 		return nil, err
 	}
+	return posts, nil
+}
+
+func (r *postRepo) GetAllPosts() ([]models.Post, error) {
+	var posts []models.Post
+
+	if err := r.DB.Find(&posts).Error; err != nil {
+		return nil, err
+	}
+
 	return posts, nil
 }

@@ -92,6 +92,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.POST("/password/forgot", s.HandleForgotPassword())
 	apirouter.POST("/password/reset/:token", s.HandleForgotPassword())
 	apirouter.POST("/report-type/states", s.HandleGetVariadicBarChart())
+	apirouter.GET("/all/publications", s.HandleGetAllPosts())
 
 	authorized := apirouter.Group("/")
 	authorized.Use(s.Authorize())
@@ -145,5 +146,4 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("reports/filters", s.handleGetReportsByFilters())
 	authorized.POST("posts/create", s.handleCreatePost())
 	authorized.GET("/all/posts/:userID", s.handleGetPostsByUserID())
-
 }
