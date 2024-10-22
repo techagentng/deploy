@@ -63,7 +63,7 @@ type IncidentReportRepository interface {
 	SaveReportType(reportType *models.ReportType) (*models.ReportType, error)
 	SaveSubReport(subReport *models.SubReport) (*models.SubReport, error)
 	GetSubReportsByCategory(category string) ([]models.SubReport, error)
-	IsBookmarked(userID uint, reportID string, bookmark *models.Bookmark) error
+	IsBookmarked(userID uint, reportID uuid.UUID, bookmark *models.Bookmark) error
 	SaveBookmark(bookmark *models.Bookmark) error
 	GetBookmarkedReports(userID uint) ([]models.IncidentReport, error)
 	GetReportsByUserID(userID uint) ([]models.ReportType, error)
@@ -84,6 +84,7 @@ type IncidentReportRepository interface {
 	GetReportTypeeByID(reportTypeID string) (*models.ReportType, error)
 	GetLastReportIDByUserID(userID uint) (string, error)
 	GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error)
+	ReportExists(reportID uuid.UUID) (bool, error)
 }
 
 type incidentReportRepo struct {
@@ -915,8 +916,9 @@ func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]mode
 }
 
 
-func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID string, bookmark *models.Bookmark) error {
-	return repo.DB.Where("user_id = ? AND report_id = ?", userID, reportID).First(bookmark).Error
+func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID uuid.UUID, bookmark *models.Bookmark) error {
+    return repo.DB.Where("user_id = ? AND report_id = ?", userID, reportID).
+        First(bookmark).Error
 }
 
 func (repo *incidentReportRepo) SaveBookmark(bookmark *models.Bookmark) error {
@@ -928,9 +930,11 @@ func (repo *incidentReportRepo) GetBookmarkedReports(userID uint) ([]models.Inci
 
 	log.Printf("Retrieving bookmarked reports for userID: %d", userID)
 
+	// Perform the query with a join on bookmarks and preload the associated ReportType
 	err := repo.DB.
 		Joins("JOIN bookmarks ON bookmarks.report_id = incident_reports.id").
 		Where("bookmarks.user_id = ?", userID).
+		Preload("ReportType"). // This preloads the related ReportType data
 		Find(&reports).Error
 
 	if err != nil {
@@ -1225,6 +1229,7 @@ func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport)
 		existingReport.SubReportType = report.SubReportType
 		existingReport.UpvoteCount = report.UpvoteCount
 		existingReport.DownvoteCount = report.DownvoteCount
+		log.Printf("Existing Report before savexxxxxxxxxx: %+v", existingReport)
 
 		// Save the updated report to the database.
 		if err := tx.Save(&existingReport).Error; err != nil {
@@ -1402,20 +1407,10 @@ func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error
 	return reportType.IncidentReportID.String(), nil
 }
 
-// func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error) {
-//     var reports []models.IncidentReport
-
-//     // Directly query the IncidentReports based on the UserID from the ReportType
-//     err := repo.DB.Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
-//         Where("report_types.user_id = ?", userID).
-//         Find(&reports).Error
-
-//     if err != nil {
-//         if errors.Is(err, gorm.ErrRecordNotFound) {
-//             return nil, errors.New("no incident reports found for this user")
-//         }
-//         return nil, err
-//     }
-
-//     return reports, nil
-// }
+func (repo *incidentReportRepo) ReportExists(reportID uuid.UUID) (bool, error) {
+    var count int64
+    err := repo.DB.Model(&models.IncidentReport{}).
+        Where("id = ?", reportID).
+        Count(&count).Error
+    return count > 0, err
+}

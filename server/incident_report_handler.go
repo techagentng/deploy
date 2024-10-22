@@ -1355,33 +1355,58 @@ func (s *Server) HandleGetVoteCounts() gin.HandlerFunc {
 }
 
 func (s *Server) HandleBookmarkReport() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Extract user ID from context
-		userIDCtx, ok := c.Get("userID")
-		if !ok {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "userID not found in context"})
-			return
-		}
+    return func(c *gin.Context) {
+        // Get userID from context
+        userIDCtx, exists := c.Get("userID")
+        if !exists {
+            c.JSON(http.StatusUnauthorized, gin.H{
+                "error": "user not authenticated",
+            })
+            return
+        }
 
-		// Assert the userID type
-		userID, ok := userIDCtx.(uint)
-		if !ok {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "userID is not of type uint"})
-			return
-		}
+        userID, ok := userIDCtx.(uint)
+        if !ok {
+            c.JSON(http.StatusInternalServerError, gin.H{
+                "error": "invalid user ID format",
+            })
+            return
+        }
 
-		// Extract reportID from request parameters
-		reportID := c.Param("reportID")
+        // Get and parse reportID
+        reportIDStr := c.Param("reportID")
+        reportID, err := uuid.Parse(reportIDStr)
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{
+                "error": "invalid report ID format",
+            })
+            return
+        }
 
-		// Call the bookmark service
-		err := s.IncidentReportService.BookmarkReport(userID, reportID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+        // Call the bookmark service
+        err = s.IncidentReportService.BookmarkReport(userID, reportID)
+        if err != nil {
+            status := http.StatusInternalServerError
+            
+            // Handle specific error cases
+            switch err.Error() {
+            case "report not found":
+                status = http.StatusNotFound
+            case "report already bookmarked":
+                status = http.StatusConflict
+            }
+            
+            c.JSON(status, gin.H{
+                "error": err.Error(),
+            })
+            return
+        }
 
-		c.JSON(http.StatusOK, gin.H{"message": "Report bookmarked successfully"})
-	}
+        // Success response
+        c.JSON(http.StatusOK, gin.H{
+            "message": "Report bookmarked successfully",
+        })
+    }
 }
 
 func (s *Server) HandleGetBookmarkedReports() gin.HandlerFunc {
