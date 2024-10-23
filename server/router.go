@@ -56,16 +56,17 @@ func (s *Server) setupRouter() *gin.Engine {
 
 	// allowedOrigins := []string{"http://localhost:3001"}
 	// if os.Getenv("GIN_MODE") == "release" {
-	// 	allowedOrigins = []string{"https://citizenx-dashboard-sbqx.onrender.com"}
+	// 	allowedOrigins = []string{"https://citizenx.ng"}
 	// }
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
-		AllowAllOrigins:  true,
+		AllowOrigins:     []string{"https://citizenx.ng", "http://localhost:3001"}, 
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
-		AllowCredentials: true,
+		AllowCredentials: true, // cookies or tokens
 		MaxAge:           12 * time.Hour,
 	}))
+	
 	r.MaxMultipartMemory = 32 << 20
 	s.defineRoutes(r)
 
@@ -93,7 +94,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.POST("/password/reset/:token", s.HandleForgotPassword())
 	apirouter.POST("/report-type/states", s.HandleGetVariadicBarChart())
 	apirouter.GET("/all/publications", s.HandleGetAllPosts())
-	apirouter.GET("/api/v1/publication/:id", s.GetPostByID())
+	apirouter.GET("/publication/:id", s.GetPostByID())
 
 	authorized := apirouter.Group("/")
 	authorized.Use(s.Authorize())
@@ -137,7 +138,6 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.PUT("/report/downvote/:reportID", s.HandleDownvoteReport())
 	authorized.GET("/user/reports", s.HandleGetAllReportsByUser())
 	authorized.GET("/report/votecounts/:reportID", s.HandleGetVoteCounts())
-	// authorized.GET("/all/user/report", s.HandleGetReportsByUserID())
 	authorized.GET("/report/counts/lga/:lga", s.GetReportTypeCountsByLGA())
 	authorized.GET("/report/counts/state/:state", s.GetReportCountsByStateAndLGA())
 	authorized.DELETE("/delete/user", s.handleDeleteUser())

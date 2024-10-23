@@ -8,4 +8,5 @@ type Post struct {
 	PostCategory    string `json:"post_category"`
 	Image           string `json:"post_image"`
 	PostDescription string `json:"post_description"`
+	UserFullname         string     `json:"fullname"`
 }
