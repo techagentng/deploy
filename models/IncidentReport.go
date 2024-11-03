@@ -108,3 +108,11 @@ type IncidentReportResponseData struct {
 	Landmark        string `json:"landmark"`
 	ImageURL        string `json:"image_url"`
 }
+
+type ReportPostRequest struct {
+    ReportTypeID int    `json:"report_type_id"`
+    SubReportID  int    `json:"sub_report_id"`
+    UserID       int    `json:"user_id"`
+    Description  string `json:"description"`
+    Message      string `json:"message"`
+}

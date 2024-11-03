@@ -1550,6 +1550,13 @@ func (s *Server) UpdateBlockRequestHandler() gin.HandlerFunc {
 			return
 		}
 
+		// Bind the JSON payload to the struct
+		var payload models.ReportPostRequest
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload", "details": err.Error()})
+			return
+		}
+
 		// Call the repository function to update the BlockRequest field
 		err = s.IncidentReportRepository.UpdateBlockRequest(c.Request.Context(), reportID)
 		if err != nil {
@@ -1557,10 +1564,11 @@ func (s *Server) UpdateBlockRequestHandler() gin.HandlerFunc {
 			return
 		}
 
-		// Return a success response
+		// Return a success response with the provided message and report ID
 		c.JSON(http.StatusOK, gin.H{
-			"message": "BlockRequest updated successfully",
-			"report_id": reportID,
+			"message":    "BlockRequest updated successfully",
+			"report_id":  reportID,
+			"user_message": payload.Message,
 		})
 	}
 }
