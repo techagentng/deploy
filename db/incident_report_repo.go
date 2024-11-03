@@ -85,12 +85,12 @@ type IncidentReportRepository interface {
 	GetLastReportIDByUserID(userID uint) (string, error)
 	GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error)
 	ReportExists(reportID uuid.UUID) (bool, error)
+	UpdateBlockRequest(ctx context.Context, reportID uuid.UUID) error
 }
 
 type incidentReportRepo struct {
 	DB *gorm.DB
 }
-
 
 func NewIncidentReportRepo(db *GormDB) IncidentReportRepository {
 	return &incidentReportRepo{db.DB}
@@ -897,28 +897,27 @@ func (repo *incidentReportRepo) GetSubReportsByCategory(category string) ([]mode
 }
 
 func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error) {
-    var reports []models.IncidentReport
+	var reports []models.IncidentReport
 
-    // Query to get reports ordered by date_of_incidence
-    err := repo.DB.Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
-        Where("report_types.user_id = ?", userID).
-        Order("incident_reports.date_of_incidence DESC"). 
-        Find(&reports).Error
+	// Query to get reports ordered by date_of_incidence
+	err := repo.DB.Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
+		Where("report_types.user_id = ?", userID).
+		Order("incident_reports.date_of_incidence DESC").
+		Find(&reports).Error
 
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            return nil, errors.New("no incident reports found for this user")
-        }
-        return nil, err
-    }
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("no incident reports found for this user")
+		}
+		return nil, err
+	}
 
-    return reports, nil
+	return reports, nil
 }
 
-
 func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID uuid.UUID, bookmark *models.Bookmark) error {
-    return repo.DB.Where("user_id = ? AND report_id = ?", userID, reportID).
-        First(bookmark).Error
+	return repo.DB.Where("user_id = ? AND report_id = ?", userID, reportID).
+		First(bookmark).Error
 }
 
 func (repo *incidentReportRepo) SaveBookmark(bookmark *models.Bookmark) error {
@@ -1229,7 +1228,6 @@ func (i *incidentReportRepo) UpdateIncidentReport(report *models.IncidentReport)
 		existingReport.SubReportType = report.SubReportType
 		existingReport.UpvoteCount = report.UpvoteCount
 		existingReport.DownvoteCount = report.DownvoteCount
-		log.Printf("Existing Report before savexxxxxxxxxx: %+v", existingReport)
 
 		// Save the updated report to the database.
 		if err := tx.Save(&existingReport).Error; err != nil {
@@ -1408,9 +1406,67 @@ func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error
 }
 
 func (repo *incidentReportRepo) ReportExists(reportID uuid.UUID) (bool, error) {
+	var count int64
+	err := repo.DB.Model(&models.IncidentReport{}).
+		Where("id = ?", reportID).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (repo *incidentReportRepo) UpdateBlockRequest(ctx context.Context, reportID uuid.UUID) error {
+    // Start a transaction to ensure data integrity
+    tx := repo.DB.Begin()
+    if tx.Error != nil {
+        log.Printf("error starting transaction: %v", tx.Error)
+        return errors.New("failed to initiate transaction")
+    }
+
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+            log.Printf("transaction rolled back due to panic: %v", r)
+        }
+    }()
+
+    // Step 1: Verify that the incident report exists
     var count int64
-    err := repo.DB.Model(&models.IncidentReport{}).
+    err := tx.Model(&models.IncidentReport{}).Where("id = ?", reportID).Count(&count).Error
+    if err != nil {
+        tx.Rollback()
+        log.Printf("error checking existence of incident report with id %v: %v", reportID, err)
+        return errors.New("failed to verify incident report existence")
+    }
+    if count == 0 {
+        tx.Rollback()
+        log.Printf("incident report with id %v not found", reportID)
+        return errors.New("incident report not found")
+    }
+
+    // Step 2: Update the BlockRequest field
+    result := tx.Model(&models.IncidentReport{}).
         Where("id = ?", reportID).
-        Count(&count).Error
-    return count > 0, err
+        Update("block_request", "true")
+
+    if result.Error != nil {
+        tx.Rollback()
+        log.Printf("error updating block_request for report id %v: %v", reportID, result.Error)
+        return errors.New("failed to update block request")
+    }
+
+    // Step 3: Confirm that an update occurred
+    if result.RowsAffected == 0 {
+        tx.Rollback()
+        log.Printf("no rows affected when updating block_request for report id %v", reportID)
+        return errors.New("no update occurred, report may not exist")
+    }
+
+    // Step 4: Commit the transaction if successful
+    if err = tx.Commit().Error; err != nil {
+        log.Printf("error committing transaction for report id %v: %v", reportID, err)
+        return errors.New("failed to commit transaction")
+    }
+
+    // Log success message and return nil for successful update
+    log.Printf("successfully updated block_request to true for report id %v", reportID)
+    return nil
 }

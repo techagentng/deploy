@@ -60,13 +60,13 @@ func (s *Server) setupRouter() *gin.Engine {
 	// }
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://citizenx.ng", "http://localhost:3000", "https://citizenx-9hk2.onrender.com", "https://www.citizenx-9hk2.onrender.com", "https://www.citizenx.ng"}, 
+		AllowOrigins:     []string{"https://citizenx.ng", "http://localhost:3000", "https://citizenx-9hk2.onrender.com", "https://www.citizenx-9hk2.onrender.com", "https://www.citizenx.ng"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-	
+
 	r.MaxMultipartMemory = 32 << 20
 	s.defineRoutes(r)
 
@@ -95,6 +95,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.POST("/report-type/states", s.HandleGetVariadicBarChart())
 	apirouter.GET("/all/publications", s.HandleGetAllPosts())
 	apirouter.GET("/publication/:id", s.GetPostByID())
+	apirouter.GET("/incident-report/block-request/:post_id", s.UpdateBlockRequestHandler())
 
 	authorized := apirouter.Group("/")
 	authorized.Use(s.Authorize())

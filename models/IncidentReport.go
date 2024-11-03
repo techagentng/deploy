@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 )
+
 type IncidentReport struct {
 	ID                   uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"` // Update to UUID type
 	CreatedAt            int64      `json:"created_at"`
@@ -34,6 +35,7 @@ type IncidentReport struct {
 	IsResponse           bool       `json:"is_response"`
 	TimeofIncidence      time.Time  `json:"time_of_incidence"`
 	ReportStatus         string     `json:"report_status"`
+	BlockRequest         string     `json:"block_request"`
 	RewardPoint          int        `json:"reward_point"`
 	RewardAccountNumber  string     `json:"reward_account_number"`
 	ActionTypeName       string     `json:"action_type_name"`
@@ -60,8 +62,8 @@ type IncidentReport struct {
 	SubReportType        string     `json:"sub_report_type"`
 	UpvoteCount          int        `json:"upvote_count" gorm:"default:0"`
 	DownvoteCount        int        `json:"downvote_count" gorm:"default:0"`
-	ReportTypeID      uuid.UUID   `json:"report_type_id" gorm:"not null"` 
-	ReportType        ReportType  `gorm:"foreignKey:ReportTypeID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"` 
+	ReportTypeID         uuid.UUID  `json:"report_type_id" gorm:"not null"`
+	ReportType           ReportType `gorm:"foreignKey:ReportTypeID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }
 type ReportCount struct {
 	StateName string

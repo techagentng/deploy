@@ -7,27 +7,26 @@ import (
 )
 
 type ReportType struct {
-    ID                   uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
-    UserID               uint             `json:"user_id"`
-    IncidentReportID     uuid.UUID        `json:"incident_report_id"`
-	IncidentReports []IncidentReport `gorm:"foreignKey:ReportTypeID;references:ID"`
-    Category             string           `json:"category" binding:"required"`
-    StateName            string           `json:"state_name"`
-    LGAName              string           `json:"lga_name"`
-    IncidentReportRating string           `json:"incident_report_rating"`
-    DateOfIncidence      time.Time        `json:"date_of_incidence"`
-    SubReports           []SubReport      `gorm:"foreignKey:ReportTypeID"`
-    CreatedAt            time.Time        `gorm:"autoCreateTime" json:"created_at"`
+	ID                   uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID               uint             `json:"user_id"`
+	IncidentReportID     uuid.UUID        `json:"incident_report_id"`
+	IncidentReports      []IncidentReport `gorm:"foreignKey:ReportTypeID;references:ID"`
+	Category             string           `json:"category" binding:"required"`
+	StateName            string           `json:"state_name"`
+	LGAName              string           `json:"lga_name"`
+	IncidentReportRating string           `json:"incident_report_rating"`
+	DateOfIncidence      time.Time        `json:"date_of_incidence"`
+	SubReports           []SubReport      `gorm:"foreignKey:ReportTypeID"`
+	CreatedAt            time.Time        `gorm:"autoCreateTime" json:"created_at"`
 }
 
-
 type SubReport struct {
-    ID            uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
-    ReportTypeID  uuid.UUID `gorm:"type:uuid;not null" json:"report_type_id"`  
-    SubReportType string    `json:"sub_report_type"`
-    Description   string    `json:"description"`
-    ReportType    ReportType `gorm:"foreignKey:ReportTypeID"`  
-	IncidentReportID uuid.UUID `json:"incident_report_id"`
+	ID               uuid.UUID  `gorm:"type:uuid;primary_key" json:"id"`
+	ReportTypeID     uuid.UUID  `gorm:"type:uuid;not null" json:"report_type_id"`
+	SubReportType    string     `json:"sub_report_type"`
+	Description      string     `json:"description"`
+	ReportType       ReportType `gorm:"foreignKey:ReportTypeID"`
+	IncidentReportID uuid.UUID  `json:"incident_report_id"`
 }
 
 type RatingPercentage struct {

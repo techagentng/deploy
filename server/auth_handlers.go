@@ -464,16 +464,12 @@ type AuthRequest struct {
 	email string `json:"email"`
 }
 
-// AccessTokenDuration represents the default duration for access tokens.
 var AccessTokenDuration = 15 * time.Minute
 
-// RefreshTokenDuration represents the default duration for refresh tokens.
 var RefreshTokenDuration = 7 * 24 * time.Hour
 
-// Generate a token (access or refresh)
 func generateToken() string {
-	// Create a byte slice to hold the random bytes
-	tokenBytes := make([]byte, 32) // You can adjust the token length as needed
+	tokenBytes := make([]byte, 32)
 
 	// Read random bytes into the slice
 	_, err := rand.Read(tokenBytes)
@@ -481,31 +477,20 @@ func generateToken() string {
 		// Handle error
 		return ""
 	}
-
-	// Encode the random bytes to base64 to generate a token string
 	token := base64.URLEncoding.EncodeToString(tokenBytes)
 	return token
 }
 
-// AddAccessToken is a functional option to add an access token to the authentication payload.
 func AddAccessToken(duration time.Duration) func(*AuthPayload) {
 	return func(payload *AuthPayload) {
 		payload.AccessTokenExpiration = time.Now().Add(duration)
-		// Generate the access token here and set it in the payload
 		payload.AccessToken = generateToken()
 	}
 }
 
-// AddRefreshTokenSessionEntry is a functional option to add a refresh token session entry.
 func AddRefreshTokenSessionEntry(c context.Context, duration time.Duration) func(*AuthPayload) error {
 	return func(payload *AuthPayload) error {
 		refreshToken := generateToken()
-		// Store the refresh token session entry
-		// err := store.StoreRefreshTokenSession(c, refreshToken, duration)
-		// if err != nil {
-		//     return err
-		// }
-		// Set the refresh token in the payload
 		payload.RefreshToken = refreshToken
 		return nil
 	}

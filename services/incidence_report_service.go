@@ -3,13 +3,13 @@ package services
 import (
 	"errors"
 	"fmt"
-	"math"
-	"strings"
-    "github.com/google/uuid"
+	"github.com/google/uuid"
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
+	"math"
+	"strings"
 )
 
 type IncidentReportService interface {
@@ -134,8 +134,8 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 		UserFullname:         savedReport.UserFullname,
 		UserUsername:         savedReport.UserUsername,
 		ThumbnailURLs:        savedReport.ThumbnailURLs,
-		StateName: savedReport.StateName,
-		LGAName: savedReport.LGAName,
+		StateName:            savedReport.StateName,
+		LGAName:              savedReport.LGAName,
 	}
 
 	return reportResponse, nil
@@ -203,38 +203,37 @@ func (s *IncidentService) GetNamesByCategory(stateName string, lgaID string, rep
 }
 
 func (s *IncidentService) BookmarkReport(userID uint, reportID uuid.UUID) error {
-    // First check if the report exists
-    exists, err := s.incidentRepo.ReportExists(reportID)
-    if err != nil {
-        return err
-    }
-    if !exists {
-        return errors.New("report not found")
-    }
+	// First check if the report exists
+	exists, err := s.incidentRepo.ReportExists(reportID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errors.New("report not found")
+	}
 
-    // Check if the report is already bookmarked by the user
-    var bookmark models.Bookmark
-    err = s.incidentRepo.IsBookmarked(userID, reportID, &bookmark)
-    if err == nil {
-        // Report is already bookmarked
-        return errors.New("report already bookmarked")
-    }
-    
-    // Only proceed if the error was "record not found"
-    if err != gorm.ErrRecordNotFound {
-        return err // Return any other unexpected errors
-    }
+	// Check if the report is already bookmarked by the user
+	var bookmark models.Bookmark
+	err = s.incidentRepo.IsBookmarked(userID, reportID, &bookmark)
+	if err == nil {
+		// Report is already bookmarked
+		return errors.New("report already bookmarked")
+	}
 
-    // Create a new bookmark
-    newBookmark := models.Bookmark{
-        UserID:   userID,
-        ReportID: reportID,
-    }
+	// Only proceed if the error was "record not found"
+	if err != gorm.ErrRecordNotFound {
+		return err // Return any other unexpected errors
+	}
 
-    // Save the bookmark
-    return s.incidentRepo.SaveBookmark(&newBookmark)
+	// Create a new bookmark
+	newBookmark := models.Bookmark{
+		UserID:   userID,
+		ReportID: reportID,
+	}
+
+	// Save the bookmark
+	return s.incidentRepo.SaveBookmark(&newBookmark)
 }
-
 
 func (s *IncidentService) GetBookmarkedReports(userID uint) ([]models.IncidentReport, error) {
 	// Call the repository method to get the bookmarked reports
