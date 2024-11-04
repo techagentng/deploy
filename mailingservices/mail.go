@@ -59,7 +59,7 @@ func (mail *Mailgun) SendVerifyAccount(userEmail, link string) (string, error) {
 	return res, errr
 }
 
-func (mail *Mailgun) SendResetPassword(userEmail, link string) (string, error) {
+func (mail *Mailgun) SendResetPassword(userEmail, live string) (string, error) {
 	EmailFrom := os.Getenv("MG_EMAIL_FROM")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -71,7 +71,7 @@ func (mail *Mailgun) SendResetPassword(userEmail, link string) (string, error) {
 		return "", err
 	}
 
-	err := m.AddVariable("link", link)
+	err := m.AddVariable("live", live)
 	if err != nil {
 		return "", err
 	}
