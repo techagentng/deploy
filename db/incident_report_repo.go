@@ -1470,3 +1470,23 @@ func (repo *incidentReportRepo) UpdateBlockRequest(ctx context.Context, reportID
     log.Printf("successfully updated block_request to true for report id %v", reportID)
     return nil
 }
+
+// ReportUser sets the IsQueried field to true.
+func (repo *incidentReportRepo) ReportUser(ctx context.Context, userID uuid.UUID) error {
+	result := repo.DB.Model(&models.User{}).Where("id = ?", userID).
+		Update("is_queried", true)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
+// BlockUser sets the IsBlocked field to true.
+func (repo *incidentReportRepo) BlockUser(ctx context.Context, userID uuid.UUID) error {
+	result := repo.DB.Model(&models.User{}).Where("id = ?", userID).
+		Update("is_blocked", true)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}

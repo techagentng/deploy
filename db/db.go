@@ -92,6 +92,7 @@ func migrate(db *gorm.DB) error {
 		&models.Role{},
 		&models.Post{},
 		&models.ReportPostRequest{},
+		&models.ReportUserRequest{},
 	)
 	if err != nil {
 		return fmt.Errorf("migrations error: %v", err)

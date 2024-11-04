@@ -26,6 +26,8 @@ type User struct {
 	Username          string            `json:"username" binding:"required,min=2"`
 	Telephone         string            `json:"telephone" gorm:"unique;default:null" binding:"required"`
 	Email             string            `json:"email" gorm:"unique;not null" binding:"required,email"`
+	IsQueried bool      `json:"is_queried" gorm:"default:false"`
+	IsBlocked bool      `json:"is_blocked" gorm:"default:false"`
 	Password          string            `json:"password,omitempty" gorm:"-"`
 	HashedPassword    string            `json:"-"`
 	IsEmailActive     bool              `json:"-"`
@@ -45,6 +47,11 @@ type User struct {
 	RoleID            uuid.UUID         `gorm:"type:uuid" json:"role_id"`
 	Role              Role              `gorm:"foreignKey:RoleID" json:"role"`
 	BookmarkedReports []*IncidentReport `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
+}
+
+type ReportUserRequest struct {
+	UserID  uuid.UUID `json:"user_id" binding:"required"`
+	Message string    `json:"message" binding:"required"`
 }
 
 type Admin struct {
