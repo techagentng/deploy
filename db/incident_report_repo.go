@@ -86,6 +86,8 @@ type IncidentReportRepository interface {
 	GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error)
 	ReportExists(reportID uuid.UUID) (bool, error)
 	UpdateBlockRequest(ctx context.Context, reportID uuid.UUID) error
+	BlockUser(ctx context.Context, userID uint) error
+	ReportUser(ctx context.Context, userID uint) error
 }
 
 type incidentReportRepo struct {
@@ -1472,7 +1474,7 @@ func (repo *incidentReportRepo) UpdateBlockRequest(ctx context.Context, reportID
 }
 
 // ReportUser sets the IsQueried field to true.
-func (repo *incidentReportRepo) ReportUser(ctx context.Context, userID uuid.UUID) error {
+func (repo *incidentReportRepo) ReportUser(ctx context.Context, userID uint) error {
 	result := repo.DB.Model(&models.User{}).Where("id = ?", userID).
 		Update("is_queried", true)
 	if result.Error != nil {
@@ -1482,7 +1484,7 @@ func (repo *incidentReportRepo) ReportUser(ctx context.Context, userID uuid.UUID
 }
 
 // BlockUser sets the IsBlocked field to true.
-func (repo *incidentReportRepo) BlockUser(ctx context.Context, userID uuid.UUID) error {
+func (repo *incidentReportRepo) BlockUser(ctx context.Context, userID uint) error {
 	result := repo.DB.Model(&models.User{}).Where("id = ?", userID).
 		Update("is_blocked", true)
 	if result.Error != nil {

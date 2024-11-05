@@ -148,4 +148,6 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("reports/filters", s.handleGetReportsByFilters())
 	authorized.POST("posts/create", s.handleCreatePost())
 	authorized.GET("/all/posts/:userID", s.handleGetPostsByUserID())
+	authorized.PUT("/users/report/:userID", s.ReportUserHandler())
+	authorized.PUT("/users/block/:userID", s.BlockUserHandler())
 }

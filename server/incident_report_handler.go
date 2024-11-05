@@ -22,6 +22,7 @@ import (
 	"github.com/techagentng/citizenx/errors"
 	"github.com/techagentng/citizenx/models"
 	"github.com/techagentng/citizenx/server/response"
+	jwtPackage "github.com/techagentng/citizenx/services/jwt"
 	"gorm.io/gorm"
 )
 
@@ -1570,5 +1571,66 @@ func (s *Server) UpdateBlockRequestHandler() gin.HandlerFunc {
 			"report_id":  reportID,
 			"user_message": payload.Message,
 		})
+	}
+}
+
+func (s *Server) BlockUserHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get user ID from URL parameters and parse it as uint
+		userIDStr := c.Param("userID")
+		userID, err := strconv.ParseUint(userIDStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
+			return
+		}
+
+		// Convert userID to uint
+		uintUserID := uint(userID)
+
+		// Call the BlockUser function
+		if err := s.IncidentReportRepository.BlockUser(c.Request.Context(), uintUserID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to block user"})
+			return
+		}
+
+		// Respond with success message
+		c.JSON(http.StatusOK, gin.H{"message": "user blocked successfully"})
+	}
+}
+
+func (s *Server) ReportUserHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get the access token from the authorization header
+		accessToken := getTokenFromHeader(c)
+		if accessToken == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		// Validate and decode the access token to get the userID
+		secret := s.Config.JWTSecret
+		accessClaims, err := jwtPackage.ValidateAndGetClaims(accessToken, secret)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		// Parse userID from the access claims as a uint
+		var userID uint
+		if id, ok := accessClaims["id"].(float64); ok {
+			userID = uint(id)
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid userID format"})
+			return
+		}
+
+		// Set the is_queried field of the user to true
+		if err := s.IncidentReportRepository.ReportUser(c.Request.Context(), userID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to report user"})
+			return
+		}
+
+		// Respond with success message
+		c.JSON(http.StatusOK, gin.H{"message": "User reported successfully"})
 	}
 }
