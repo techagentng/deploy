@@ -66,7 +66,7 @@ func (mail *Mailgun) SendResetPassword(userEmail, live string) (string, error) {
 	defer cancel()
 
 	m := mail.Client.NewMessage(EmailFrom, "Reset Password", "")
-	m.SetTemplate("reset_password")
+	m.SetTemplate("live")
 	if err := m.AddRecipient(userEmail); err != nil {
 		return "", err
 	}
