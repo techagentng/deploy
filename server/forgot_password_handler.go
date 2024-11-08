@@ -66,44 +66,47 @@ type ResetPasswordRequest struct {
 
 // ResetPasswordHandler handles the reset password request
 func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Step 1: Parse and validate the request
-		var req ResetPasswordRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+    return func(c *gin.Context) {
+        // Step 1: Get token from URL parameter
+        token := c.Param("token")
 
-		// Step 2: Validate the reset token
-		claims, err := utils.VerifyResetToken(req.Token)
-		if err != nil || time.Now().After(time.Unix(claims.ExpiresAt, 0)) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired token"})
-			return
-		}
+        // Parse and validate the request body for the new password
+        var req ResetPasswordRequest
+        if err := c.ShouldBindJSON(&req); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+            return
+        }
 
-		// Step 3: Find the user associated with the token
-		user, err := s.AuthRepository.FindUserByEmail(claims.Email)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-			return
-		}
+        // Step 2: Validate the reset token
+        claims, err := utils.VerifyResetToken(token)
+        if err != nil || time.Now().After(time.Unix(claims.ExpiresAt, 0)) {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired token"})
+            return
+        }
 
-		// Step 4: Hash the new password
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
-			return
-		}
+        // Step 3: Find the user associated with the token
+        user, err := s.AuthRepository.FindUserByEmail(claims.Email)
+        if err != nil {
+            c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+            return
+        }
 
-		// Step 5: Update the user's password in the database
-		if err := s.AuthRepository.UpdateUserPassword(user, string(hashedPassword)); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update password"})
-			return
-		}
+        // Step 4: Hash the new password
+        hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
+            return
+        }
 
-		// Step 6: Respond with success
-		c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
-	}
+        // Step 5: Update the user's password in the database
+        if err := s.AuthRepository.UpdateUserPassword(user, string(hashedPassword)); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update password"})
+            return
+        }
+
+        // Step 6: Respond with success
+        c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
+    }
 }
 
 type TokenClaims struct {
