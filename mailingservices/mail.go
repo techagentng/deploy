@@ -12,7 +12,7 @@ type Mailgun struct {
 }
 
 type Mailer interface {
-	SendSimpleMessage(UserEmail, EmailSubject, EmailBody string) (string, error)
+	SendWelcomeMessage(userEmail, link string) (string, error)
 	SendVerifyAccount(userEmail, link string) (string, error)
 	SendResetPassword(userEmail, link string) (string, error)
 }
@@ -23,17 +23,21 @@ func (mail *Mailgun) Init() {
 	mail.Client = mailgun.NewMailgun(domain, apiKey)
 }
 
-func (mail Mailgun) SendSimpleMessage(UserEmail, EmailSubject, EmailBody string) (string, error) {
+func (mail Mailgun) SendWelcomeMessage(userEmail, link string) (string, error) {
 	EmailFrom := os.Getenv("MG_EMAIL_FROM")
 
-	m := mail.Client.NewMessage(EmailFrom, EmailSubject, EmailBody, UserEmail)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	res, _, err := mail.Client.Send(ctx, m)
-	if err != nil {
+	m := mail.Client.NewMessage(EmailFrom, "Welcome to CX", "")
+	m.SetTemplate("welcome")
+	if err := m.AddRecipient(userEmail); err != nil {
 		return "", err
+	}
+
+	res, _, errr := mail.Client.Send(ctx, m)
+	if errr != nil {
+		return "", errr
 	}
 	return res, nil
 }

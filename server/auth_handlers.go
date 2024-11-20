@@ -281,9 +281,19 @@ func (s *Server) handleSignup() gin.HandlerFunc {
 			return
 		}
 
+		// Send welcome email
+		subject := "Welcome to Our Platform!"
+
+		_, err = s.Mail.SendWelcomeMessage(user.Email, subject)
+		if err != nil {
+			log.Printf("Error sending welcome email: %v", err)
+			// Log the error but do not interrupt the signup flow
+		}
+
 		response.JSON(c, "Signup successful, check your email for verification", http.StatusCreated, userResponse, nil)
 	}
 }
+
 
 // Middleware to redirect non-credential users to sign-in page for certain actions
 func (s *Server) handleNonCredentialLogin() gin.HandlerFunc {
