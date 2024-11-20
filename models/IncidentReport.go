@@ -110,9 +110,9 @@ type IncidentReportResponseData struct {
 }
 
 type ReportPostRequest struct {
-    ReportTypeID int    `json:"report_type_id"`
-    SubReportID  int    `json:"sub_report_id"`
-    UserID       int    `json:"user_id"`
-    Description  string `json:"description"`
-    Message      string `json:"message"`
+	ReportTypeID int    `json:"report_type_id"`
+	SubReportID  int    `json:"sub_report_id"`
+	UserID       int    `json:"user_id"`
+	Description  string `json:"description"`
+	Message      string `json:"message"`
 }

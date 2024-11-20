@@ -9,14 +9,9 @@ import (
 	goval "github.com/go-passwd/validator"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-
-	// "github.com/go-playground/locales/en"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
-
-	// enTranslations "github.com/go-playground/validator/v10"
 	"github.com/leebenson/conform"
-	// "golang.org/x/crypto/bcrypt"
 )
 
 // User represents a user of the application
@@ -26,8 +21,8 @@ type User struct {
 	Username          string            `json:"username" binding:"required,min=2"`
 	Telephone         string            `json:"telephone" gorm:"unique;default:null" binding:"required"`
 	Email             string            `json:"email" gorm:"unique;not null" binding:"required,email"`
-	IsQueried bool      `json:"is_queried" gorm:"default:false"`
-	IsBlocked bool      `json:"is_blocked" gorm:"default:false"`
+	IsQueried         bool              `json:"is_queried" gorm:"default:false"`
+	IsBlocked         bool              `json:"is_blocked" gorm:"default:false"`
 	Password          string            `json:"password,omitempty" gorm:"-"`
 	HashedPassword    string            `json:"-"`
 	IsEmailActive     bool              `json:"-"`

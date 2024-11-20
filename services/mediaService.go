@@ -19,9 +19,12 @@ import (
 	"sync"
 	"time"
 
+	// "github.com/aws/aws-sdk-go-v2/aws"
+	// "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/nfnt/resize"
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
 	"github.com/techagentng/citizenx/models"
@@ -30,6 +33,18 @@ import (
 type MediaService interface {
 	ProcessMedia(c *gin.Context, formMedia []*multipart.FileHeader, userID uint, reportID string) ([]string, []string, []string, []string, error)
 	SaveMedia(media models.Media, reportID string, userID uint, imageCount int, videoCount int, audioCount int, totalPoints int) error
+	ProcessSingleMedia(mediaFile *multipart.FileHeader, userID uint, reportID string) (string, string, string, error)
+	downloadVideo(feedURL string) (string, error)
+	generateThumbnailFromVideo(videoFilePath string) (string, error)
+	UploadThumbnailToStorage(thumbnailPath, bucketName, folderName string) (string, error)
+	GenerateThumbnail(feedURL string) (string, error)
+	captureThumbnail(videoFilePath string) (string, error)
+	ProcessVideoFile(mediaFile *multipart.FileHeader, userID uint, reportIDStr string) (string, string, string, error)
+	SaveToStorage(file multipart.File, fileName, bucketName, folderName string) error
+	GenerateVideoThumbnail(file multipart.File, outputPath string) error
+	// GenerateImageThumbnail(file multipart.File, thumbnailPath string) error
+	ProcessImageFile(mediaFile *multipart.FileHeader, userID uint, reportIDStr string) (string, string, string, error)
+	GenerateImageThumbnail(mediaFile *multipart.FileHeader, thumbnailPath string) error
 }
 
 type mediaService struct {
@@ -561,3 +576,474 @@ func processAndStoreAudio(fileBytes []byte) (string, string, error) {
 
 	return audioDestPath, "audio", nil
 }
+
+// ProcessSingleMedia processes a single media file and returns URLs for different formats.
+func (m *mediaService) ProcessSingleMedia(mediaFile *multipart.FileHeader, userID uint, reportID string) (string, string, string, error) {
+	// Open the media file
+	file, err := mediaFile.Open()
+	if err != nil {
+		return "", "", "", fmt.Errorf("unable to open media file: %w", err)
+	}
+	defer file.Close()
+
+	// Define buffer size for content type detection
+	const bufferSize = 512
+	buffer := make([]byte, bufferSize)
+
+	// Read the first 512 bytes of the file for MIME type detection
+	_, err = file.Read(buffer)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to read file for content type detection: %w", err)
+	}
+
+	// Detect content type
+	fileType := http.DetectContentType(buffer)
+	fileSize := mediaFile.Size
+
+	// Reset file position to the beginning after reading
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to reset file read position: %w", err)
+	}
+
+	var feedURL, thumbnailURL, fullsizeURL string
+
+	// Image processing
+	if strings.HasPrefix(fileType, "image") {
+		if fileSize > 10*1024*1024 { // Example limit of 10MB for images
+			return "", "", "", fmt.Errorf("image file size exceeds limit")
+		}
+		// Retrieve the bucket name from environment variables
+		bucketName := os.Getenv("AWS_BUCKET")
+		if bucketName == "" {
+			return "", "", "", fmt.Errorf("AWS_BUCKET environment variable is not set")
+		}
+
+		folderName := "media"
+
+		feedURL, err = m.mediaRepo.UploadMediaToS3(file, mediaFile, bucketName, folderName)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to upload feed image: %w", err)
+		}
+
+		// Generate thumbnail for the image
+		thumbnailURL, err = m.GenerateThumbnail(feedURL)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to create thumbnail: %w", err)
+		}
+
+		fullsizeURL = feedURL // Assuming full-size is the original uploaded image URL
+
+		// Video processing
+	} else if strings.HasPrefix(fileType, "video") {
+		if fileSize > 80*1024*1024 { // Example limit of 80MB for videos
+			return "", "", "", fmt.Errorf("video file size exceeds limit")
+		}
+
+		// Retrieve the bucket name from environment variables
+		bucketName := os.Getenv("AWS_BUCKET")
+		if bucketName == "" {
+			return "", "", "", fmt.Errorf("AWS_BUCKET environment variable is not set")
+		}
+
+		// Define folder name for video upload (e.g., "videos")
+		folderName := "videos"
+
+		// Upload video to S3 and get feed URL
+		feedURL, err := m.mediaRepo.UploadMediaToS3(file, mediaFile, bucketName, folderName)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to upload feed video: %w", err)
+		}
+
+		// Extract video thumbnail
+		thumbnailURL, err = m.ExtractVideoThumbnail(feedURL)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to extract video thumbnail: %w", err)
+		}
+
+		fullsizeURL = feedURL // Use feed URL as full-size video URL
+
+	} else {
+		return "", "", "", fmt.Errorf("unsupported file type: %s", fileType)
+	}
+
+	// Return the generated URLs
+	return feedURL, thumbnailURL, fullsizeURL, nil
+}
+
+func (m *mediaService) downloadVideo(feedURL string) (string, error) {
+	// Create a temporary file for the video
+	tempFile, err := os.CreateTemp("", "video-*.mp4")
+	if err != nil {
+		return "", fmt.Errorf("unable to create temp file for video: %w", err)
+	}
+	defer tempFile.Close()
+
+	// Download the video
+	resp, err := http.Get(feedURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download video: %w", err)
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(tempFile, resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to save video to file: %w", err)
+	}
+
+	return tempFile.Name(), nil
+}
+
+func (m *mediaService) generateThumbnailFromVideo(videoFilePath string) (string, error) {
+	// Create a temporary file for the thumbnail
+	thumbnailPath := strings.Replace(videoFilePath, ".mp4", "_thumbnail.jpg", 1)
+
+	// Execute FFmpeg command to generate the thumbnail
+	cmd := exec.Command("ffmpeg", "-i", videoFilePath, "-ss", "00:00:01.000", "-vframes", "1", thumbnailPath)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to generate thumbnail with FFmpeg: %w", err)
+	}
+
+	return thumbnailPath, nil
+}
+
+func (m *mediaService) UploadThumbnailToStorage(thumbnailPath, bucketName, folderName string) (string, error) {
+	// Open the thumbnail file
+	file, err := os.Open(thumbnailPath)
+	if err != nil {
+		return "", fmt.Errorf("unable to open thumbnail file: %v", err)
+	}
+	defer file.Close()
+
+	// Retrieve file info for creating FileHeader
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return "", fmt.Errorf("unable to get file info: %v", err)
+	}
+
+	// Create a FileHeader using the file's information
+	fileHeader := &multipart.FileHeader{
+		Filename: fileInfo.Name(),
+		Size:     fileInfo.Size(),
+	}
+
+	// Use UploadMediaToS3 to upload the thumbnail
+	thumbnailURL, err := m.mediaRepo.UploadMediaToS3(file, fileHeader, bucketName, folderName)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload thumbnail to S3: %v", err)
+	}
+
+	return thumbnailURL, nil
+}
+
+func (m *mediaService) ExtractVideoThumbnail(feedURL string) (string, error) {
+	// Step 1: Download the video from feedURL to a temporary local file
+	videoFilePath, err := m.downloadVideo(feedURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download video: %w", err)
+	}
+	defer os.Remove(videoFilePath) // Ensure the file is cleaned up afterward
+
+	// Step 2: Generate a thumbnail from the video file
+	thumbnailFilePath, err := m.generateThumbnailFromVideo(videoFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate thumbnail: %w", err)
+	}
+	defer os.Remove(thumbnailFilePath) // Clean up the thumbnail file after uploading
+
+	// Step 3: Upload the thumbnail to S3 or another storage service
+	thumbnailURL, err := m.uploadThumbnailToStorage(thumbnailFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload thumbnail: %w", err)
+	}
+
+	return thumbnailURL, nil
+}
+
+func (m *mediaService) GenerateThumbnail(feedURL string) (string, error) {
+	// Step 1: Download the video from feedURL to a temporary file
+	videoFilePath, err := m.downloadVideoFile(feedURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download video: %w", err)
+	}
+	defer os.Remove(videoFilePath) // Ensure the file is deleted after we're done
+
+	// Step 2: Generate a thumbnail from the video file
+	thumbnailFilePath, err := m.captureThumbnail(videoFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to capture thumbnail: %w", err)
+	}
+	defer os.Remove(thumbnailFilePath) // Ensure the thumbnail file is deleted after upload
+
+	// Step 3: Upload the thumbnail to storage and get its URL
+	thumbnailURL, err := m.uploadThumbnailToStorage(thumbnailFilePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload thumbnail: %w", err)
+	}
+
+	// Return the URL of the uploaded thumbnail
+	return thumbnailURL, nil
+}
+
+func (m *mediaService) downloadVideoFile(feedURL string) (string, error) {
+	// Create a temporary file to store the video
+	tempFile, err := os.CreateTemp("", "video-*.mp4")
+	if err != nil {
+		return "", fmt.Errorf("unable to create temp file for video: %w", err)
+	}
+	defer tempFile.Close()
+
+	// Download the video content
+	resp, err := http.Get(feedURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download video from URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Write the downloaded video to the temporary file
+	_, err = io.Copy(tempFile, resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to save video to file: %w", err)
+	}
+
+	return tempFile.Name(), nil
+}
+
+func (m *mediaService) captureThumbnail(videoFilePath string) (string, error) {
+	// Define a path for the generated thumbnail
+	thumbnailPath := strings.Replace(videoFilePath, ".mp4", "_thumbnail.jpg", 1)
+
+	// Use FFmpeg to capture a frame at the 1-second mark as a thumbnail
+	cmd := exec.Command("ffmpeg", "-i", videoFilePath, "-ss", "00:00:01.000", "-vframes", "1", thumbnailPath)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("FFmpeg failed to generate thumbnail: %w", err)
+	}
+
+	return thumbnailPath, nil
+}
+
+// ProcessVideoFile processes a video file, generates a feed URL, a thumbnail, and a full-size URL.
+func (m *mediaService) ProcessVideoFile(mediaFile *multipart.FileHeader, userID uint, reportIDStr string) (string, string, string, error) {
+    // Open the video file
+    file, err := mediaFile.Open()
+    if err != nil {
+        log.Printf("Error opening video file: %v", err)
+        return "", "", "", fmt.Errorf("error opening video file: %v", err)
+    }
+    defer file.Close()
+
+    // Define the file storage paths and URLs
+    videoFileName := fmt.Sprintf("%d_%s", userID, mediaFile.Filename)
+    feedURL := fmt.Sprintf("https://yourstorage.com/feed/%s", videoFileName)
+    fullSizeURL := fmt.Sprintf("https://yourstorage.com/fullsize/%s", videoFileName)
+    thumbnailFileName := fmt.Sprintf("%d_%s_thumbnail.jpg", userID, reportIDStr)
+    thumbnailURL := fmt.Sprintf("https://yourstorage.com/thumbnails/%s", thumbnailFileName)
+
+    // Example bucket and folder names
+    bucketName := os.Getenv("AWS_BUCKET")
+    folderName := "media"  // Replace with your desired folder name in the bucket
+
+    // Save the original video file to storage (Ensure file stream is handled properly)
+    if err := m.SaveToStorage(file, videoFileName, bucketName, folderName); err != nil {
+        log.Printf("Error saving video to storage: %v", err)
+        return "", "", "", fmt.Errorf("error saving video to storage: %v", err)
+    }
+
+    // Generate a thumbnail using FFmpeg (only if FFmpeg is installed and configured)
+    thumbnailPath := fmt.Sprintf("/tmp/%s", thumbnailFileName) // temporary path for processing
+    if err := m.GenerateVideoThumbnail(file, thumbnailPath); err != nil {
+        log.Printf("Error generating video thumbnail: %v", err)
+        return "", "", "", fmt.Errorf("error generating video thumbnail: %v", err)
+    }
+
+    // Upload the thumbnail to storage and get the URL
+    thumbnailURL, err = m.UploadThumbnailToStorage(thumbnailPath, bucketName, folderName)
+    if err != nil {
+        log.Printf("Error uploading thumbnail: %v", err)
+        return "", "", "", fmt.Errorf("error uploading thumbnail: %v", err)
+    }
+
+    // Remove the temporary thumbnail file
+    if err := os.Remove(thumbnailPath); err != nil {
+        log.Printf("Error deleting temporary thumbnail file: %v", err)
+    }
+
+    // Construct the correct URLs for the video and thumbnail
+    feedURL = fmt.Sprintf("https://%s.s3.amazonaws.com/%s/%s", bucketName, folderName, videoFileName)
+    thumbnailURL = fmt.Sprintf("https://%s.s3.amazonaws.com/%s/%s", bucketName, folderName, thumbnailFileName)
+    fullSizeURL = fmt.Sprintf("https://%s.s3.amazonaws.com/%s/%s", bucketName, folderName, videoFileName)
+
+    log.Printf("Processed video file successfully: %s", mediaFile.Filename)
+
+    return feedURL, thumbnailURL, fullSizeURL, nil
+}
+
+
+
+func (m *mediaService) SaveToStorage(file multipart.File, fileName, bucketName, folderName string) error {
+	// Upload file to S3 using the repository method
+	fileURL, err := m.mediaRepo.UploadMediaToS3(file, &multipart.FileHeader{Filename: fileName}, bucketName, folderName)
+	if err != nil {
+		return fmt.Errorf("error uploading file to S3: %v", err)
+	}
+
+	// Log the file URL
+	log.Printf("File successfully uploaded to S3: %s", fileURL)
+
+	// You can return the file URL or save it to the database if needed
+	return nil
+}
+
+func (m *mediaService) GenerateVideoThumbnail(file multipart.File, outputPath string) error {
+    // Use FFmpeg command to extract a thumbnail at a specified time (e.g., 1 second)
+    cmd := exec.Command("ffmpeg", "-i", "/dev/stdin", "-ss", "00:00:01", "-vframes", "1", outputPath)
+    cmd.Stdin = file
+    if err := cmd.Run(); err != nil {
+        return fmt.Errorf("failed to generate thumbnail: %w", err)
+    }
+    log.Printf("Generated thumbnail at %s", outputPath)
+    return nil
+}
+
+func (m *mediaService) uploadThumbnailToStorage(thumbnailFilePath string) (string, error) {
+	// Open the thumbnail file
+	file, err := os.Open(thumbnailFilePath)
+	if err != nil {
+		return "", fmt.Errorf("unable to open thumbnail file: %v", err)
+	}
+	defer file.Close()
+
+	// Retrieve file info for creating FileHeader
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return "", fmt.Errorf("unable to get file info: %v", err)
+	}
+
+	// Create a FileHeader using the file's information
+	fileHeader := &multipart.FileHeader{
+		Filename: fileInfo.Name(),
+		Size:     fileInfo.Size(),
+	}
+
+	// Get bucket and folder names from environment variables
+	bucketName := os.Getenv("BUCKET_NAME")
+	folderName := os.Getenv("FOLDER_NAME")
+
+	// Use UploadMediaToS3 to upload the thumbnail
+	thumbnailURL, err := m.mediaRepo.UploadMediaToS3(file, fileHeader, bucketName, folderName)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload thumbnail to S3: %v", err)
+	}
+
+	return thumbnailURL, nil
+}
+
+func (s *mediaService) ProcessImageFile(mediaFile *multipart.FileHeader, userID uint, reportIDStr string) (string, string, string, error) {
+    // Open the image file
+    file, err := mediaFile.Open()
+    if err != nil {
+        log.Printf("Error opening image file: %v", err)
+        return "", "", "", fmt.Errorf("error opening image file: %v", err)
+    }
+    defer file.Close()
+
+    // Sanitize and define file storage paths
+    sanitizedFilename := strings.ReplaceAll(mediaFile.Filename, " ", "_")
+    imageFileName := fmt.Sprintf("%d_%s", userID, sanitizedFilename)
+    feedURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", 
+        os.Getenv("AWS_BUCKET"), 
+        os.Getenv("AWS_REGION"), 
+        "media2", // Folder name in S3
+        imageFileName,
+    )
+    fullSizeURL := feedURL // Full-size image URL would be the same for now
+    thumbnailFileName := fmt.Sprintf("%d_%s_thumbnail.jpg", userID, reportIDStr)
+    thumbnailURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", 
+        os.Getenv("AWS_BUCKET"), 
+        os.Getenv("AWS_REGION"), 
+        "media2", // Folder name in S3
+        thumbnailFileName,
+    )
+
+    // Define S3 bucket and folder name
+    bucketName := os.Getenv("AWS_BUCKET") // Use the AWS_BUCKET environment variable
+    folderName := "media2"               // Folder name where the file will be stored in S3
+    
+    // Step 1: Save the original image file to S3 storage
+    if err := s.SaveToStorage(file, imageFileName, bucketName, folderName); err != nil {
+        log.Printf("Error saving image to storage: %v", err)
+        return "", "", "", fmt.Errorf("error saving image to storage: %v", err)
+    }
+
+    // Step 2: Generate a thumbnail for the image
+    // Ensure the directory for the thumbnail exists
+    thumbnailDir := "/tmp" // Temporary processing directory
+    if err := os.MkdirAll(thumbnailDir, os.ModePerm); err != nil {
+        log.Printf("Error creating thumbnail directory: %v", err)
+        return "", "", "", fmt.Errorf("error creating thumbnail directory: %v", err)
+    }
+
+    thumbnailPath := fmt.Sprintf("%s/%s", thumbnailDir, thumbnailFileName) // Full path for the thumbnail
+    if err := s.GenerateImageThumbnail(mediaFile, thumbnailPath); err != nil {
+        log.Printf("Error generating image thumbnail: %v", err)
+        return "", "", "", fmt.Errorf("error generating image thumbnail: %v", err)
+    }
+
+    // Step 3: Upload the thumbnail to S3 storage
+    thumbnailURL, err = s.UploadThumbnailToStorage(thumbnailPath, bucketName, folderName)
+    if err != nil {
+        log.Printf("Error uploading thumbnail: %v", err)
+        return "", "", "", fmt.Errorf("error uploading thumbnail: %v", err)
+    }
+
+    // Clean up the temporary thumbnail file
+    if err := os.Remove(thumbnailPath); err != nil {
+        log.Printf("Error deleting temporary thumbnail file: %v", err)
+    }
+
+    log.Printf("Processed image file successfully: %s", mediaFile.Filename)
+
+    return feedURL, thumbnailURL, fullSizeURL, nil
+}
+
+
+
+func (s *mediaService) GenerateImageThumbnail(mediaFile *multipart.FileHeader, thumbnailPath string) error {
+    // Open the file from the multipart.FileHeader
+    file, err := mediaFile.Open()
+    if err != nil {
+        log.Printf("Error opening media file: %v", err)
+        return fmt.Errorf("error opening media file: %v", err)
+    }
+    defer file.Close()
+
+    // Decode the image
+    img, _, err := image.Decode(file)
+    if err != nil {
+        log.Printf("Error decoding image: %v", err)
+        return fmt.Errorf("error decoding image: %v", err)
+    }
+
+    // Resize or process the image as needed (using an example thumbnail size)
+    thumbnail := resize.Resize(200, 0, img, resize.Lanczos3) // Requires github.com/nfnt/resize
+
+    // Create the thumbnail file
+    outFile, err := os.Create(thumbnailPath)
+    if err != nil {
+        log.Printf("Error creating thumbnail file: %v", err)
+        return fmt.Errorf("error creating thumbnail file: %v", err)
+    }
+    defer outFile.Close()
+
+    // Encode the thumbnail as a JPEG
+    if err := jpeg.Encode(outFile, thumbnail, nil); err != nil {
+        log.Printf("Error encoding thumbnail to JPEG: %v", err)
+        return fmt.Errorf("error encoding thumbnail to JPEG: %v", err)
+    }
+
+    log.Printf("Thumbnail generated successfully: %s", thumbnailPath)
+    return nil
+}
+
+
+

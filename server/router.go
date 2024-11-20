@@ -63,7 +63,7 @@ func (s *Server) setupRouter() *gin.Engine {
 		AllowOrigins:     []string{"https://citizenx.ng", "http://localhost:3000", "https://citizenx-9hk2.onrender.com", "https://www.citizenx-9hk2.onrender.com", "https://www.citizenx.ng"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
-		ExposeHeaders:    []string{"Content-Length"}, 
+		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -84,7 +84,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.POST("/no-cred/login", restrictAccessToProtectedRoutes(), s.handleNonCredentialLogin())
 	apirouter.GET("/fb/auth", s.handleFBLogin())
 	apirouter.GET("fb/callback", s.handleFBCallback())
-	apirouter.GET("/incident_reports", s.handleGetAllReport())
+	apirouter.GET("/incident_reports", s.handleGetAllReport()) //
 	apirouter.GET("/google/login", s.HandleGoogleLogin())
 	apirouter.GET("/auth/google/callback", s.HandleGoogleCallback())
 	apirouter.GET("/incident_reports/state/:state", s.handleGetAllReportsByState())
@@ -138,7 +138,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/report/sub_reports", s.HandleGetSubReportsByCategory())
 	authorized.PUT("/report/upvote/:reportID", s.HandleUpvoteReport())
 	authorized.PUT("/report/downvote/:reportID", s.HandleDownvoteReport())
-	authorized.GET("/user/reports", s.HandleGetAllReportsByUser())
+	authorized.GET("/user/reports", s.HandleGetAllReportsByUser())  //
 	authorized.GET("/report/votecounts/:reportID", s.HandleGetVoteCounts())
 	authorized.GET("/report/counts/lga/:lga", s.GetReportTypeCountsByLGA())
 	authorized.GET("/report/counts/state/:state", s.GetReportCountsByStateAndLGA())

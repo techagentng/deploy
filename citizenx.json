@@ -1,0 +1,100 @@
+openapi: 3.0.0
+info:
+  title: Citizenx API
+  description: This is a citizenx API documentation using OpenAPI.
+  version: 1.0.0
+servers:
+  - url: https://citizenx-9hk2.onrender.com
+    description: Production server on render
+  - url: https://citizenx-9hk2.onrender.com/api/v1
+    description: Staging server
+
+paths:
+  /auth/signup:
+    post:
+      summary: User Signup
+      description: Register a new user and upload a profile image.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                profile_image:
+                  type: string
+                  format: binary
+                  description: The profile image file to upload (JPEG or PNG).
+                fullname:
+                  type: string
+                  example: Nnamdi Nnah
+                telephone:
+                  type: string
+                  example: 08903620106
+                email:
+                  type: string
+                  format: email
+                  example: techagentng2@gmail.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+                username:
+                  type: string
+                  example: telairsay
+              required:
+                - profile_image
+                - fullname
+                - telephone
+                - email
+                - password
+                - username
+      responses:
+        '201':
+          description: User successfully registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ID:
+                        type: integer
+                        example: 7
+                      fullname:
+                        type: string
+                        example: Nnamdi Nnah
+                      username:
+                        type: string
+                        example: telairsay
+                      thumbnail_url:
+                        type: string
+                        example: https://citizenx.s3.amazonaws.com/sample.png
+                  message:
+                    type: string
+                    example: Signup successful, check your email for verification
+                  status:
+                    type: string
+                    example: Created
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid input data
+                  status:
+                    type: string
+                    example: Bad Request
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	// "io/ioutil"
-	_ "github.com/gin-gonic/gin"
 	_ "github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/techagentng/citizenx/config"

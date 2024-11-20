@@ -16,7 +16,7 @@ import (
 
 	"gorm.io/gorm"
 
-	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
+	// ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
 	errs "github.com/techagentng/citizenx/errors"
 	"github.com/techagentng/citizenx/models"
@@ -102,16 +102,6 @@ func (s *Server) Authorize() gin.HandlerFunc {
 		// Continue to the next middleware or handler
 		c.Next()
 	}
-}
-
-func limitRateForPasswordReset(store ratelimit.Store) gin.HandlerFunc {
-	// Initialize rate limiter using the provided store
-	mw := ratelimit.RateLimiter(store, &ratelimit.Options{
-		ErrorHandler:   errs.ErrorHandler,
-		KeyFunc:        keyFunc,
-		BeforeResponse: nil,
-	})
-	return mw
 }
 
 // Function to check if the user has exceeded the rate limit

@@ -1,6 +1,8 @@
 module github.com/techagentng/citizenx
 
-go 1.20
+go 1.21
+
+toolchain go1.21.1
 
 require (
 	github.com/JGLTechnologies/gin-rate-limit v1.5.4
@@ -15,6 +17,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/leebenson/conform v1.2.2
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pkg/errors v0.9.1
 	golang.org/x/oauth2 v0.22.0
 	gorm.io/gorm v1.25.11
