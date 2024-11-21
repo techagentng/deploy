@@ -92,7 +92,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.GET("/incident_reports/report_type/:report_type", s.handleGetAllReportsByReportType())
 	// apirouter.GET("/verifyEmail/:token", s.HandleVerifyEmail())
 	apirouter.POST("/password/forgot", s.HandleForgotPassword())
-	apirouter.POST("/password/reset/:token", s.ResetPasswordHandler())
+	apirouter.POST("/password/reset/:token", s.ResetPasswordHandler()) //
 	apirouter.POST("/report-type/states", s.HandleGetVariadicBarChart())
 	apirouter.GET("/all/publications", s.HandleGetAllPosts())
 	apirouter.GET("/publication/:id", s.GetPostByID())

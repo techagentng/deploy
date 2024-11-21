@@ -67,47 +67,58 @@ type ResetPasswordRequest struct {
 // ResetPasswordHandler handles the reset password request
 func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Step 1: Get token from URL parameter
+		// Step 1: Get the token from the URL parameter
 		token := c.Param("token")
+		if token == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
+			return
+		}
 
-		// Parse and validate the request body for the new password
-		var req ResetPasswordRequest
+		// Step 2: Parse and validate the request body for the new password
+		var req struct {
+			NewPassword string `json:"new_password" binding:"required"`
+		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "New password is required"})
 			return
 		}
 
-		// Step 2: Validate the reset token
+		// Step 3: Validate the reset token
 		claims, err := utils.VerifyResetToken(token)
-		if err != nil || time.Now().After(time.Unix(claims.ExpiresAt, 0)) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired token"})
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid token"})
+			return
+		}
+		if time.Now().After(time.Unix(claims.ExpiresAt, 0)) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Token has expired"})
 			return
 		}
 
-		// Step 3: Find the user associated with the token
+		// Step 4: Find the user associated with the token
 		user, err := s.AuthRepository.FindUserByEmail(claims.Email)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
 		}
 
-		// Step 4: Hash the new password
+		// Step 5: Hash the new password
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
 			return
 		}
 
-		// Step 5: Update the user's password in the database
+		// Step 6: Update the user's password in the database
 		if err := s.AuthRepository.UpdateUserPassword(user, string(hashedPassword)); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update password"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 			return
 		}
 
-		// Step 6: Respond with success
+		// Step 7: Respond with success
 		c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
 	}
 }
+
 
 type TokenClaims struct {
 	UserID    uint      `json:"user_id"`
