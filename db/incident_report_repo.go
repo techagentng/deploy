@@ -215,14 +215,14 @@ func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{
 	// Calculate the offset
 	offset := (page - 1) * 20
 
-	// Fetch reports with feedUrl and fullSizeUrl from the database
+	// Fetch reports with correct column names from the database
 	err := repo.DB.
 		Table("incident_reports").
 		Select(`
 			incident_reports.*, 
 			users.thumb_nail_url AS thumbnail_urls,
-			incident_reports.feed_url, 
-			incident_reports.full_size_url
+			incident_reports.feed_urls,  -- Use the correct column name
+			incident_reports.full_size_urls  -- Use the correct column name
 		`).
 		Joins("JOIN users ON users.id = incident_reports.user_id").
 		Order("incident_reports.created_at DESC").
@@ -239,6 +239,7 @@ func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{
 
 	return reports, nil
 }
+
 
 
 func (repo *incidentReportRepo) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
