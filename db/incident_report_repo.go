@@ -33,7 +33,7 @@ type IncidentReportRepository interface {
 	UpdateReward(userID uint, reward *models.Reward) error
 	FindUserByID(id uint) (*models.UserResponse, error)
 	GetReportByID(report_id string) (*models.IncidentReport, error)
-	GetAllReports(page int) ([]models.IncidentReport, error)
+	GetAllReports(page int) ([]map[string]interface{}, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByLGA(lga string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByReportType(lga string, page int) ([]models.IncidentReport, error)
@@ -204,8 +204,8 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 	return &report, nil
 }
 
-func (repo *incidentReportRepo) GetAllReports(page int) ([]models.IncidentReport, error) {
-	var reports []models.IncidentReport
+func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{}, error) {
+	var reports []map[string]interface{}
 
 	// Ensure page is valid (default to page 1 if invalid)
 	if page < 1 {
@@ -215,12 +215,18 @@ func (repo *incidentReportRepo) GetAllReports(page int) ([]models.IncidentReport
 	// Calculate the offset
 	offset := (page - 1) * 20
 
-	// Fetch reports ordered by 'created_at' in descending order
+	// Fetch reports along with the user's thumbnail URL, exclude thumbnail_urls
 	err := repo.DB.
-		Order("created_at DESC"). // Change to descending order
+		Table("incident_reports").
+		Select(`
+			incident_reports.*, 
+			users.thumb_nail_url AS thumbnail_urls
+		`).
+		Joins("JOIN users ON users.id = incident_reports.user_id").
+		Order("incident_reports.created_at DESC").
 		Limit(20).
 		Offset(offset).
-		Find(&reports).Error
+		Scan(&reports).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

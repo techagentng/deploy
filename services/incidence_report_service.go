@@ -14,7 +14,7 @@ import (
 
 type IncidentReportService interface {
 	SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error)
-	GetAllReports(page int) ([]models.IncidentReport, error)
+	GetAllReports(page int) ([]map[string]interface{}, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByLGA(lga string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByReportType(reportType string, page int) ([]models.IncidentReport, error)
@@ -141,9 +141,11 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 	return reportResponse, nil
 }
 
-func (s *IncidentService) GetAllReports(page int) ([]models.IncidentReport, error) {
+func (s *IncidentService) GetAllReports(page int) ([]map[string]interface{}, error) {
+	// Delegate the call to the repository
 	return s.incidentRepo.GetAllReports(page)
 }
+
 
 func (s *IncidentService) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
 	return s.incidentRepo.GetAllReportsByState(state, page)

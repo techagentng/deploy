@@ -429,7 +429,6 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 	}
 }
 
-
 // Helper function to parse coordinates from the request form
 func parseCoordinates(c *gin.Context) (float64, float64, error) {
 	lat, lng := 0.0, 0.0
@@ -461,7 +460,7 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 		}
 
 		// Process media files and collect URLs and types
-		feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, err := s.processAndSaveMedia(c)
+		feedURLs, _, fullsizeURLs, fileTypes, err := s.processAndSaveMedia(c)
 		if err != nil {
 			log.Printf("Error processing media: %v", err)
 			response.JSON(c, "Unable to process media files", http.StatusInternalServerError, nil, err)
@@ -472,7 +471,7 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 		response.JSON(c, "Media added to report successfully", http.StatusOK, gin.H{
 			"reportID":      reportID,
 			"feedURLs":      feedURLs,
-			"thumbnailURLs": thumbnailURLs,
+			// "thumbnailURLs": thumbnailURLs,
 			"fullsizeURLs":  fullsizeURLs,
 			"fileTypes":     fileTypes,
 		}, nil)
