@@ -41,6 +41,7 @@ type AuthRepository interface {
 	GetUserRoleByUserID(userID uint) (*models.Role, error)
 	SoftDeleteUser(userID uint) error
 	UpdateUserPassword(user *models.User, hashedPassword string) error
+	GetUserByID(userID uint) (*models.User, error)
 }
 
 type authRepo struct {
@@ -447,4 +448,18 @@ func (a *authRepo) SoftDeleteUser(userID uint) error {
 func (a *authRepo) UpdateUserPassword(user *models.User, hashedPassword string) error {
 	user.Password = hashedPassword
 	return a.DB.Save(user).Error
+}
+
+func (a *authRepo) GetUserByID(userID uint) (*models.User, error) {
+	var user models.User
+
+	// Query the database for the user with the specified ID
+	if err := a.DB.First(&user, "id = ?", userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, err // Return not found error if the user doesn't exist
+		}
+		return nil, err // Return any other database error
+	}
+
+	return &user, nil
 }

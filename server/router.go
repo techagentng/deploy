@@ -60,7 +60,7 @@ func (s *Server) setupRouter() *gin.Engine {
 	// }
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://citizenx.ng", "http://localhost:3000", "https://citizenx-9hk2.onrender.com", "https://www.citizenx-9hk2.onrender.com", "https://www.citizenx.ng"},
+		AllowOrigins:     []string{"https://citizenx.ng", "http://localhost:3001", "https://citizenx-9hk2.onrender.com", "https://www.citizenx-9hk2.onrender.com", "https://www.citizenx.ng"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -103,7 +103,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	// Upload endpoint
 	authorized.GET("/logout", s.handleLogout())
 	authorized.GET("/users/online", s.handleGetOnlineUsers())
-	authorized.POST("/user/report/", s.handleIncidentReport())
+	authorized.POST("/user/report/", s.handleIncidentReport())  //
 	authorized.POST("/user/report/media", s.handleUploadMedia())
 	authorized.GET("/categories", s.handleGetAllCategories())
 	authorized.GET("/states", s.handleGetAllStates())
@@ -151,4 +151,6 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/all/posts/:userID", s.handleGetPostsByUserID())
 	authorized.PUT("/users/report/:userID", s.ReportUserHandler())
 	authorized.PUT("/users/block/:userID", s.BlockUserHandler())
+	authorized.PUT("/users/:user_id/role", s.handleChangeUserRole())
+
 }

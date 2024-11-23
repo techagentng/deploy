@@ -832,52 +832,47 @@ func (m *mediaService) ProcessVideoFile(mediaFile *multipart.FileHeader, userID 
     }
     defer file.Close()
 
-    // Define the file storage paths and URLs
-    videoFileName := fmt.Sprintf("%d_%s", userID, mediaFile.Filename)
-    feedURL := fmt.Sprintf("https://yourstorage.com/feed/%s", videoFileName)
-    fullSizeURL := fmt.Sprintf("https://yourstorage.com/fullsize/%s", videoFileName)
+    // Sanitize and define file paths
+    sanitizedFilename := strings.ReplaceAll(mediaFile.Filename, " ", "_")
+    videoFileName := fmt.Sprintf("%d_%s", userID, sanitizedFilename)
     thumbnailFileName := fmt.Sprintf("%d_%s_thumbnail.jpg", userID, reportIDStr)
-    thumbnailURL := fmt.Sprintf("https://yourstorage.com/thumbnails/%s", thumbnailFileName)
 
-    // Example bucket and folder names
     bucketName := os.Getenv("AWS_BUCKET")
-    folderName := "media"  // Replace with your desired folder name in the bucket
+    folderName := "media" // Folder name for S3
 
-    // Save the original video file to storage (Ensure file stream is handled properly)
+    // URLs for S3 storage
+    feedURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", bucketName, os.Getenv("AWS_REGION"), folderName, videoFileName)
+    fullSizeURL := feedURL
+    thumbnailURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", bucketName, os.Getenv("AWS_REGION"), folderName, thumbnailFileName)
+
+    // Step 1: Save video to S3
     if err := m.SaveToStorage(file, videoFileName, bucketName, folderName); err != nil {
-        log.Printf("Error saving video to storage: %v", err)
-        return "", "", "", fmt.Errorf("error saving video to storage: %v", err)
+        log.Printf("Error saving video to S3: %v", err)
+        return "", "", "", fmt.Errorf("error saving video to S3: %v", err)
     }
 
-    // Generate a thumbnail using FFmpeg (only if FFmpeg is installed and configured)
-    thumbnailPath := fmt.Sprintf("/tmp/%s", thumbnailFileName) // temporary path for processing
+    // Step 2: Generate a thumbnail using FFmpeg
+    thumbnailPath := fmt.Sprintf("/tmp/%s", thumbnailFileName) // Temporary path
     if err := m.GenerateVideoThumbnail(file, thumbnailPath); err != nil {
         log.Printf("Error generating video thumbnail: %v", err)
         return "", "", "", fmt.Errorf("error generating video thumbnail: %v", err)
     }
 
-    // Upload the thumbnail to storage and get the URL
-    thumbnailURL, err = m.UploadThumbnailToStorage(thumbnailPath, bucketName, folderName)
-    if err != nil {
-        log.Printf("Error uploading thumbnail: %v", err)
-        return "", "", "", fmt.Errorf("error uploading thumbnail: %v", err)
-    }
+    // Step 3: Upload the thumbnail to S3
+    // if err := m.UploadThumbnailToStorage(thumbnailPath, bucketName, folderName); err != nil {
+    //     log.Printf("Error uploading video thumbnail to S3: %v", err)
+    //     return "", "", "", fmt.Errorf("error uploading video thumbnail to S3: %v", err)
+    // }
 
-    // Remove the temporary thumbnail file
+    // Step 4: Clean up temporary files
     if err := os.Remove(thumbnailPath); err != nil {
-        log.Printf("Error deleting temporary thumbnail file: %v", err)
+        log.Printf("Error cleaning up thumbnail file: %v", err)
     }
 
-    // Construct the correct URLs for the video and thumbnail
-    feedURL = fmt.Sprintf("https://%s.s3.amazonaws.com/%s/%s", bucketName, folderName, videoFileName)
-    thumbnailURL = fmt.Sprintf("https://%s.s3.amazonaws.com/%s/%s", bucketName, folderName, thumbnailFileName)
-    fullSizeURL = fmt.Sprintf("https://%s.s3.amazonaws.com/%s/%s", bucketName, folderName, videoFileName)
-
-    log.Printf("Processed video file successfully: %s", mediaFile.Filename)
+    log.Printf("Successfully processed video file: %s", mediaFile.Filename)
 
     return feedURL, thumbnailURL, fullSizeURL, nil
 }
-
 
 
 func (m *mediaService) SaveToStorage(file multipart.File, fileName, bucketName, folderName string) error {
@@ -947,20 +942,26 @@ func (s *mediaService) ProcessImageFile(mediaFile *multipart.FileHeader, userID 
     }
     defer file.Close()
 
+    // Generate a unique identifier (using UUID and timestamp)
+    uniqueID := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().UnixNano())
+
     // Sanitize and define file storage paths
     sanitizedFilename := strings.ReplaceAll(mediaFile.Filename, " ", "_")
-    imageFileName := fmt.Sprintf("%d_%s", userID, sanitizedFilename)
-    feedURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", 
-        os.Getenv("AWS_BUCKET"), 
-        os.Getenv("AWS_REGION"), 
+    imageFileName := fmt.Sprintf("%d_%s_%s", userID, uniqueID, sanitizedFilename)
+
+    feedURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s",
+        os.Getenv("AWS_BUCKET"),
+        os.Getenv("AWS_REGION"),
         "media2", // Folder name in S3
         imageFileName,
     )
     fullSizeURL := feedURL // Full-size image URL would be the same for now
-    thumbnailFileName := fmt.Sprintf("%d_%s_thumbnail.jpg", userID, reportIDStr)
-    thumbnailURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s", 
-        os.Getenv("AWS_BUCKET"), 
-        os.Getenv("AWS_REGION"), 
+
+    // Generate a unique filename for the thumbnail
+    thumbnailFileName := fmt.Sprintf("%d_%s_thumbnail.jpg", userID, uniqueID)
+    thumbnailURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s/%s",
+        os.Getenv("AWS_BUCKET"),
+        os.Getenv("AWS_REGION"),
         "media2", // Folder name in S3
         thumbnailFileName,
     )
@@ -968,7 +969,7 @@ func (s *mediaService) ProcessImageFile(mediaFile *multipart.FileHeader, userID 
     // Define S3 bucket and folder name
     bucketName := os.Getenv("AWS_BUCKET") // Use the AWS_BUCKET environment variable
     folderName := "media2"               // Folder name where the file will be stored in S3
-    
+
     // Step 1: Save the original image file to S3 storage
     if err := s.SaveToStorage(file, imageFileName, bucketName, folderName); err != nil {
         log.Printf("Error saving image to storage: %v", err)

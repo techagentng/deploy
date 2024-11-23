@@ -479,121 +479,118 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 }
 
 func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []string, []string, error) {
-    // Retrieve media files from the multipart form
-    formMedia := c.Request.MultipartForm.File["mediaFiles"]
-    if formMedia == nil {
-        log.Println("Error: No media files found in the request")
-        return nil, nil, nil, nil, fmt.Errorf("no media files found in the request")
-    }
+	// Parse multipart form with a size limit
+	if err := c.Request.ParseMultipartForm(100 << 20); err != nil { // 100 MB limit
+		log.Printf("Error parsing multipart form: %v", err)
+		return nil, nil, nil, nil, fmt.Errorf("error parsing multipart form: %v", err)
+	}
 
-    // Initialize URL and file type slices
-    var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
-    var imageCount, videoCount, audioCount int
+	// Retrieve files
+	formMedia := c.Request.MultipartForm.File["mediaFiles"]
+	if formMedia == nil {
+		log.Println("No media files found in the request")
+		return nil, nil, nil, nil, fmt.Errorf("no media files found in the request")
+	}
 
-    userID, exists := c.Get("userID")
-    if !exists {
-        log.Println("Error: userID not found in context")
-        return nil, nil, nil, nil, fmt.Errorf("unauthorized: userID not found in context")
-    }
+	// Initialize URL and file type slices
+	var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
+	var imageCount, videoCount, audioCount int
 
-    userIDUint := userID.(uint)
+	userID, exists := c.Get("userID")
+	if !exists {
+		log.Println("Error: userID not found in context")
+		return nil, nil, nil, nil, fmt.Errorf("unauthorized: userID not found in context")
+	}
 
-    // Fetch the last report ID of the current user
-    reportIDStr, err := s.IncidentReportRepository.GetLastReportIDByUserID(userIDUint)
-    if err != nil {
-        log.Printf("Error fetching last report ID: %v\n", err)
-        return nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
-    }
+	userIDUint := userID.(uint)
 
-    // Iterate through uploaded media files
-    for _, mediaFile := range formMedia {
-        // Log file details for debugging
-        log.Printf("Processing file: %s, Size: %d, Content-Type: %s", mediaFile.Filename, mediaFile.Size, mediaFile.Header.Get("Content-Type"))
+	// Fetch the last report ID of the current user
+	reportIDStr, err := s.IncidentReportRepository.GetLastReportIDByUserID(userIDUint)
+	if err != nil {
+		log.Printf("Error fetching last report ID: %v\n", err)
+		return nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
+	}
 
-        // Determine file type and check size for video files
-        fileType := detectFileType(mediaFile.Filename)
-        if fileType == "video" {
-            log.Printf("Detected video file: %s, Size: %d", mediaFile.Filename, mediaFile.Size)
-            if mediaFile.Size > 80*1024*1024 {
-                log.Printf("Error: Video file %s exceeds the 80 MB size limit", mediaFile.Filename)
-                return nil, nil, nil, nil, fmt.Errorf("video file %s exceeds the 80 MB size limit", mediaFile.Filename)
-            }
-        }
+	// Iterate through uploaded media files
+	for _, mediaFile := range formMedia {
+		log.Printf("Processing file: %s, Size: %d, Content-Type: %s", mediaFile.Filename, mediaFile.Size, mediaFile.Header.Get("Content-Type"))
 
-        // Process each media file
-        log.Printf("Processing media file: %s for user: %d", mediaFile.Filename, userIDUint)
-        var processedFeedURL, processedThumbnailURL, processedFullsizeURL string
-        var err error
+		fileType := detectFileType(mediaFile.Filename)
+		if fileType == "video" && mediaFile.Size > 80*1024*1024 {
+			log.Printf("Error: Video file %s exceeds the 80 MB size limit", mediaFile.Filename)
+			return nil, nil, nil, nil, fmt.Errorf("video file %s exceeds the 80 MB size limit", mediaFile.Filename)
+		}
+		
+		var processedFeedURL, processedThumbnailURL, processedFullsizeURL string
+		switch fileType {
+		case "image":
+			processedFeedURL, processedThumbnailURL, processedFullsizeURL, err = s.MediaService.ProcessImageFile(mediaFile, userIDUint, reportIDStr)
+		case "video":
+			processedFeedURL, processedThumbnailURL, processedFullsizeURL, err = s.MediaService.ProcessVideoFile(mediaFile, userIDUint, reportIDStr)
+		default:
+			log.Printf("Unsupported file type for %s", mediaFile.Filename)
+			return nil, nil, nil, nil, fmt.Errorf("unsupported file type: %s", fileType)
+		}
 
-        // Image processing (no FFmpeg)
-        if fileType == "image" {
-            processedFeedURL, processedThumbnailURL, processedFullsizeURL, err = s.MediaService.ProcessImageFile(mediaFile, userIDUint, reportIDStr)
-        } else if fileType == "video" {
-            processedFeedURL, processedThumbnailURL, processedFullsizeURL, err = s.MediaService.ProcessVideoFile(mediaFile, userIDUint, reportIDStr)
-        } else {
-            log.Printf("Unsupported file type for %s", mediaFile.Filename)
-            return nil, nil, nil, nil, fmt.Errorf("unsupported file type: %s", fileType)
-        }
+		if err != nil {
+			log.Printf("Error processing media file %s: %v\n", mediaFile.Filename, err)
+			return nil, nil, nil, nil, err
+		}
 
-        if err != nil {
-            log.Printf("Error processing media file %s: %v\n", mediaFile.Filename, err)
-            return nil, nil, nil, nil, err
-        }
+		// Append processed URLs and file type
+		feedURLs = append(feedURLs, processedFeedURL)
+		thumbnailURLs = append(thumbnailURLs, processedThumbnailURL)
+		fullsizeURLs = append(fullsizeURLs, processedFullsizeURL)
+		fileTypes = append(fileTypes, fileType)
 
-        // Append processed URLs and file type
-        feedURLs = append(feedURLs, processedFeedURL)
-        thumbnailURLs = append(thumbnailURLs, processedThumbnailURL)
-        fullsizeURLs = append(fullsizeURLs, processedFullsizeURL)
-        fileTypes = append(fileTypes, fileType)
+		// Update counters
+		switch fileType {
+		case "image":
+			imageCount++
+		case "video":
+			videoCount++
+		case "audio":
+			audioCount++
+		}
+	}
 
-        // Update counters based on file type
-        switch fileType {
-        case "image":
-            imageCount++
-        case "video":
-            videoCount++
-        case "audio":
-            audioCount++
-        }
-    }
+	// Update incident report with the processed URLs
+	incidentReport, err := s.IncidentReportRepository.GetIncidentReportByID(reportIDStr)
+	if err != nil {
+		log.Printf("Error retrieving report: %v\n", err)
+		return nil, nil, nil, nil, fmt.Errorf("error retrieving report: %v", err)
+	}
 
-    // Update incident report with the processed URLs
-    incidentReport, err := s.IncidentReportRepository.GetIncidentReportByID(reportIDStr)
-    if err != nil {
-        log.Printf("Error retrieving report: %v\n", err)
-        return nil, nil, nil, nil, fmt.Errorf("error retrieving report: %v", err)
-    }
+	incidentReport.FeedURLs = strings.Join(feedURLs, ",")
+	incidentReport.ThumbnailURLs = strings.Join(thumbnailURLs, ",")
+	incidentReport.FullSizeURLs = strings.Join(fullsizeURLs, ",")
 
-    incidentReport.FeedURLs = strings.Join(feedURLs, ",")
-    incidentReport.ThumbnailURLs = strings.Join(thumbnailURLs, ",")
-    incidentReport.FullSizeURLs = strings.Join(fullsizeURLs, ",")
-    
-    // Save the updated report
-    if err := s.IncidentReportRepository.UpdateIncidentReport(incidentReport); err != nil {
-        log.Printf("Error updating incident report: %v\n", err)
-        return nil, nil, nil, nil, fmt.Errorf("error updating incident report: %v", err)
-    }
+	// Save the updated report
+	if err := s.IncidentReportRepository.UpdateIncidentReport(incidentReport); err != nil {
+		log.Printf("Error updating incident report: %v\n", err)
+		return nil, nil, nil, nil, fmt.Errorf("error updating incident report: %v", err)
+	}
 
-    // Save each processed media to the database
-    for i := range feedURLs {
-        mediaModel := models.Media{
-            UserID:       userIDUint,
-            FeedURL:      feedURLs[i],
-            ThumbnailURL: thumbnailURLs[i],
-            FullSizeURL:  fullsizeURLs[i],
-            FileType:     fileTypes[i],
-        }
+	// Save each processed media to the database
+	totalPoints := (imageCount * 5) + (videoCount * 10) + (audioCount * 8)
+	for i := range feedURLs {
+		mediaModel := models.Media{
+			UserID:       userIDUint,
+			FeedURL:      feedURLs[i],
+			ThumbnailURL: thumbnailURLs[i],
+			FullSizeURL:  fullsizeURLs[i],
+			FileType:     fileTypes[i],
+		}
 
-        totalPoints := (imageCount * 5) + (videoCount * 10) + (audioCount * 8)
-        if err := s.MediaService.SaveMedia(mediaModel, reportIDStr, userIDUint, imageCount, videoCount, audioCount, totalPoints); err != nil {
-            log.Printf("Error saving media: %v\n", err)
-            return nil, nil, nil, nil, fmt.Errorf("error saving media: %v", err)
-        }
-    }
+		if err := s.MediaService.SaveMedia(mediaModel, reportIDStr, userIDUint, imageCount, videoCount, audioCount, totalPoints); err != nil {
+			log.Printf("Error saving media: %v\n", err)
+			return nil, nil, nil, nil, fmt.Errorf("error saving media: %v", err)
+		}
+	}
 
-    // Return the final URLs and file types
-    log.Println("Media processed and saved successfully")
-    return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
+	// Return the final URLs and file types
+	log.Println("Media processed and saved successfully")
+	return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
 }
 
 
@@ -1673,3 +1670,53 @@ func (s *Server) ReportUserHandler() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"message": "User reported successfully"})
 	}
 }
+
+func (s *Server) handleChangeUserRole() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Parse the user ID from the URL parameter
+        userIDParam := c.Param("user_id")
+        if userIDParam == "" {
+            response.JSON(c, "User ID is required", http.StatusBadRequest, nil, nil)
+            return
+        }
+
+        // Convert user ID to uint
+        userID, err := strconv.ParseUint(userIDParam, 10, 32)
+        if err != nil {
+            response.JSON(c, "Invalid user ID", http.StatusBadRequest, nil, err)
+            return
+        }
+
+        // Parse the new role name from the POST form data
+        newRoleName := c.PostForm("role_name")
+        if newRoleName == "" {
+            response.JSON(c, "Role Name is required", http.StatusBadRequest, nil, nil)
+            return
+        }
+
+        // Fetch the role by name
+        role, err := s.AuthService.GetRoleByName(newRoleName)
+        if err != nil {
+            response.JSON(c, "Role not found", http.StatusBadRequest, nil, err)
+            return
+        }
+
+        // Fetch the user by ID
+        user, err := s.AuthRepository.GetUserByID(uint(userID)) // Convert to uint
+        if err != nil {
+            response.JSON(c, "User not found", http.StatusNotFound, nil, err)
+            return
+        }
+
+        // Update the user's RoleID
+        user.RoleID = role.ID
+        err = s.AuthRepository.UpdateUserStatus(user)
+        if err != nil {
+            response.JSON(c, "Failed to update user role", http.StatusInternalServerError, nil, err)
+            return
+        }
+
+        response.JSON(c, "User role updated successfully", http.StatusOK, user, nil)
+    }
+}
+
