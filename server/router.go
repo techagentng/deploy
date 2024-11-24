@@ -60,7 +60,13 @@ func (s *Server) setupRouter() *gin.Engine {
 	// }
 	// Use CORS middleware with appropriate configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://citizenx.ng", "http://localhost:3001", "https://citizenx-9hk2.onrender.com", "https://www.citizenx-9hk2.onrender.com", "https://www.citizenx.ng"},
+		AllowOrigins:     []string{"https://citizenx.ng", 
+		"http://localhost:3001", 
+		"https://citizenx-9hk2.onrender.com", 
+		"https://www.citizenx-9hk2.onrender.com", 
+		"https://www.citizenx.ng",
+		"https://citizenx-9hk2.onrender.com/api/v1/google/login",
+	},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
