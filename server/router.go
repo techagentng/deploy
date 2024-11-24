@@ -66,6 +66,7 @@ func (s *Server) setupRouter() *gin.Engine {
 		"https://www.citizenx-9hk2.onrender.com", 
 		"https://www.citizenx.ng",
 		"https://citizenx-9hk2.onrender.com/api/v1/google/login",
+		"https://citizenx-9hk2.onrender.com/api/v1/auth/google/callback",
 	},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
