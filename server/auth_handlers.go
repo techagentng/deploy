@@ -388,6 +388,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 		// Retrieve parameters from the URL
 		state := c.DefaultQuery("state", "")
 		code := c.DefaultQuery("code", "")
+		log.Printf("Received state: %s", state)
 		if state == "" || code == "" {
 			log.Println("Error: missing state or code in callback")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing state or code"})
