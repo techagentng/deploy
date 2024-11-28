@@ -474,22 +474,30 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 
 // generateJWTToken generates a jwt token to manage the state between calls to google
 func generateJWTToken(secret string) (string, error) {
+	// Validate that the secret is provided
 	if secret == "" {
 		return "", fmt.Errorf("empty secret")
 	}
 
+	// Define claims for the token
 	claims := jwt.MapClaims{
-		"exp": time.Now().Add(time.Hour).Unix(),
+		"exp": time.Now().Add(time.Hour).Unix(), // Token expiration time
+		"iat": time.Now().Unix(),               // Token issued at time
+		"typ": "state",                         // Optional: Include a type for clarity
 	}
 
+	// Create a new token with claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
+	// Sign the token with the secret key
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
+
 	return tokenString, nil
 }
+
 
 type GoogleUser struct {
 	ID         string `json:"id"`
