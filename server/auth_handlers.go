@@ -385,6 +385,8 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		state := c.Query("state")
 		code := c.Query("code")
+		log.Println("xx1",state)
+		log.Println("xx1",code)
 		err := validateState(state, s.Config.JWTSecret)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
