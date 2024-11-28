@@ -707,9 +707,17 @@ func validateState(state, secret string) error {
 		}
 		return []byte(secret), nil
 	})
-	if !token.Valid {
-		return fmt.Errorf("invalid state")
+	if token == nil {
+		// Handle the error - perhaps log it and return an appropriate response
+		log.Println("Error: token is nil")
+		return fmt.Errorf("token is nil")
 	}
+	if !token.Valid {
+		// Handle invalid token
+		log.Println("Error: invalid token")
+		return fmt.Errorf("invalid token")
+	}
+	
 	return err
 }
 
