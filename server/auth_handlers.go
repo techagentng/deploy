@@ -12,6 +12,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -381,57 +382,84 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 	}
 }
 
-func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		state := c.Query("state")
-		code := c.Query("code")
-		log.Println("xx1",state)
-		log.Println("xx1",code)
-		err := validateState(state, s.Config.JWTSecret)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid login",
-			})
-			return
-		}
+// HandleGoogleCallback processes the Google OAuth callback
+func (s *Server) HandleGoogleCallback(c *gin.Context) {
+    // Retrieve parameters from the URL
+    state := c.DefaultQuery("state", "")
+    code := c.DefaultQuery("code", "")
+    if state == "" || code == "" {
+        log.Println("Error: missing state or code in callback")
+        c.JSON(http.StatusBadRequest, gin.H{"error": "missing state or code"})
+        return
+    }
 
-		oauth2Config := &oauth2.Config{
-			ClientID:     s.Config.GoogleClientID,
-			ClientSecret: s.Config.GoogleClientSecret,
-			RedirectURL:  s.Config.GoogleRedirectURL,
-			Endpoint:     google.Endpoint,
-			Scopes: []string{
-				"https://www.googleapis.com/auth/userinfo.email",
-				"https://www.googleapis.com/auth/userinfo.profile",
-			},
-		}
+    // Step 1: Validate the state parameter (ensure it matches the expected state)
+    if err := validateState(state, s.Config.JWTSecret); err != nil {
+        log.Println("Error validating state:", err)
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
+        return
+    }
 
-		token, err := oauth2Config.Exchange(context.Background(), code)
+    // Step 2: Prepare the request to exchange the authorization code for an access token
+    tokenEndpoint := "https://oauth2.googleapis.com/token"
+    clientID := s.Config.GoogleClientID
+    clientSecret := s.Config.GoogleClientSecret
+    redirectURI := s.Config.GoogleRedirectURL
 
-		if err != nil || token == nil {
-			fmt.Println("Token exchange error:", err.Error())
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid token",
-			})
-			return
-		}
+    // Step 3: Create the form data for the POST request
+    formData := url.Values{
+        "code":          {code},
+        "client_id":     {clientID},
+        "client_secret": {clientSecret},
+        "redirect_uri":  {redirectURI},
+        "grant_type":    {"authorization_code"},
+    }
 
-		authPayload, errr := s.googleSignInUser(c, token.AccessToken)
-		log.Println("Google code:", authPayload)
-		if errr != nil {
-			log.Println("printed", errr)
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid authTokenxxx",
-			})
-			return
-		}
-		c.Header("Access-Control-Allow-Origin", os.Getenv("ACCESS_CONTROL_ALLOW_ORIGIN"))
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
-		c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
-		c.Header("Access-Control-Allow-Credentials", "true")
-		log.Println("authpay data", authPayload.Data)
-		response.JSON(c, "google sign in successful", http.StatusOK, authPayload, err)
+    // Step 4: Send the POST request to the token endpoint
+    resp, err := http.PostForm(tokenEndpoint, formData)
+    if err != nil {
+        log.Println("Error sending token exchange request:", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "token exchange failed"})
+        return
+    }
+    defer resp.Body.Close()
+
+	// OAuthTokenResponse struct to handle the token response from Google OAuth
+	type OAuthTokenResponse struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+		ExpiresIn   int    `json:"expires_in"`
+		IDToken     string `json:"id_token"`
 	}
+
+    // Step 5: Parse the response from the OAuth provider
+    var tokenResponse OAuthTokenResponse
+    if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
+        log.Println("Error decoding token response:", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode token response"})
+        return
+    }
+
+    // Step 6: Handle the response and check for a valid access token
+    if tokenResponse.AccessToken == "" {
+        log.Println("Error: no access token received")
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "no access token received"})
+        return
+    }
+
+    // Step 7: Use the access token to fetch the user’s information (optional step)
+    // userInfo, err := getUserInfo(tokenResponse.AccessToken)
+    // if err != nil {
+    //     log.Println("Error fetching user info:", err)
+    //     c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user info"})
+    //     return
+    // }
+
+    // Step 8: Respond with user data or any additional processing
+    c.JSON(http.StatusOK, gin.H{
+        // "user_info": userInfo,
+        "access_token": tokenResponse.AccessToken,
+    })
 }
 
 // generateJWTToken generates a jwt token to manage the state between calls to google
