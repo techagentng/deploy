@@ -739,23 +739,29 @@ func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption 
 }
 
 func validateState(state, secret string) error {
-	// Parse the token
-	token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(secret), nil
-	})
+    // Decode the state if it's URL-encoded
+    decodedState, err := url.QueryUnescape(state)
+    if err != nil {
+        return fmt.Errorf("failed to decode state: %v", err)
+    }
 
-	if err != nil {
-		return fmt.Errorf("failed to parse token: %v", err)
-	}
+    // Parse the decoded state as a JWT
+    token, err := jwt.Parse(decodedState, func(token *jwt.Token) (interface{}, error) {
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+        }
+        return []byte(secret), nil
+    })
 
-	if token == nil || !token.Valid {
-		return fmt.Errorf("invalid token")
-	}
+    if err != nil {
+        return fmt.Errorf("failed to parse token: %v", err)
+    }
 
-	return nil
+    if token == nil || !token.Valid {
+        return fmt.Errorf("invalid token")
+    }
+
+    return nil
 }
 
 func GetValuesFromContext(c *gin.Context) (string, *models.User, *errors.Error) {
