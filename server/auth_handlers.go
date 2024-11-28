@@ -701,26 +701,26 @@ func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption 
 	return payload, nil
 }
 
-// validateState checks the state string with the system jwt secret while also validating the state validity
 func validateState(state, secret string) error {
-	token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(secret), nil
-	})
-	if token == nil {
-		// Handle the error - perhaps log it and return an appropriate response
-		log.Println("Error: token is nil")
-		return fmt.Errorf("token is nil")
-	}
-	if !token.Valid {
-		// Handle invalid token
-		log.Println("Error: invalid token")
-		return fmt.Errorf("invalid token")
-	}
-	
-	return err
+    // Parse the token first
+    token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+        }
+        return []byte(secret), nil
+    })
+
+    // Check parsing error first
+    if err != nil {
+        return fmt.Errorf("failed to parse token: %v", err)
+    }
+
+    // Validate token
+    if token == nil || !token.Valid {
+        return fmt.Errorf("invalid token")
+    }
+
+    return nil
 }
 
 func GetValuesFromContext(c *gin.Context) (string, *models.User, *errors.Error) {
