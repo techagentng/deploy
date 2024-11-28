@@ -739,14 +739,14 @@ func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption 
 }
 
 func validateState(state, secret string) error {
-    // Decode the state if it's URL-encoded
-    decodedState, err := url.QueryUnescape(state)
-    if err != nil {
-        return fmt.Errorf("failed to decode state: %v", err)
+    // Ensure state is not empty
+    if state == "" {
+        return fmt.Errorf("empty state token")
     }
 
-    // Parse the decoded state as a JWT
-    token, err := jwt.Parse(decodedState, func(token *jwt.Token) (interface{}, error) {
+    // Parse with correct method signature
+    token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
+        // Explicitly check signing method
         if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
             return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
         }
@@ -754,14 +754,22 @@ func validateState(state, secret string) error {
     })
 
     if err != nil {
-        return fmt.Errorf("failed to parse token: %v", err)
+        return fmt.Errorf("token validation error: %v", err)
     }
 
-    if token == nil || !token.Valid {
-        return fmt.Errorf("invalid token")
+    // Additional claims validation
+    if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+        // Optional: Check expiration
+        if exp, exists := claims["exp"]; exists {
+            expTime := time.Unix(int64(exp.(float64)), 0)
+            if time.Now().After(expTime) {
+                return fmt.Errorf("token expired")
+            }
+        }
+        return nil
     }
 
-    return nil
+    return fmt.Errorf("invalid token claims")
 }
 
 func GetValuesFromContext(c *gin.Context) (string, *models.User, *errors.Error) {
