@@ -743,7 +743,7 @@ func validateState(state, secret string) error {
     if state == "" {
         return fmt.Errorf("empty state token")
     }
-
+	log.Printf("State received: %s", state)
     // Attempt to decode potentially URL-encoded state
     decodedState, err := url.QueryUnescape(state)
     if err != nil {
