@@ -383,7 +383,8 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 }
 
 // HandleGoogleCallback processes the Google OAuth callback
-func (s *Server) HandleGoogleCallback(c *gin.Context) {
+func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
+	return func(c *gin.Context) {
     // Retrieve parameters from the URL
     state := c.DefaultQuery("state", "")
     code := c.DefaultQuery("code", "")
@@ -460,6 +461,7 @@ func (s *Server) HandleGoogleCallback(c *gin.Context) {
         // "user_info": userInfo,
         "access_token": tokenResponse.AccessToken,
     })
+}
 }
 
 // generateJWTToken generates a jwt token to manage the state between calls to google
