@@ -764,7 +764,7 @@ func validateState(state, secret string) error {
     }
 
     // Validate token claims
-    if claims, ok := token.Claims.(*jwt.MapClaims); ok && token.Valid {
+    if _, ok := token.Claims.(*jwt.MapClaims); ok && token.Valid {
         // Optional: Add additional claim validations if needed
         return nil
     }
