@@ -385,83 +385,90 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 	return func(c *gin.Context) {
-    // Retrieve parameters from the URL
-    state := c.DefaultQuery("state", "")
-    code := c.DefaultQuery("code", "")
-    if state == "" || code == "" {
-        log.Println("Error: missing state or code in callback")
-        c.JSON(http.StatusBadRequest, gin.H{"error": "missing state or code"})
-        return
-    }
+		// Retrieve parameters from the URL
+		state := c.DefaultQuery("state", "")
+		code := c.DefaultQuery("code", "")
+		if state == "" || code == "" {
+			log.Println("Error: missing state or code in callback")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing state or code"})
+			return
+		}
 
-    // Step 1: Validate the state parameter (ensure it matches the expected state)
-    if err := validateState(state, s.Config.JWTSecret); err != nil {
-        log.Println("Error validating state:", err)
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
-        return
-    }
+		// Step 1: Validate the state parameter
+		if err := validateState(state, s.Config.JWTSecret); err != nil {
+			log.Printf("Error validating state: %v\n", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
+			return
+		}
 
-    // Step 2: Prepare the request to exchange the authorization code for an access token
-    tokenEndpoint := "https://oauth2.googleapis.com/token"
-    clientID := s.Config.GoogleClientID
-    clientSecret := s.Config.GoogleClientSecret
-    redirectURI := s.Config.GoogleRedirectURL
+		// Step 2: Prepare the request to exchange the code for an access token
+		tokenEndpoint := "https://oauth2.googleapis.com/token"
+		clientID := s.Config.GoogleClientID
+		clientSecret := s.Config.GoogleClientSecret
+		redirectURI := s.Config.GoogleRedirectURL
 
-    // Step 3: Create the form data for the POST request
-    formData := url.Values{
-        "code":          {code},
-        "client_id":     {clientID},
-        "client_secret": {clientSecret},
-        "redirect_uri":  {redirectURI},
-        "grant_type":    {"authorization_code"},
-    }
+		// Step 3: Create the form data for the POST request
+		formData := url.Values{
+			"code":          {code},
+			"client_id":     {clientID},
+			"client_secret": {clientSecret},
+			"redirect_uri":  {redirectURI},
+			"grant_type":    {"authorization_code"},
+		}
 
-    // Step 4: Send the POST request to the token endpoint
-    resp, err := http.PostForm(tokenEndpoint, formData)
-    if err != nil {
-        log.Println("Error sending token exchange request:", err)
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "token exchange failed"})
-        return
-    }
-    defer resp.Body.Close()
+		// Step 4: Send the POST request to the token endpoint
+		resp, err := http.PostForm(tokenEndpoint, formData)
+		if err != nil {
+			log.Printf("Error sending token exchange request: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "token exchange failed"})
+			return
+		}
+		defer resp.Body.Close()
 
-	// OAuthTokenResponse struct to handle the token response from Google OAuth
-	type OAuthTokenResponse struct {
-		AccessToken string `json:"access_token"`
-		TokenType   string `json:"token_type"`
-		ExpiresIn   int    `json:"expires_in"`
-		IDToken     string `json:"id_token"`
+		if resp.StatusCode != http.StatusOK {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			log.Printf("Token exchange failed with status: %d, response: %s\n", resp.StatusCode, string(bodyBytes))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "token exchange failed"})
+			return
+		}
+
+		// OAuthTokenResponse struct to handle the token response from Google OAuth
+		type OAuthTokenResponse struct {
+			AccessToken string `json:"access_token"`
+			TokenType   string `json:"token_type"`
+			ExpiresIn   int    `json:"expires_in"`
+			IDToken     string `json:"id_token"`
+		}
+
+		// Step 5: Parse the response
+		var tokenResponse OAuthTokenResponse
+		if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
+			log.Printf("Error decoding token response: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode token response"})
+			return
+		}
+
+		// Step 6: Handle the response and check for a valid access token
+		if tokenResponse.AccessToken == "" {
+			log.Println("Error: no access token received")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "no access token received"})
+			return
+		}
+
+		// Step 7: (Optional) Fetch user information
+		// userInfo, err := getUserInfo(tokenResponse.AccessToken)
+		// if err != nil {
+		//     log.Println("Error fetching user info:", err)
+		//     c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user info"})
+		//     return
+		// }
+
+		// Step 8: Respond with user data or additional processing
+		c.JSON(http.StatusOK, gin.H{
+			// "user_info": userInfo,
+			"access_token": tokenResponse.AccessToken,
+		})
 	}
-
-    // Step 5: Parse the response from the OAuth provider
-    var tokenResponse OAuthTokenResponse
-    if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
-        log.Println("Error decoding token response:", err)
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode token response"})
-        return
-    }
-
-    // Step 6: Handle the response and check for a valid access token
-    if tokenResponse.AccessToken == "" {
-        log.Println("Error: no access token received")
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "no access token received"})
-        return
-    }
-
-    // Step 7: Use the access token to fetch the user’s information (optional step)
-    // userInfo, err := getUserInfo(tokenResponse.AccessToken)
-    // if err != nil {
-    //     log.Println("Error fetching user info:", err)
-    //     c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user info"})
-    //     return
-    // }
-
-    // Step 8: Respond with user data or any additional processing
-    c.JSON(http.StatusOK, gin.H{
-        // "user_info": userInfo,
-        "access_token": tokenResponse.AccessToken,
-    })
-}
 }
 
 // generateJWTToken generates a jwt token to manage the state between calls to google
@@ -732,25 +739,23 @@ func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption 
 }
 
 func validateState(state, secret string) error {
-    // Parse the token first
-    token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
-        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-        }
-        return []byte(secret), nil
-    })
+	// Parse the token
+	token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	})
 
-    // Check parsing error first
-    if err != nil {
-        return fmt.Errorf("failed to parse token: %v", err)
-    }
+	if err != nil {
+		return fmt.Errorf("failed to parse token: %v", err)
+	}
 
-    // Validate token
-    if token == nil || !token.Valid {
-        return fmt.Errorf("invalid token")
-    }
+	if token == nil || !token.Valid {
+		return fmt.Errorf("invalid token")
+	}
 
-    return nil
+	return nil
 }
 
 func GetValuesFromContext(c *gin.Context) (string, *models.User, *errors.Error) {
