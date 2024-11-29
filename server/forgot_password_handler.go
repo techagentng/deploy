@@ -111,9 +111,8 @@ func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
             return
         }
 
-        // Clear the reset token after successful password reset
-        user.ResetToken = "" // Clear the reset token
-        if err := s.DB.Save(&user).Error; err != nil {
+        // Clear the reset token using the repository method
+        if err := s.AuthRepository.ClearResetToken(user); err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear reset token"})
             return
         }
@@ -121,7 +120,6 @@ func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
     }
 }
-
 
 func hashPassword(password string) (string, error) {
     hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -147,7 +145,7 @@ func VerifyResetToken(tokenString string) (*TokenClaims, error) {
 
 	if claims, ok := token.Claims.(*TokenClaims); ok && token.Valid {
 		if claims.TokenType != "password_reset_token" {
-			return nil, errors.New("invalid token type", http.StatusAccepted)
+			return nil, fmt.Errorf("invalid token type", http.StatusAccepted)
 		}
 		return claims, nil
 	}

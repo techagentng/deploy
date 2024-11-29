@@ -43,6 +43,7 @@ type AuthRepository interface {
 	UpdateUserPassword(user *models.User, hashedPassword string) error
 	GetUserByID(userID uint) (*models.User, error)
 	FindUserByResetToken(token string) (*models.User, error)
+	ClearResetToken(user *models.User) error
 }
 
 type authRepo struct {
