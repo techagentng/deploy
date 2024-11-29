@@ -79,7 +79,7 @@ func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
 			NewPassword string `json:"new_password" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "New password is required"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "New password is requiredxxxxxxxx"})
 			return
 		}
 
