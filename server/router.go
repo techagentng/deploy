@@ -159,6 +159,6 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.PUT("/users/report/:userID", s.ReportUserHandler())
 	authorized.PUT("/users/block/:userID", s.BlockUserHandler())
 	authorized.PUT("/users/:user_id/role", s.handleChangeUserRole())
-	router.GET("/auth/google/state", s.GenerateGoogleState())
+	apirouter.GET("/auth/google/state", s.GenerateGoogleState())
 
 }
