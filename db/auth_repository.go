@@ -184,31 +184,37 @@ func (a *authRepo) FindUserByEmail(email string) (*models.User, error) {
 }
 
 func (a *authRepo) UpdateUser(user *models.User) error {
-	// Check if the user exists in the database
-	var existingUser models.User
-	if err := a.DB.Where("email = ?", user.Email).First(&existingUser).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return errors.New("user not found")
-		}
-		return err
-	}
+    // Check if the user exists in the database
+    var existingUser models.User
+    if err := a.DB.Where("email = ?", user.Email).First(&existingUser).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return errors.New("user not found")
+        }
+        return err
+    }
 
-	// Hash the new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
+    // Hash the new password if provided
+    if user.Password != "" {
+        hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+        if err != nil {
+            return err
+        }
+        existingUser.Password = string(hashedPassword)
+    }
 
-	// Update the password in the user model
-	existingUser.Password = string(hashedPassword)
+    // Update the reset token
+    if user.ResetToken != "" {
+        existingUser.ResetToken = user.ResetToken
+    }
 
-	// Save the updated user to the database
-	if err := a.DB.Save(&existingUser).Error; err != nil {
-		return err
-	}
+    // Save the updated user to the database
+    if err := a.DB.Save(&existingUser).Error; err != nil {
+        return err
+    }
 
-	return nil
+    return nil
 }
+
 
 func (a *authRepo) AddToBlackList(blacklist *models.Blacklist) error {
 	result := a.DB.Create(blacklist)
