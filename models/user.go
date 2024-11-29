@@ -23,7 +23,7 @@ type User struct {
 	Email             string            `json:"email" gorm:"unique;not null" binding:"required,email"`
 	IsQueried         bool              `json:"is_queried" gorm:"default:false"`
 	IsBlocked         bool              `json:"is_blocked" gorm:"default:false"`
-	 Password string `json:"password,omitempty" validate:"omitempty,min=4"`
+	Password string `json:"password,omitempty" validate:"omitempty,min=4"`
 	HashedPassword    string            `json:"-"`
 	IsEmailActive     bool              `json:"-"`
 	IsSocial          bool              `json:"-"`

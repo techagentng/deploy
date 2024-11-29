@@ -100,7 +100,7 @@ func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
 
         // Step 3: Parse the new password from the request body
         var req struct {
-            Password string `json:"password" binding:"required,min=8"`
+            Password string `json:"password,omitempty" validate:"omitempty,min=4"`
         }
         if err := c.ShouldBindJSON(&req); err != nil {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
