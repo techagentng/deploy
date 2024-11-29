@@ -1061,3 +1061,17 @@ func (s *Server) handleDeleteUser() gin.HandlerFunc {
 // func generateUniqueToken() string {
 // 	return uuid.New().String()
 // }
+func (s *Server) GenerateGoogleState() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Generate a JWT state
+        state, err := generateJWTToken(s.Config.JWTSecret)
+        if err != nil {
+            log.Println("Error generating state:", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate state"})
+            return
+        }
+
+        // Send the JWT state to the frontend
+        c.JSON(http.StatusOK, gin.H{"state": state})
+    }
+}
