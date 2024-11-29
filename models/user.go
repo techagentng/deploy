@@ -35,6 +35,7 @@ type User struct {
 	Notifications     []Notification    `gorm:"foreignKey:UserID"`
 	ThumbNailURL      string            `json:"thumbnail_url,omitempty"`
 	MacAddress        string            `json:"mac_address"`
+	ResetToken	      string             `json:"reset_token"`
 	LGAName           string            `gorm:"foreignKey:Name"`
 	Online            bool              `json:"online"`
 	Upvotes           int               `json:"up_vote"`

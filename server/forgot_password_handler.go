@@ -2,15 +2,18 @@ package server
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
-	"github.com/techagentng/citizenx/errors"
-	"github.com/techagentng/citizenx/server/response"
-	"github.com/techagentng/citizenx/services/utils"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"os"
 	"time"
+    "errors"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
+	// "github.com/techagentng/citizenx/errors"
+	// "github.com/techagentng/citizenx/models"
+	"github.com/techagentng/citizenx/server/response"
+	"github.com/techagentng/citizenx/services/utils"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 	// jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
 
@@ -66,59 +69,67 @@ type ResetPasswordRequest struct {
 
 // ResetPasswordHandler handles the reset password request
 func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Step 1: Get the token from the URL parameter
-		token := c.Param("token")
-		if token == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
-			return
-		}
+    return func(c *gin.Context) {
+        // Extract the token from the URL parameter
+        token := c.Param("token")
+        if token == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Reset token is required"})
+            return
+        }
 
-		// Step 2: Parse and validate the request body for the new password
-		var req struct {
-			NewPassword string `json:"newPassword" binding:"required"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "New password is requiredxxxxxxxx"})
-			return
-		}
+        // Retrieve the user associated with the token
+        user, err := s.AuthRepository.FindUserByResetToken(token)
+        if err != nil {
+            if errors.Is(err, gorm.ErrRecordNotFound) {
+                c.JSON(http.StatusNotFound, gin.H{"error": "Invalid or expired reset token"})
+            } else {
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+            }
+            return
+        }
 
-		// Step 3: Validate the reset token
-		claims, err := utils.VerifyResetToken(token)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid token"})
-			return
-		}
-		if time.Now().After(time.Unix(claims.ExpiresAt, 0)) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Token has expired"})
-			return
-		}
+        // Parse the new password from the request body
+        var req struct {
+            Password string `json:"password" binding:"required,min=8"`
+        }
+        if err := c.ShouldBindJSON(&req); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
+            return
+        }
 
-		// Step 4: Find the user associated with the token
-		user, err := s.AuthRepository.FindUserByEmail(claims.Email)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-			return
-		}
+        // Hash the new password
+        hashedPassword, err := hashPassword(req.Password)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+            return
+        }
 
-		// Step 5: Hash the new password
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
-			return
-		}
+        // Update the user's password
+        user.Password = hashedPassword // Set the hashed password to the user
+        if err := s.AuthRepository.UpdateUserPassword(user, hashedPassword); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+            return
+        }
 
-		// Step 6: Update the user's password in the database
-		if err := s.AuthRepository.UpdateUserPassword(user, string(hashedPassword)); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
-			return
-		}
+        // Clear the reset token after successful password reset
+        user.ResetToken = "" // Clear the reset token
+        if err := s.DB.Save(&user).Error; err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear reset token"})
+            return
+        }
 
-		// Step 7: Respond with success
-		c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
-	}
+        c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
+    }
 }
 
+
+func hashPassword(password string) (string, error) {
+    hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+    if err != nil {
+        return "", err
+    }
+    return string(hashedPassword), nil
+}
 
 type TokenClaims struct {
 	UserID    uint      `json:"user_id"`

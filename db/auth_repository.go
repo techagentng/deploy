@@ -42,6 +42,7 @@ type AuthRepository interface {
 	SoftDeleteUser(userID uint) error
 	UpdateUserPassword(user *models.User, hashedPassword string) error
 	GetUserByID(userID uint) (*models.User, error)
+	FindUserByResetToken(token string) (*models.User, error)
 }
 
 type authRepo struct {
@@ -462,4 +463,25 @@ func (a *authRepo) GetUserByID(userID uint) (*models.User, error) {
 	}
 
 	return &user, nil
+}
+
+func (a *authRepo) FindUserByResetToken(token string) (*models.User, error) {
+    var user models.User
+    if err := a.DB.Where("reset_token = ?", token).First(&user).Error; err != nil {
+        return nil, err
+    }
+    return &user, nil
+}
+
+// In AuthRepository (repository/auth_repository.go)
+func (a *authRepo) ClearResetToken(user *models.User) error {
+    // Set the ResetToken to an empty string
+    user.ResetToken = ""
+
+    // Save the user with the cleared reset token
+    if err := a.DB.Save(user).Error; err != nil {
+        return err
+    }
+
+    return nil
 }
