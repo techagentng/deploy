@@ -43,11 +43,18 @@ func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 			return
 		}
 
+		// Save the reset token to the database
+		user.ResetToken = resetToken
+		if err := s.AuthRepository.UpdateUser(user); err != nil {
+			response.JSON(c, "failed to save reset token", http.StatusInternalServerError, nil, err)
+			return
+		}
+
+		// Create the reset link
 		baseURL := os.Getenv("BASE_URL")
 		if baseURL == "" {
 			baseURL = "http://localhost:3002"
 		}
-		// Create reset link
 		resetLink := fmt.Sprintf("%s/reset-password/%s", baseURL, resetToken)
 
 		// Send password reset email
@@ -70,25 +77,26 @@ type ResetPasswordRequest struct {
 // ResetPasswordHandler handles the reset password request
 func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
     return func(c *gin.Context) {
-        // Extract the token from the URL parameter
+        // Step 1: Extract the reset token from the URL parameter
         token := c.Param("token")
         if token == "" {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Reset token is required"})
             return
         }
 
-        // Retrieve the user associated with the token
+        // Step 2: Retrieve the user associated with the token
         user, err := s.AuthRepository.FindUserByResetToken(token)
         if err != nil {
             if errors.Is(err, gorm.ErrRecordNotFound) {
                 c.JSON(http.StatusNotFound, gin.H{"error": "Invalid or expired reset token"})
             } else {
-                c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+                // Return a more generic internal server error for unexpected errors
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "details": err.Error()})
             }
             return
         }
 
-        // Parse the new password from the request body
+        // Step 3: Parse the new password from the request body
         var req struct {
             Password string `json:"password" binding:"required,min=8"`
         }
@@ -97,26 +105,30 @@ func (s *Server) ResetPasswordHandler() gin.HandlerFunc {
             return
         }
 
-        // Hash the new password
+        // Step 4: Hash the new password
         hashedPassword, err := hashPassword(req.Password)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+            // Return an error if hashing fails
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password", "details": err.Error()})
             return
         }
 
-        // Update the user's password
-        user.Password = hashedPassword // Set the hashed password to the user
+        // Step 5: Update the user's password with the hashed password
+        user.Password = hashedPassword // Set the hashed password to the user object
         if err := s.AuthRepository.UpdateUserPassword(user, hashedPassword); err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+            // Handle errors during password update
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password", "details": err.Error()})
             return
         }
 
-        // Clear the reset token using the repository method
+        // Step 6: Clear the reset token after the password is updated
         if err := s.AuthRepository.ClearResetToken(user); err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear reset token"})
+            // Handle errors when clearing the reset token
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear reset token", "details": err.Error()})
             return
         }
 
+        // Step 7: Return success response
         c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
     }
 }
