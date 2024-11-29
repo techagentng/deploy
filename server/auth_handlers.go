@@ -356,6 +356,7 @@ func (s *Server) handleLogin() gin.HandlerFunc {
 
 func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Google OAuth2 configuration
 		config := &oauth2.Config{
 			ClientID:     s.Config.GoogleClientID,
 			ClientSecret: s.Config.GoogleClientSecret,
@@ -366,21 +367,29 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 				"https://www.googleapis.com/auth/userinfo.profile",
 			},
 		}
+
+		// Generate state as a JWT
 		state, err := generateJWTToken(s.Config.JWTSecret)
 		if err != nil {
+			log.Println("Error generating state JWT:", err)
 			response.JSON(c, "", errors.ErrInternalServerError.Status, nil, err)
 			return
 		}
 
+		// Create the Google Auth URL with state
 		url := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+
+		// Set CORS headers (if needed)
 		c.Header("Access-Control-Allow-Origin", os.Getenv("ACCESS_CONTROL_ALLOW_ORIGIN"))
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 		c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
 		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Redirect(http.StatusTemporaryRedirect, url)
 
+		// Redirect to Google's OAuth URL
+		c.Redirect(http.StatusTemporaryRedirect, url)
 	}
 }
+
 
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
@@ -502,28 +511,27 @@ func (s *Server) getUserDataFromGoogle(accessToken string) (map[string]interface
 
 // generateJWTToken generates a jwt token to manage the state between calls to google
 func generateJWTToken(secret string) (string, error) {
-	// Validate that the secret is provided
-	if secret == "" {
-		return "", fmt.Errorf("empty secret")
-	}
-
-	// Define claims for the token
+	// Define claims for the JWT
 	claims := jwt.MapClaims{
-		"exp": time.Now().Add(time.Hour).Unix(), // Token expiration time
-		"iat": time.Now().Unix(),               // Token issued at time
-		"typ": "state",                         // Optional: Include a type for clarity
+		"timestamp": time.Now().Unix(),      // Current timestamp
+		"nonce":     generateRandomString(), // Random string for uniqueness
 	}
 
-	// Create a new token with claims
+	// Create the JWT with claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// Sign the token with the secret key
-	tokenString, err := token.SignedString([]byte(secret))
-	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
-	}
+	// Sign the token with the secret
+	return token.SignedString([]byte(secret))
+}
 
-	return tokenString, nil
+// Utility function to generate a random string for the nonce
+func generateRandomString() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, 16) // Generate a 16-character string
+	for i := range result {
+		result[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+	}
+	return string(result)
 }
 
 
