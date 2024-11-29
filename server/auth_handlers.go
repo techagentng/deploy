@@ -375,7 +375,7 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 			response.JSON(c, "", errors.ErrInternalServerError.Status, nil, err)
 			return
 		}
-
+		log.Println("Generated JWT state:", state)
 		// Create the Google Auth URL with state
 		url := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 
