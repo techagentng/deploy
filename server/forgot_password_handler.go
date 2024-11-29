@@ -1,13 +1,16 @@
 package server
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
-    "errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+
 	// "github.com/techagentng/citizenx/errors"
 	// "github.com/techagentng/citizenx/models"
 	"github.com/techagentng/citizenx/server/response"
@@ -42,7 +45,7 @@ func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 			response.JSON(c, "failed to generate reset token", http.StatusInternalServerError, nil, err)
 			return
 		}
-
+log.Println("xxxxxxx", resetToken)
 		// Save the reset token to the database
 		user.ResetToken = resetToken
 		if err := s.AuthRepository.UpdateUser(user); err != nil {
