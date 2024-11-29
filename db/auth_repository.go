@@ -46,6 +46,7 @@ type AuthRepository interface {
 	GetUserByID(userID uint) (*models.User, error)
 	FindUserByResetToken(token string) (*models.User, error)
 	ClearResetToken(user *models.User) error
+	GetUserByEmail(email string) (*models.User, error)
 }
 
 type authRepo struct {
@@ -516,4 +517,22 @@ func (a *authRepo) ClearResetToken(user *models.User) error {
     }
 
     return nil
+}
+func (a *authRepo) GetUserByEmail(email string) (*models.User, error) {
+	var user models.User
+
+	// Query the database for a user with the given email
+	err := a.DB.Where("email = ?", email).First(&user).Error
+	if err != nil {
+		// Check if the error is that the record was not found
+		if err == gorm.ErrRecordNotFound {
+			// If the user is not found, return nil and no error
+			return nil, nil
+		}
+		// Log and return any other errors
+		log.Printf("GetUserByEmail error: %v", err)
+		return nil, err
+	}
+	// Return the found user
+	return &user, nil
 }
