@@ -45,7 +45,7 @@ func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 			response.JSON(c, "failed to generate reset token", http.StatusInternalServerError, nil, err)
 			return
 		}
-log.Println("xxxxxxx", resetToken)
+fmt.Println("xxxxxxxx", resetToken)
 		// Save the reset token to the database
 		user.ResetToken = resetToken
 		if err := s.AuthRepository.UpdateUser(user); err != nil {
