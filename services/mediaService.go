@@ -851,12 +851,12 @@ func (m *mediaService) ProcessVideoFile(mediaFile *multipart.FileHeader, userID 
         return "", "", "", fmt.Errorf("error saving video to S3: %v", err)
     }
 
-    // Step 2: Generate a thumbnail using FFmpeg
-    thumbnailPath := fmt.Sprintf("/tmp/%s", thumbnailFileName) // Temporary path
-    if err := m.GenerateVideoThumbnail(file, thumbnailPath); err != nil {
-        log.Printf("Error generating video thumbnail: %v", err)
-        return "", "", "", fmt.Errorf("error generating video thumbnail: %v", err)
-    }
+    // // Step 2: Generate a thumbnail using FFmpeg
+    // thumbnailPath := fmt.Sprintf("/tmp/%s", thumbnailFileName) // Temporary path
+    // if err := m.GenerateVideoThumbnail(file, thumbnailPath); err != nil {
+    //     log.Printf("Error generating video thumbnail: %v", err)
+    //     return "", "", "", fmt.Errorf("error generating video thumbnail: %v", err)
+    // }
 
     // Step 3: Upload the thumbnail to S3
     // if err := m.UploadThumbnailToStorage(thumbnailPath, bucketName, folderName); err != nil {
@@ -865,9 +865,9 @@ func (m *mediaService) ProcessVideoFile(mediaFile *multipart.FileHeader, userID 
     // }
 
     // Step 4: Clean up temporary files
-    if err := os.Remove(thumbnailPath); err != nil {
-        log.Printf("Error cleaning up thumbnail file: %v", err)
-    }
+    // if err := os.Remove(thumbnailPath); err != nil {
+    //     log.Printf("Error cleaning up thumbnail file: %v", err)
+    // }
 
     log.Printf("Successfully processed video file: %s", mediaFile.Filename)
 

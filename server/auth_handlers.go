@@ -398,7 +398,6 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         state := c.DefaultQuery("state", "")
         code := c.DefaultQuery("code", "")
 
-        // Validate the state and code
         if state == "" || code == "" {
             c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state or code"})
             return
@@ -425,14 +424,13 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         }
 
         email := userData["email"].(string)
-
-        // Check if the user exists in the database
         user, err := s.AuthRepository.GetUserByEmail(email)
         if err != nil {
-            if err == gorm.ErrRecordNotFound { // User doesn't exist, create a new user
+            if err == gorm.ErrRecordNotFound {
+                // Create new user if not found
                 user = &models.User{
-                    Email:       email,
-                    Fullname:    userData["name"].(string),
+                    Email:    email,
+                    Fullname: userData["name"].(string),
                     ThumbNailURL: userData["picture"].(string),
                 }
                 if _, err := s.AuthRepository.CreateUser(user); err != nil {
@@ -452,11 +450,18 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
             return
         }
 
-        // Redirect to the dashboard with the token as a query parameter
-        redirectURL := fmt.Sprintf("%s/dashboard?token=%s", s.Config.FRONTEND_URL, tokenString)
-        c.Redirect(http.StatusFound, redirectURL)
+        // Return the token and user data to the frontend
+        c.JSON(http.StatusOK, gin.H{
+            "token": tokenString,
+            "user": gin.H{
+                "email":    user.Email,
+                "name":     user.Fullname,
+                "picture":  user.ThumbNailURL,
+            },
+        })
     }
 }
+
 
 
 type UserClaims struct {
