@@ -19,7 +19,7 @@ type User struct {
 	Model
 	Fullname          string            `json:"fullname" binding:"required,min=2"`
 	Username          string            `json:"username" binding:"required,min=2"`
-	Telephone         string            `json:"telephone" gorm:"unique;default:null" binding:"required"`
+	Telephone string `json:"telephone" gorm:"default:null" binding:"required"`
 	Email             string            `json:"email" gorm:"unique;not null" binding:"required,email"`
 	IsQueried         bool              `json:"is_queried" gorm:"default:false"`
 	IsBlocked         bool              `json:"is_blocked" gorm:"default:false"`
