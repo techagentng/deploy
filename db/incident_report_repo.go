@@ -220,9 +220,10 @@ func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{
 		Table("incident_reports").
 		Select(`
 			incident_reports.*, 
-			users.thumb_nail_url AS thumbnail_urls,
-			incident_reports.feed_urls,  -- Use the correct column name
-			incident_reports.full_size_urls  -- Use the correct column name
+			users.thumb_nail_url AS thumbnail_url, 
+			users.profile_image AS profile_image,  -- Select profile_image field
+			incident_reports.feed_urls,  
+			incident_reports.full_size_urls  
 		`).
 		Joins("JOIN users ON users.id = incident_reports.user_id").
 		Order("incident_reports.created_at DESC").
@@ -237,9 +238,20 @@ func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{
 		return nil, err
 	}
 
+	// Combine thumbnail_url and profile_image fields into one profile_image field
+	for _, report := range reports {
+		// If profile_image is not empty, use it, otherwise fallback to thumbnail_url
+		if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
+			report["profile_image"] = profileImage
+		} else if thumbnailUrl, exists := report["thumbnail_url"]; exists && thumbnailUrl != "" {
+			report["profile_image"] = thumbnailUrl
+		} else {
+			report["profile_image"] = nil // Or set a default value if required
+		}
+	}
+
 	return reports, nil
 }
-
 
 
 func (repo *incidentReportRepo) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {

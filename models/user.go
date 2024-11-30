@@ -34,6 +34,7 @@ type User struct {
 	AdminStatus       bool              `json:"is_admin" gorm:"foreignKey:Status"` // admin
 	Notifications     []Notification    `gorm:"foreignKey:UserID"`
 	ThumbNailURL      string            `json:"thumbnail_url,omitempty"`
+	Profile_image      string            `json:"profile_immage,omitempty"`
 	MacAddress        string            `json:"mac_address"`
 	ResetToken	      string             `json:"reset_token"`
 	LGAName           string            `gorm:"foreignKey:Name"`
