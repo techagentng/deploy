@@ -36,6 +36,7 @@ type Config struct {
 	AWS_REGION                   string `envconfig:"aws_region"`
 	AWS_ACCESS_KEY_ID            string `envconfig:"aws_access_key_id"`
 	AWS_SECRET_ACCESS_KEY        string `envconfig:"aws_secret_access_key"`
+	FRONTEND_URL        string `envconfig:"frontend_url"`
 }
 
 func Load() (*Config, error) {

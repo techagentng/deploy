@@ -429,17 +429,16 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         // Check if the user exists in the database
         user, err := s.AuthRepository.GetUserByEmail(email)
         if err != nil {
-            if err == gorm.ErrRecordNotFound { // Use gorm.ErrRecordNotFound for GORM
-                // User doesn't exist, create a new user
+            if err == gorm.ErrRecordNotFound { // User doesn't exist, create a new user
                 user = &models.User{
-                    Email:    email,
-                    Fullname: userData["name"].(string),
+                    Email:       email,
+                    Fullname:    userData["name"].(string),
                     ThumbNailURL: userData["picture"].(string),
                 }
-				if _, err := s.AuthRepository.CreateUser(user); err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
-					return
-				}
+                if _, err := s.AuthRepository.CreateUser(user); err != nil {
+                    c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+                    return
+                }
             } else {
                 c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
                 return
@@ -453,18 +452,12 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
             return
         }
 
-        // Return the token and user data to the frontend
-        c.JSON(http.StatusOK, gin.H{
-            "token": tokenString,
-            "user": gin.H{
-                "email":    user.Email,
-                "name":     user.Fullname,
-                "picture":  user.ThumbNailURL, // Make sure the correct field is being sent
-                // "google_id": user.GoogleI0D,
-            },
-        })
+        // Redirect to the dashboard with the token as a query parameter
+        redirectURL := fmt.Sprintf("%s/dashboard?token=%s", s.Config.FRONTEND_URL, tokenString)
+        c.Redirect(http.StatusFound, redirectURL)
     }
 }
+
 
 type UserClaims struct {
 	ID    uint   `json:"id"`
