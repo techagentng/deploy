@@ -1065,7 +1065,7 @@ func (s *mediaService) UploadFileToS3(mediaFile *multipart.FileHeader, userID ui
 	fileKey := fmt.Sprintf("media/%d_%s_%s%s", userID, fileType, uuid.New().String(), fileExtension)
 
 	// Prepare the S3 bucket name from environment variables
-	bucketName := os.Getenv("AWS_S3_BUCKET_NAME")
+	bucketName := os.Getenv("AWS_BUCKET")
 	if bucketName == "" {
 		return "", fmt.Errorf("S3 bucket name is not configured")
 	}
