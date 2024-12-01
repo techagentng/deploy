@@ -920,12 +920,20 @@ func (repo *incidentReportRepo) GetSubReportsByCategory(category string) ([]mode
 	return subReports, nil
 }
 
-func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]models.IncidentReport, error) {
-	var reports []models.IncidentReport
+func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]map[string]interface{}, error) {
+	var reports []map[string]interface{} // Change to map for dynamic fields
 
-	// Query the incident_reports table directly by user_id and order by TimeofIncidence in descending order
-	err := repo.DB.Where("user_id = ?", userID).
-		Order("timeof_incidence DESC"). // Ordering by TimeofIncidence in descending order
+	// Query the incident_reports table by user_id, join with users table to get thumbnail
+	err := repo.DB.
+		Table("incident_reports").
+		Select(`
+			incident_reports.*, 
+			users.thumb_nail_url AS profile_image,  -- Renaming thumbnail to profile_image
+			users.profile_image AS user_profile_image  -- Keeping original user_profile_image for reference if needed
+		`).
+		Joins("JOIN users ON users.id = incident_reports.user_id").
+		Where("incident_reports.user_id = ?", userID).
+		Order("incident_reports.timeof_incidence DESC").
 		Find(&reports).Error
 
 	if err != nil {
@@ -935,7 +943,18 @@ func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]mode
 		return nil, err // Return the error if something went wrong in the query
 	}
 
-	return reports, nil // Return the reports if no error occurred
+	// Iterate over the reports to ensure profile_image is set from thumbnail_url
+	for _, report := range reports {
+		if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
+			report["profile_image"] = profileImage
+		} else if userProfileImage, exists := report["user_profile_image"]; exists && userProfileImage != "" {
+			report["profile_image"] = userProfileImage // Fallback to the original profile_image if necessary
+		} else {
+			report["profile_image"] = nil // Or set a default value if required
+		}
+	}
+
+	return reports, nil
 }
 
 
