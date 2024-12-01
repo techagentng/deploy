@@ -207,23 +207,19 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{}, error) {
 	var reports []map[string]interface{}
 
-	// Ensure page is valid (default to page 1 if invalid)
 	if page < 1 {
 		page = 1
 	}
 
-	// Calculate the offset
 	offset := (page - 1) * 20
 
-	// Fetch reports with correct column names from the database
 	err := repo.DB.
 		Table("incident_reports").
 		Select(`
 			incident_reports.*, 
-			users.thumb_nail_url AS thumbnail_url, 
-			users.profile_image AS profile_image,  -- Select profile_image field
-			incident_reports.feed_urls,  
-			incident_reports.full_size_urls  
+			users.thumb_nail_url AS thumbnail_urls,  -- Changed thumbnail_url to thumbnail_urls
+			users.profile_image AS profile_image, 
+			incident_reports.feed_urls
 		`).
 		Joins("JOIN users ON users.id = incident_reports.user_id").
 		Order("incident_reports.created_at DESC").
@@ -238,15 +234,19 @@ func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{
 		return nil, err
 	}
 
-	// Combine thumbnail_url and profile_image fields into one profile_image field
 	for _, report := range reports {
-		// If profile_image is not empty, use it, otherwise fallback to thumbnail_url
+		// Profile image logic remains unchanged
 		if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
 			report["profile_image"] = profileImage
-		} else if thumbnailUrl, exists := report["thumbnail_url"]; exists && thumbnailUrl != "" {
+		} else if thumbnailUrl, exists := report["thumbnail_urls"]; exists && thumbnailUrl != "" {  // Updated to thumbnail_urls
 			report["profile_image"] = thumbnailUrl
 		} else {
-			report["profile_image"] = nil // Or set a default value if required
+			report["profile_image"] = nil
+		}
+
+		// Ensure feed_urls is properly handled
+		if feedUrls, exists := report["feed_urls"]; exists {
+			report["feed_urls"] = feedUrls
 		}
 	}
 
