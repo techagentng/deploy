@@ -13,6 +13,8 @@ type IncidentReport struct {
 	DateOfIncidence      string     `json:"date_of_incidence"`
 	Description          string     `json:"description" gorm:"type:varchar(1000)"`
 	FeedURLs             string     `json:"feed_urls"`
+	VideoURL             string     `json:"video_url"`
+	AudioURL             string     `json:"audio_url"`
 	ThumbnailURLs        string     `json:"thumbnail_urls"`
 	FullSizeURLs         string     `json:"full_size_urls"`
 	ProductName          string     `json:"product_name"`

@@ -460,7 +460,7 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 		}
 
 		// Process media files and collect URLs and types
-		feedURLs, _, fullsizeURLs, fileTypes, err := s.processAndSaveMedia(c)
+		feedURLs, fullsizeURLs, _,_,fileTypes, err := s.processAndSaveMedia(c)
 		if err != nil {
 			log.Printf("Error processing media: %v", err)
 			response.JSON(c, "Unable to process media files", http.StatusInternalServerError, nil, err)
@@ -469,37 +469,37 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 
 		// Respond with successful media upload details
 		response.JSON(c, "Media added to report successfully", http.StatusOK, gin.H{
-			"reportID":      reportID,
-			"feedURLs":      feedURLs,
-			// "thumbnailURLs": thumbnailURLs,
-			"fullsizeURLs":  fullsizeURLs,
-			"fileTypes":     fileTypes,
+			"reportID":     reportID,
+			"feedURLs":     feedURLs,
+			"fullsizeURLs": fullsizeURLs,
+			"fileTypes":    fileTypes,
 		}, nil)
 	}
 }
 
-func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []string, []string, error) {
+
+func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []string, []string, []string, error) {
 	// Parse multipart form with a size limit
 	if err := c.Request.ParseMultipartForm(100 << 20); err != nil { // 100 MB limit
 		log.Printf("Error parsing multipart form: %v", err)
-		return nil, nil, nil, nil, fmt.Errorf("error parsing multipart form: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("error parsing multipart form: %v", err)
 	}
 
 	// Retrieve files
 	formMedia := c.Request.MultipartForm.File["mediaFiles"]
 	if formMedia == nil {
 		log.Println("No media files found in the request")
-		return nil, nil, nil, nil, fmt.Errorf("no media files found in the request")
+		return nil, nil, nil, nil, nil, fmt.Errorf("no media files found in the request")
 	}
 
 	// Initialize URL and file type slices
 	var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
-	var imageCount, videoCount, audioCount int
+	var videoURL, audioURL string
 
 	userID, exists := c.Get("userID")
 	if !exists {
 		log.Println("Error: userID not found in context")
-		return nil, nil, nil, nil, fmt.Errorf("unauthorized: userID not found in context")
+		return nil, nil, nil, nil, nil, fmt.Errorf("unauthorized: userID not found in context")
 	}
 
 	userIDUint := userID.(uint)
@@ -508,7 +508,7 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 	reportIDStr, err := s.IncidentReportRepository.GetLastReportIDByUserID(userIDUint)
 	if err != nil {
 		log.Printf("Error fetching last report ID: %v\n", err)
-		return nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
 	}
 
 	// Iterate through uploaded media files
@@ -516,41 +516,43 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 		log.Printf("Processing file: %s, Size: %d, Content-Type: %s", mediaFile.Filename, mediaFile.Size, mediaFile.Header.Get("Content-Type"))
 
 		fileType := detectFileType(mediaFile.Filename)
-		if fileType == "video" && mediaFile.Size > 80*1024*1024 {
-			log.Printf("Error: Video file %s exceeds the 80 MB size limit", mediaFile.Filename)
-			return nil, nil, nil, nil, fmt.Errorf("video file %s exceeds the 80 MB size limit", mediaFile.Filename)
-		}
-		
 		var processedFeedURL, processedThumbnailURL, processedFullsizeURL string
+
 		switch fileType {
 		case "image":
 			processedFeedURL, processedThumbnailURL, processedFullsizeURL, err = s.MediaService.ProcessImageFile(mediaFile, userIDUint, reportIDStr)
+			if err == nil {
+				feedURLs = append(feedURLs, processedFeedURL)
+				thumbnailURLs = append(thumbnailURLs, processedThumbnailURL)
+				fullsizeURLs = append(fullsizeURLs, processedFullsizeURL)
+				fileTypes = append(fileTypes, "image")
+			}
 		case "video":
-			processedFeedURL, processedThumbnailURL, processedFullsizeURL, err = s.MediaService.ProcessVideoFile(mediaFile, userIDUint, reportIDStr)
+			if mediaFile.Size > 100*1024*1024 {
+				return nil, nil, nil, nil, nil, fmt.Errorf("video file %s exceeds the 100 MB size limit", mediaFile.Filename)
+			}
+			videoURL, err = s.MediaService.UploadFileToS3(mediaFile, userIDUint, "video")
+			if err == nil {
+				feedURLs = append(feedURLs, videoURL)
+				fileTypes = append(fileTypes, "video")
+			}
+		case "audio":
+			if mediaFile.Size > 50*1024*1024 {
+				return nil, nil, nil, nil, nil, fmt.Errorf("audio file %s exceeds the 50 MB size limit", mediaFile.Filename)
+			}
+			audioURL, err = s.MediaService.UploadFileToS3(mediaFile, userIDUint, "audio")
+			if err == nil {
+				feedURLs = append(feedURLs, audioURL)
+				fileTypes = append(fileTypes, "audio")
+			}
 		default:
 			log.Printf("Unsupported file type for %s", mediaFile.Filename)
-			return nil, nil, nil, nil, fmt.Errorf("unsupported file type: %s", fileType)
+			return nil, nil, nil, nil, nil, fmt.Errorf("unsupported file type: %s", fileType)
 		}
 
 		if err != nil {
 			log.Printf("Error processing media file %s: %v\n", mediaFile.Filename, err)
-			return nil, nil, nil, nil, err
-		}
-
-		// Append processed URLs and file type
-		feedURLs = append(feedURLs, processedFeedURL)
-		thumbnailURLs = append(thumbnailURLs, processedThumbnailURL)
-		fullsizeURLs = append(fullsizeURLs, processedFullsizeURL)
-		fileTypes = append(fileTypes, fileType)
-
-		// Update counters
-		switch fileType {
-		case "image":
-			imageCount++
-		case "video":
-			videoCount++
-		case "audio":
-			audioCount++
+			return nil, nil, nil, nil, nil, err
 		}
 	}
 
@@ -558,40 +560,27 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 	incidentReport, err := s.IncidentReportRepository.GetIncidentReportByID(reportIDStr)
 	if err != nil {
 		log.Printf("Error retrieving report: %v\n", err)
-		return nil, nil, nil, nil, fmt.Errorf("error retrieving report: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("error retrieving report: %v", err)
 	}
 
 	incidentReport.FeedURLs = strings.Join(feedURLs, ",")
 	incidentReport.ThumbnailURLs = strings.Join(thumbnailURLs, ",")
 	incidentReport.FullSizeURLs = strings.Join(fullsizeURLs, ",")
+	incidentReport.VideoURL = videoURL
+	incidentReport.AudioURL = audioURL
 
 	// Save the updated report
 	if err := s.IncidentReportRepository.UpdateIncidentReport(incidentReport); err != nil {
 		log.Printf("Error updating incident report: %v\n", err)
-		return nil, nil, nil, nil, fmt.Errorf("error updating incident report: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("error updating incident report: %v", err)
 	}
 
-	// Save each processed media to the database
-	totalPoints := (imageCount * 5) + (videoCount * 10) + (audioCount * 8)
-	for i := range feedURLs {
-		mediaModel := models.Media{
-			UserID:       userIDUint,
-			FeedURL:      feedURLs[i],
-			ThumbnailURL: thumbnailURLs[i],
-			FullSizeURL:  fullsizeURLs[i],
-			FileType:     fileTypes[i],
-		}
-
-		if err := s.MediaService.SaveMedia(mediaModel, reportIDStr, userIDUint, imageCount, videoCount, audioCount, totalPoints); err != nil {
-			log.Printf("Error saving media: %v\n", err)
-			return nil, nil, nil, nil, fmt.Errorf("error saving media: %v", err)
-		}
-	}
-
-	// Return the final URLs and file types
+	// Return the final URLs
 	log.Println("Media processed and saved successfully")
-	return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil
+	return feedURLs, fullsizeURLs, fileTypes, nil, nil, err
 }
+
+
 
 
 // Helper function to detect file type based on extension (expand as needed)

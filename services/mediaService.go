@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"image"
@@ -21,11 +22,15 @@ import (
 
 	// "github.com/aws/aws-sdk-go-v2/aws"
 	// "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/disintegration/imaging"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/nfnt/resize"
 	"github.com/techagentng/citizenx/config"
+	fig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/techagentng/citizenx/db"
 	"github.com/techagentng/citizenx/models"
 )
@@ -45,6 +50,7 @@ type MediaService interface {
 	// GenerateImageThumbnail(file multipart.File, thumbnailPath string) error
 	ProcessImageFile(mediaFile *multipart.FileHeader, userID uint, reportIDStr string) (string, string, string, error)
 	GenerateImageThumbnail(mediaFile *multipart.FileHeader, thumbnailPath string) error
+	UploadFileToS3(mediaFile *multipart.FileHeader, userID uint, fileType string) (string, error)
 }
 
 type mediaService struct {
@@ -1046,5 +1052,55 @@ func (s *mediaService) GenerateImageThumbnail(mediaFile *multipart.FileHeader, t
     return nil
 }
 
+func (s *mediaService) UploadFileToS3(mediaFile *multipart.FileHeader, userID uint, fileType string) (string, error) {
+	// Open the media file
+	file, err := mediaFile.Open()
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %v", err)
+	}
+	defer file.Close()
 
+	// Generate a unique file key for the S3 bucket
+	fileExtension := filepath.Ext(mediaFile.Filename)
+	fileKey := fmt.Sprintf("media/%d_%s_%s%s", userID, fileType, uuid.New().String(), fileExtension)
 
+	// Prepare the S3 bucket name from environment variables
+	bucketName := os.Getenv("AWS_S3_BUCKET_NAME")
+	if bucketName == "" {
+		return "", fmt.Errorf("S3 bucket name is not configured")
+	}
+
+	// Load AWS config
+	cfg, err := fig.LoadDefaultConfig(context.TODO(),
+		fig.WithRegion(os.Getenv("AWS_REGION")),
+		fig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), ""),
+		),
+	)
+	if err != nil {
+		return "", fmt.Errorf("unable to load AWS config: %v", err)
+	}
+
+	// Create S3 client
+	svc := s3.NewFromConfig(cfg)
+
+	// Stream file directly to S3
+	putObjectInput := &s3.PutObjectInput{
+		Bucket:      aws.String(bucketName),
+		Key:         aws.String(fileKey),
+		Body:        file,                       // Stream the file content
+		ACL:         "public-read",              // Make the file publicly accessible
+		ContentType: aws.String(mediaFile.Header.Get("Content-Type")), // Use the file's content type
+	}
+
+	// Upload the file
+	_, err = svc.PutObject(context.TODO(), putObjectInput)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload file to S3: %v", err)
+	}
+
+	// Construct the file URL
+	fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, os.Getenv("AWS_REGION"), fileKey)
+
+	return fileURL, nil
+}
