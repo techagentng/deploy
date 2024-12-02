@@ -480,7 +480,7 @@ func (a *authRepo) SoftDeleteUser(userID uint) error {
 
 // UpdateUserPassword updates the password for a given user
 func (a *authRepo) UpdateUserPassword(user *models.User, hashedPassword string) error {
-	user.Password = hashedPassword
+	user.HashedPassword = hashedPassword
 	return a.DB.Save(user).Error
 }
 
