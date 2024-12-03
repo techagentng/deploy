@@ -402,12 +402,12 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         code := c.DefaultQuery("code", "")
 
         // Validate the presence of state and code
-        if code == "" {
+        if state == "" || code == "" {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state or code"})
             return
         }
 
-        // Retrieve the state from session or local storage (assuming it's stored)
+        // Retrieve the state from session or local storage (assuming it's stored securely)
         storedState := c.GetHeader("X-Client-State") // Example of retrieving from a header
 
         // Validate the state by comparing it with the stored state
