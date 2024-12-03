@@ -401,34 +401,40 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         state := c.DefaultQuery("state", "")
         code := c.DefaultQuery("code", "")
 
-        // Validate presence of state and code
+        // Validate the presence of state and code
         if state == "" || code == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state or code"})
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state or code"})
             return
         }
 
         // Validate the JWT state token
         if err := validateState(state, s.Config.JWTSecret); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token"})
             return
         }
 
         // Exchange the code for an access token
         token, err := s.exchangeCodeForToken(code)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to exchange code for token"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code for token"})
             return
         }
 
         // Retrieve user data from Google
         userData, err := s.getUserDataFromGoogle(token)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve user data"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user data"})
             return
         }
 
-        // Extract user email and check if the user exists in the database
-        email := userData["email"].(string)
+        // Extract user email and check if it exists
+        email, ok := userData["email"].(string)
+        if !ok || email == "" {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user data: email missing"})
+            return
+        }
+
+        // Check if the user exists in the database
         user, err := s.AuthRepository.GetUserByEmail(email)
         if err != nil {
             if err == gorm.ErrRecordNotFound {
@@ -439,11 +445,11 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
                     ThumbNailURL: userData["picture"].(string),
                 }
                 if _, err := s.AuthRepository.CreateUser(user); err != nil {
-                    c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+                    c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
                     return
                 }
             } else {
-                c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
                 return
             }
         }
@@ -451,7 +457,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         // Generate a JWT token for the authenticated user
         tokenString, err := GenerateJWTTokenForUser(*user, s.Config.JWTSecret)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
             return
         }
 
@@ -466,7 +472,6 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         })
     }
 }
-
 
 type UserClaims struct {
 	ID    uint   `json:"id"`
