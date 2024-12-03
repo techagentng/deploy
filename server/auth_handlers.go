@@ -402,7 +402,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         code := c.DefaultQuery("code", "")
 
         // Validate the presence of state and code
-        if state == "" || code == "" {
+        if code == "" {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state or code"})
             return
         }
