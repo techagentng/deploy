@@ -407,8 +407,11 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
             return
         }
 
-        // Validate the JWT state token
-        if err := validateState(state, s.Config.JWTSecret); err != nil {
+        // Retrieve the state from session or local storage (assuming it's stored)
+        storedState := c.GetHeader("X-Client-State") // Example of retrieving from a header
+
+        // Validate the state by comparing it with the stored state
+        if state != storedState {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token"})
             return
         }
@@ -472,6 +475,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         })
     }
 }
+
 
 type UserClaims struct {
 	ID    uint   `json:"id"`
