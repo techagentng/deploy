@@ -372,32 +372,36 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 		// Generate state as a JWT
 		state, err := generateJWTToken(s.Config.JWTSecret)
 		if err != nil {
-			log.Println("Error generating state JWT:", err)
+			// Handle error generating JWT state
+			log.Printf("Error generating state JWT: %v", err)
 			response.JSON(c, "", errors.ErrInternalServerError.Status, nil, err)
 			return
 		}
-		log.Println("Generated JWT state:", state)
-		// Create the Google Auth URL with state
-		url := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 
-		// Set CORS headers (if needed)
+		log.Printf("Generated JWT state: %v", state)
+
+		// Create the Google Auth URL with the generated state
+		authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+
+		// Set CORS headers
 		c.Header("Access-Control-Allow-Origin", os.Getenv("ACCESS_CONTROL_ALLOW_ORIGIN"))
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
 		c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
 		c.Header("Access-Control-Allow-Credentials", "true")
 
-		// Redirect to Google's OAuth URL
-		c.Redirect(http.StatusTemporaryRedirect, url)
+		// Redirect the user to the Google OAuth URL
+		c.Redirect(http.StatusTemporaryRedirect, authURL)
 	}
 }
-
 
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
     return func(c *gin.Context) {
+        // Extract state and code from query parameters
         state := c.DefaultQuery("state", "")
         code := c.DefaultQuery("code", "")
 
+        // Validate presence of state and code
         if state == "" || code == "" {
             c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state or code"})
             return
@@ -409,7 +413,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
             return
         }
 
-        // Exchange the code for a token
+        // Exchange the code for an access token
         token, err := s.exchangeCodeForToken(code)
         if err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to exchange code for token"})
@@ -423,14 +427,15 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
             return
         }
 
+        // Extract user email and check if the user exists in the database
         email := userData["email"].(string)
         user, err := s.AuthRepository.GetUserByEmail(email)
         if err != nil {
             if err == gorm.ErrRecordNotFound {
-                // Create new user if not found
+                // Create a new user if not found
                 user = &models.User{
-                    Email:    email,
-                    Fullname: userData["name"].(string),
+                    Email:        email,
+                    Fullname:     userData["name"].(string),
                     ThumbNailURL: userData["picture"].(string),
                 }
                 if _, err := s.AuthRepository.CreateUser(user); err != nil {
@@ -454,14 +459,13 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{
             "token": tokenString,
             "user": gin.H{
-                "email":    user.Email,
-                "name":     user.Fullname,
-                "picture":  user.ThumbNailURL,
+                "email":   user.Email,
+                "name":    user.Fullname,
+                "picture": user.ThumbNailURL,
             },
         })
     }
 }
-
 
 
 type UserClaims struct {
