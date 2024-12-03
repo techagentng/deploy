@@ -88,6 +88,8 @@ type IncidentReportRepository interface {
 	UpdateBlockRequest(ctx context.Context, reportID uuid.UUID) error
 	BlockUser(ctx context.Context, userID uint) error
 	ReportUser(ctx context.Context, userID uint) error
+	CreateFollow(follow models.Follow) error
+	GetFollowersByReport(reportID uuid.UUID) ([]models.User, error)
 }
 
 type incidentReportRepo struct {
@@ -1533,3 +1535,14 @@ func (repo *incidentReportRepo) BlockUser(ctx context.Context, userID uint) erro
 	}
 	return nil
 }
+
+func (repo *incidentReportRepo) CreateFollow(follow models.Follow) error {
+	return repo.DB.Create(&follow).Error
+}
+
+func (repo *incidentReportRepo) GetFollowersByReport(reportID uuid.UUID) ([]models.User, error) {
+	var followers []models.User
+	err := repo.DB.Model(&models.IncidentReport{}).Where("id = ?", reportID).Association("Followers").Find(&followers)
+	return followers, err
+}
+

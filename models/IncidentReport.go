@@ -66,6 +66,8 @@ type IncidentReport struct {
 	DownvoteCount        int        `json:"downvote_count" gorm:"default:0"`
 	ReportTypeID         uuid.UUID  `json:"report_type_id" gorm:"not null"`
 	ReportType           ReportType `gorm:"foreignKey:ReportTypeID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+	Followers []*User `gorm:"many2many:follows;joinForeignKey:ReportID;joinReferences:UserID" json:"followers"`
+
 }
 type ReportCount struct {
 	StateName string

@@ -1709,3 +1709,106 @@ func (s *Server) handleChangeUserRole() gin.HandlerFunc {
     }
 }
 
+func (s *Server) HandleFollowReport() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Parse multipart form data with a max size of 20 MB
+		if err := c.Request.ParseMultipartForm(20 << 20); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "File size exceeds 20 MB"})
+			return
+		}
+
+// Extract and parse the report_id from the URL
+reportIDParam := c.Param("report_id")
+reportID, err := uuid.Parse(reportIDParam)
+if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid report ID format"})
+    return
+}
+
+		// Extract followText from the form data
+		followText := c.PostForm("followText")
+
+		// Extract followMedia (image/video) from the form data
+		var mediaURL string
+		file, handler, err := c.Request.FormFile("followMedia")
+		if err == nil {
+			defer file.Close()
+
+			// Validate the file type (only image or video)
+			if !isValidMediaType(handler.Header.Get("Content-Type")) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media type. Only image or video files are allowed"})
+				return
+			}
+
+			// Create S3 client
+			s3Client, err := createS3Client()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create S3 client"})
+				return
+			}
+
+			// Generate a unique filename for the media
+			mediaFilename := fmt.Sprintf("%s_%s", reportID.String(), handler.Filename)
+
+			// Upload the file to S3
+			mediaURL, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), mediaFilename)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload media"})
+				return
+			}
+		}
+
+		// Create a Follow instance with userID from context and reportID from URL
+		userID := c.MustGet("userID").(uint) // UserID is set in the context by the authorization middleware
+		follow := models.Follow{
+			UserID:   userID,
+			ReportID: reportID,
+			FollowText: followText,
+			FollowMedia: mediaURL,
+		}
+
+		// Call the repository to create a follow record
+		if err := s.IncidentReportRepository.CreateFollow(follow); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow report"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Successfully followed the report"})
+	}
+}
+
+// Helper function to validate media type (image or video)
+func isValidMediaType(contentType string) bool {
+	// Allow only image and video types
+	validTypes := []string{"image/jpeg", "image/png", "image/gif", "video/mp4", "video/avi", "video/mkv"}
+	for _, validType := range validTypes {
+		if contentType == validType {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) HandleGetFollowersByReport() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get reportID from the URL parameter and convert it to uuid.UUID
+		reportIDStr := c.Param("report_id")
+		reportID, err := uuid.Parse(reportIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid report ID"})
+			return
+		}
+
+		// Fetch followers from the repository
+		followers, err := s.IncidentReportRepository.GetFollowersByReport(reportID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch followers"})
+			return
+		}
+
+		// Return the followers as a JSON response
+		c.JSON(http.StatusOK, gin.H{"followers": followers})
+	}
+}
+
+

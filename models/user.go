@@ -44,6 +44,7 @@ type User struct {
 	RoleID            uuid.UUID         `gorm:"type:uuid" json:"role_id"`
 	Role              Role              `gorm:"foreignKey:RoleID" json:"role"`
 	BookmarkedReports []*IncidentReport `gorm:"many2many:incident_report_user;" json:"bookmarked_reports"`
+	FollowingReports []*IncidentReport `gorm:"many2many:follows;joinForeignKey:UserID;joinReferences:ReportID" json:"following_reports"`
 }
 
 type ReportUserRequest struct {

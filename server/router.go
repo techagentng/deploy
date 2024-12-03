@@ -159,6 +159,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.PUT("/users/block/:userID", s.BlockUserHandler())
 	authorized.PUT("/users/:user_id/role", s.handleChangeUserRole())
 	apirouter.GET("/auth/google/state", s.GenerateGoogleState())
-	
+	authorized.POST("/reports/follow/:report_id", s.HandleFollowReport())
+	authorized.GET("/reports/followers/:report_id", s.HandleGetFollowersByReport())
 
 }
