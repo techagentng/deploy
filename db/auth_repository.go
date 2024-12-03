@@ -518,6 +518,7 @@ func (a *authRepo) ClearResetToken(user *models.User) error {
 
     return nil
 }
+
 func (a *authRepo) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 
