@@ -356,18 +356,14 @@ func (s *Server) handleLogin() gin.HandlerFunc {
 }
 
 func generateJWTState(secret string) (string, error) {
-	// Define custom claims for the state
-	claims := jwt.MapClaims{
-		"state_id": generateRandomString(), // Random unique identifier
-		"exp":      time.Now().Add(10 * time.Minute).Unix(), // Expiration time
-	}
-
-	// Create the token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Sign the token
-	return token.SignedString([]byte(secret))
+    claims := jwt.MapClaims{
+        "exp": time.Now().Add(time.Minute * 10).Unix(), // Token expires in 10 minutes
+        "iat": time.Now().Unix(),
+    }
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    return token.SignedString([]byte(secret))
 }
+
 
 func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -399,40 +395,31 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 }
 
 func validateJWTState(state, secret string) error {
-    // Log the incoming state
+    // Log the raw state
     fmt.Printf("Validating state: %s\n", state)
 
-    // Parse the JWT
+    // Attempt to parse the JWT
     token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
-        // Log the signing method
-        fmt.Printf("Signing method: %v\n", token.Header["alg"])
-
-        // Ensure the signing method is HMAC
         if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
             return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
         }
         return []byte(secret), nil
     })
 
-    // Check for parsing errors
     if err != nil {
         fmt.Printf("JWT parsing error: %v\n", err)
         return fmt.Errorf("invalid state token: %w", err)
     }
 
-    // Check if the token is valid
     if !token.Valid {
-        fmt.Println("Invalid token")
+        fmt.Println("Token is invalid")
         return fmt.Errorf("invalid state token")
     }
 
-    // Log claims if token is valid
-    if claims, ok := token.Claims.(jwt.MapClaims); ok {
-        fmt.Printf("Token claims: %+v\n", claims)
-    }
-
+    fmt.Println("State token validated successfully")
     return nil
 }
+
 
 
 
