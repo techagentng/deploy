@@ -399,108 +399,131 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 }
 
 func validateJWTState(state, secret string) error {
-	// Parse the JWT
-	token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
-		// Ensure the signing method is as expected
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(secret), nil
-	})
+    // Log the incoming state
+    fmt.Printf("Validating state: %s\n", state)
 
-	// Check for parsing or validation errors
-	if err != nil {
-		return fmt.Errorf("invalid state token: %w", err)
-	}
+    // Parse the JWT
+    token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
+        // Log the signing method
+        fmt.Printf("Signing method: %v\n", token.Header["alg"])
 
-	// Ensure the token is valid
-	if !token.Valid {
-		return fmt.Errorf("invalid state token")
-	}
+        // Ensure the signing method is HMAC
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+        }
+        return []byte(secret), nil
+    })
 
-	return nil
+    // Check for parsing errors
+    if err != nil {
+        fmt.Printf("JWT parsing error: %v\n", err)
+        return fmt.Errorf("invalid state token: %w", err)
+    }
+
+    // Check if the token is valid
+    if !token.Valid {
+        fmt.Println("Invalid token")
+        return fmt.Errorf("invalid state token")
+    }
+
+    // Log claims if token is valid
+    if claims, ok := token.Claims.(jwt.MapClaims); ok {
+        fmt.Printf("Token claims: %+v\n", claims)
+    }
+
+    return nil
 }
+
 
 
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Extract the code and state
 		var requestData struct {
-			Code  string `json:"code"`
-			State string `json:"state"`
+			Code  string `json:"code" binding:"required"`
+			State string `json:"state" binding:"required"`
 		}
-		if err := c.ShouldBindJSON(&requestData); err != nil || requestData.Code == "" || requestData.State == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+
+		// Bind and validate request data
+		if err := c.ShouldBindJSON(&requestData); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
 			return
 		}
 
 		// Validate the state JWT
 		if err := validateJWTState(requestData.State, s.Config.JWTSecret); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token", "details": err.Error()})
 			return
 		}
 
-		// Exchange the code for an access token
+		// Exchange the authorization code for a token
 		token, err := s.exchangeCodeForToken(requestData.Code)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code for token"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code for token", "details": err.Error()})
 			return
 		}
 
-        // Retrieve user data from Google
-        userData, err := s.getUserDataFromGoogle(token)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user data"})
-            return
-        }
+		// Retrieve user data from Google
+		userData, err := s.getUserDataFromGoogle(token)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user data", "details": err.Error()})
+			return
+		}
 
-        // Extract user email and other details, with validation
-        email, ok := userData["email"].(string)
-        if !ok || email == "" {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user data: email missing"})
-            return
-        }
+		// Extract and validate email
+		email, ok := userData["email"].(string)
+		if !ok || email == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user data: email missing"})
+			return
+		}
 
-        // Check if the user exists in the database
-        user, err := s.AuthRepository.GetUserByEmail(email)
-        if err != nil {
-            if err == gorm.ErrRecordNotFound {
-                // Create a new user if not found
-                user = &models.User{
-                    Email:        email,
-                    Fullname:     userData["name"].(string),
-                    ThumbNailURL: userData["picture"].(string),
-                }
-                if _, err := s.AuthRepository.CreateUser(user); err != nil {
-                    c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
-                    return
-                }
-            } else {
-                c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-                return
-            }
-        }
+		// Get or create the user
+		user, err := s.getOrCreateUser(email, userData)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user", "details": err.Error()})
+			return
+		}
 
-        // Generate a JWT token for the authenticated user
-        tokenString, err := GenerateJWTTokenForUser(*user, s.Config.JWTSecret)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
-            return
-        }
+		// Generate a JWT token
+		tokenString, err := GenerateJWTTokenForUser(*user, s.Config.JWTSecret)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JWT token", "details": err.Error()})
+			return
+		}
 
-        // Return the token and user data to the frontend
-        c.JSON(http.StatusOK, gin.H{
-            "token": tokenString,
-            "user": gin.H{
-                "email":   user.Email,
-                "name":    user.Fullname,
-                "picture": user.ThumbNailURL,
-            },
-        })
-    }
+		// Respond with token and user data
+		c.JSON(http.StatusOK, gin.H{
+			"token": tokenString,
+			"user": gin.H{
+				"email":   user.Email,
+				"name":    user.Fullname,
+				"picture": user.ThumbNailURL,
+			},
+		})
+	}
 }
 
+
+// Helper function: Get or create user
+func (s *Server) getOrCreateUser(email string, userData map[string]interface{}) (*models.User, error) {
+	user, err := s.AuthRepository.GetUserByEmail(email)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Create a new user if not found
+			newUser := &models.User{
+				Email:        email,
+				Fullname:     userData["name"].(string),
+				ThumbNailURL: userData["picture"].(string),
+			}
+			if _, err := s.AuthRepository.CreateUser(newUser); err != nil {
+				return nil, err
+			}
+			return newUser, nil
+		}
+		return nil, err
+	}
+	return user, nil
+}
 
 type UserClaims struct {
 	ID    uint   `json:"id"`
