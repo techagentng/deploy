@@ -397,21 +397,26 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
     return func(c *gin.Context) {
-        // Extract state and code from query parameters
-        state := c.DefaultQuery("state", "")
-        code := c.DefaultQuery("code", "")
+        // Extract the code from the request body
+        var requestData struct {
+            Code string `json:"code"`
+        }
+        if err := c.ShouldBindJSON(&requestData); err != nil || requestData.Code == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or missing code"})
+            return
+        }
+        code := requestData.Code
 
-        // Validate the presence of state and code
-        if state == "" || code == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state or code"})
+        // Extract the state from the header
+        state := c.GetHeader("X-Client-State")
+        if state == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Missing state in headers"})
             return
         }
 
-        // Retrieve the state from session or local storage (assuming it's stored securely)
-        storedState := c.GetHeader("X-Client-State") // Example of retrieving from a header
-
-        // Validate the state by comparing it with the stored state
-        if state != storedState {
+        // Retrieve the stored state securely (from session, database, etc.)
+        storedState, exists := s.SessionManager.Get("oauth_state") // Example session storage
+        if !exists || state != storedState {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token"})
             return
         }
@@ -430,7 +435,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
             return
         }
 
-        // Extract user email and check if it exists
+        // Extract user email and other details, with validation
         email, ok := userData["email"].(string)
         if !ok || email == "" {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user data: email missing"})
