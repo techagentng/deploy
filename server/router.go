@@ -70,7 +70,7 @@ func (s *Server) setupRouter() *gin.Engine {
 	},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
-		ExposeHeaders:    []string{"Content-Length"},
+		ExposeHeaders:    []string{"Content-Length","X-Client-State"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
