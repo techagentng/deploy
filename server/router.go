@@ -23,23 +23,9 @@ func (s *Server) setupRouter() *gin.Engine {
 	}
 
 	r := gin.New()
-	// r.Static("/static", "./build/static")
 
-	// staticFiles := "server/templates/static"
-	// htmlFiles := "server/templates/*.html"
-	// if s.Config.Env == "test" {
-	// 	_, b, _, _ := runtime.Caller(0)
-	// 	basepath := filepath.Dir(b)
-	// 	staticFiles = basepath + "/templates/static"
-	// 	htmlFiles = basepath + "/templates/*.html"
-	// }
-	// r.StaticFS("static", http.Dir(staticFiles))
-	// r.LoadHTMLGlob(htmlFiles)
-
-	// LoggerWithFormatter middleware will write the logs to gin.DefaultWriter
-	// By default gin.DefaultWriter = os.Stdout
+	// Logger middleware with custom format
 	r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		// your custom format
 		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
 			param.ClientIP,
 			param.TimeStamp.Format(time.RFC1123),
@@ -54,28 +40,33 @@ func (s *Server) setupRouter() *gin.Engine {
 	}))
 	r.Use(gin.Recovery())
 
-	// allowedOrigins := []string{"http://localhost:3001"}
-	// if os.Getenv("GIN_MODE") == "release" {
-	// 	allowedOrigins = []string{"https://citizenx.ng"}
-	// }
-	// Use CORS middleware with appropriate configuration
+	// CORS middleware configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://citizenx.ng", 
-		"http://localhost:3001", 
-		"https://citizenx-9hk2.onrender.com", 
-		"https://www.citizenx-9hk2.onrender.com", 
-		"https://www.citizenx.ng",
-		"https://citizenx-9hk2.onrender.com/api/v1/google/login",
-		"https://citizenx-9hk2.onrender.com/api/v1/auth/google/callback",
-	},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
-		ExposeHeaders:    []string{"Content-Length","X-Client-State"},
+		AllowOrigins: []string{
+			"https://citizenx.ng",
+			"http://localhost:3001",
+			"https://citizenx-9hk2.onrender.com",
+			"https://www.citizenx-9hk2.onrender.com",
+			"https://www.citizenx.ng",
+			"https://citizenx-9hk2.onrender.com/api/v1/google/login",
+			"https://citizenx-9hk2.onrender.com/api/v1/auth/google/callback",
+		},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{
+			"Origin", 
+			"Authorization", 
+			"Content-Type", 
+			"X-Client-State", // Add this header
+		},
+		ExposeHeaders:    []string{"Content-Length", "X-Client-State"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Increase memory limit for multipart forms
 	r.MaxMultipartMemory = 32 << 20
+
+	// Define application routes
 	s.defineRoutes(r)
 
 	return r
