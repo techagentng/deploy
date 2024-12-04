@@ -9,7 +9,7 @@ import (
 	// "path/filepath"
 	// "runtime"
 	"time"
-
+	// "github.com/gin-contrib/cors"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -65,7 +65,6 @@ func (s *Server) setupRouter() *gin.Engine {
 
 	// Increase memory limit for multipart forms
 	r.MaxMultipartMemory = 32 << 20
-
 	// Define application routes
 	s.defineRoutes(r)
 

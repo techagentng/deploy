@@ -355,6 +355,20 @@ func (s *Server) handleLogin() gin.HandlerFunc {
 	}
 }
 
+func generateJWTState(secret string) (string, error) {
+	// Define custom claims for the state
+	claims := jwt.MapClaims{
+		"state_id": generateRandomString(), // Random unique identifier
+		"exp":      time.Now().Add(10 * time.Minute).Unix(), // Expiration time
+	}
+
+	// Create the token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Sign the token
+	return token.SignedString([]byte(secret))
+}
+
 func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Google OAuth2 configuration
@@ -369,64 +383,70 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 			},
 		}
 
-		// Generate state as a JWT
-		state, err := generateJWTToken(s.Config.JWTSecret)
+		// Generate the JWT state
+		state, err := generateJWTState(s.Config.JWTSecret)
 		if err != nil {
-			// Handle error generating JWT state
-			log.Printf("Error generating state JWT: %v", err)
-			response.JSON(c, "", errors.ErrInternalServerError.Status, nil, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate state"})
 			return
 		}
 
-		log.Printf("Generated JWT state: %v", state)
-
-		// Create the Google Auth URL with the generated state
+		// Create the Google Auth URL
 		authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 
-		// Set CORS headers
-		c.Header("Access-Control-Allow-Origin", os.Getenv("ACCESS_CONTROL_ALLOW_ORIGIN"))
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
-		c.Header("Access-Control-Allow-Headers", "Origin, Authorization, Content-Type")
-		c.Header("Access-Control-Allow-Credentials", "true")
-
-		// Redirect the user to the Google OAuth URL
+		// Redirect the user to the Google Auth URL
 		c.Redirect(http.StatusTemporaryRedirect, authURL)
 	}
 }
 
+func validateJWTState(state, secret string) error {
+	// Parse the JWT
+	token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
+		// Ensure the signing method is as expected
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	})
+
+	// Check for parsing or validation errors
+	if err != nil {
+		return fmt.Errorf("invalid state token: %w", err)
+	}
+
+	// Ensure the token is valid
+	if !token.Valid {
+		return fmt.Errorf("invalid state token")
+	}
+
+	return nil
+}
+
+
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Extract the code from the request body
-        var requestData struct {
-            Code string `json:"code"`
-        }
-        if err := c.ShouldBindJSON(&requestData); err != nil || requestData.Code == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or missing code"})
-            return
-        }
-        code := requestData.Code
+	return func(c *gin.Context) {
+		// Extract the code and state
+		var requestData struct {
+			Code  string `json:"code"`
+			State string `json:"state"`
+		}
+		if err := c.ShouldBindJSON(&requestData); err != nil || requestData.Code == "" || requestData.State == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+			return
+		}
 
-        // Extract the state from the header
-        state := c.GetHeader("X-Client-State")
-        if state == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Missing state in headers"})
-            return
-        }
+		// Validate the state JWT
+		if err := validateJWTState(requestData.State, s.Config.JWTSecret); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state"})
+			return
+		}
 
-        // Retrieve the stored state securely (from session, database, etc.)
-        storedState, exists := s.SessionManager.Get("oauth_state") // Example session storage
-        if !exists || state != storedState {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token"})
-            return
-        }
-
-        // Exchange the code for an access token
-        token, err := s.exchangeCodeForToken(code)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code for token"})
-            return
-        }
+		// Exchange the code for an access token
+		token, err := s.exchangeCodeForToken(requestData.Code)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code for token"})
+			return
+		}
 
         // Retrieve user data from Google
         userData, err := s.getUserDataFromGoogle(token)

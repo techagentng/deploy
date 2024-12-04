@@ -30,6 +30,7 @@ type Server struct {
 	PostService              services.PostService
 	PostRepository           db.PostRepository
 	DB                       db.GormDB
+	SessionSecret            string
 }
 
 // Server serves requests to DB with rout
