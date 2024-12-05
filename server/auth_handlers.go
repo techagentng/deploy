@@ -410,30 +410,44 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 	}
 }
 
-func validateJWTState(state, secret string) error {
-    // Use jwt.ParseWithClaims instead of jwt.Parse
-    token, err := jwt.ParseWithClaims(state, &jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-        // Verify the signing method
+func validateJWTState(state string, secret string) error {
+    // Parse and validate the JWT token using the provided secret
+    token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
+        // Ensure the signing method is correct
         if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
             return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
         }
-
-        // Return the secret for verification
         return []byte(secret), nil
     })
 
-    // Handle parsing errors
     if err != nil {
-        return fmt.Errorf("invalid state token: %w", err)
+        return fmt.Errorf("failed to parse JWT state: %v", err)
     }
 
-    // Ensure the token is valid
-    if !token.Valid {
-        return fmt.Errorf("invalid state token")
+    // Extract claims from the token (e.g., exp, iat, state)
+    claims, ok := token.Claims.(jwt.MapClaims)
+    if !ok || !token.Valid {
+        return fmt.Errorf("invalid JWT state token")
+    }
+
+    // Check if the token is expired
+    if exp, ok := claims["exp"].(int64); ok {
+        if exp < time.Now().Unix() {
+            return fmt.Errorf("JWT state token has expired")
+        }
+    }
+
+    // Optionally: Check for specific fields or values in the token (e.g., "state")
+    if stateValue, ok := claims["state"].(string); ok {
+        // Validate the state value here if needed
+        log.Println("Validated state:", stateValue)
+    } else {
+        return fmt.Errorf("missing 'state' field in JWT token")
     }
 
     return nil
 }
+
 
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
@@ -452,6 +466,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 
         // Validate the state token
         if err := validateJWTState(requestData.State, s.Config.JWTSecret); err != nil {
+            log.Printf("State validation failed: %v", err)
             c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token", "details": err.Error()})
             return
         }
