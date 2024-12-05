@@ -375,7 +375,6 @@ func generateJWTState(secret string) (string, error) {
     if err != nil {
         return "", fmt.Errorf("failed to sign JWT token: %w", err)
     }
-
     return signedToken, nil
 }
 
