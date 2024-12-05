@@ -437,6 +437,7 @@ func validateJWTState(state, secret string) error {
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		
 		var requestData struct {
 			Code  string `json:"code" binding:"required"`
 			State string `json:"state" binding:"required"`
@@ -444,6 +445,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 
 		// Bind and validate request data
 		if err := c.ShouldBindJSON(&requestData); err != nil {
+			log.Printf("Error binding JSON: %v", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
 			return
 		}
@@ -453,7 +455,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token", "details": err.Error()})
 			return
 		}
-
+		log.Printf("Validated request data: %+v", requestData)
 		// Exchange the authorization code for a token
 		token, err := s.exchangeCodeForToken(requestData.Code)
 		if err != nil {
