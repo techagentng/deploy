@@ -910,38 +910,49 @@ func (s *Server) SocialAuthenticate(authRequest *AuthRequest, authPayloadOption 
 }
 
 func validateState(state, secret string) error {
-    // Basic validation
+    // Step 1: Basic validation
     if state == "" {
         return fmt.Errorf("empty state token")
     }
-	log.Printf("State received: %s", state)
-    // Attempt to decode potentially URL-encoded state
+    log.Printf("State received: %s", state)
+
+    // Step 2: Decode state (in case it's URL-encoded)
     decodedState, err := url.QueryUnescape(state)
     if err != nil {
         return fmt.Errorf("failed to decode state: %v", err)
     }
+    log.Printf("Decoded state: %s", decodedState)
 
-    // Attempt JWT parsing
-    token, err := jwt.ParseWithClaims(decodedState, &jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-        // Verify signing method
+    // Step 3: Parse the JWT token
+    token, err := jwt.ParseWithClaims(decodedState, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
+        // Verify the signing method is HMAC
         if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
             return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
         }
         return []byte(secret), nil
     })
 
+    // Handle token parsing errors
     if err != nil {
         return fmt.Errorf("token parse error: %v", err)
     }
 
-    // Validate token claims
-    if _, ok := token.Claims.(*jwt.MapClaims); ok && token.Valid {
-        // Optional: Add additional claim validations if needed
-        return nil
+    // Step 4: Check token validity and claims
+    if token == nil || !token.Valid {
+        return fmt.Errorf("token is invalid or nil")
     }
 
-    return fmt.Errorf("invalid token")
+    claims, ok := token.Claims.(jwt.MapClaims)
+    if !ok {
+        return fmt.Errorf("failed to parse claims")
+    }
+
+    log.Printf("Token claims: %v", claims)
+
+    // Optional: Add custom claim validation if needed
+    return nil
 }
+
 
 func GetValuesFromContext(c *gin.Context) (string, *models.User, *errors.Error) {
 	var tokenI, userI interface{}
