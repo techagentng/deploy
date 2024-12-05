@@ -436,73 +436,83 @@ func validateJWTState(state, secret string) error {
 
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		
-		var requestData struct {
-			Code  string `json:"code" binding:"required"`
-			State string `json:"state" binding:"required"`
-		}
+    return func(c *gin.Context) {
+        var requestData struct {
+            Code  string `json:"code" binding:"required"`
+            State string `json:"state" binding:"required"`
+        }
 
-		// Bind and validate request data
-		if err := c.ShouldBindJSON(&requestData); err != nil {
-			log.Printf("Error binding JSON: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
-			return
-		}
+        // Bind and validate request data
+        if err := c.ShouldBindJSON(&requestData); err != nil {
+            log.Printf("Error binding JSON: %v", err)
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+            return
+        }
 
-		// Validate the state JWT
-		if err := validateJWTState(requestData.State, s.Config.JWTSecret); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token", "details": err.Error()})
-			return
-		}
-		log.Printf("Validated request data: %+v", requestData)
-		// Exchange the authorization code for a token
-		token, err := s.exchangeCodeForToken(requestData.Code)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code for token", "details": err.Error()})
-			return
-		}
+        // Validate the state token
+        if err := validateJWTState(requestData.State, s.Config.JWTSecret); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state token", "details": err.Error()})
+            return
+        }
 
-		// Retrieve user data from Google
-		userData, err := s.getUserDataFromGoogle(token)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user data", "details": err.Error()})
-			return
-		}
+        // Exchange the authorization code for tokens
+        tokenData, err := s.exchangeCodeForToken(requestData.Code)
+        if err != nil {
+            log.Printf("Error exchanging code for token: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code for token", "details": err.Error()})
+            return
+        }
 
-		// Extract and validate email
-		email, ok := userData["email"].(string)
-		if !ok || email == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user data: email missing"})
-			return
-		}
+        // Assuming tokenData is a struct, extract the access token string
+        token := tokenData.AccessToken
+        if token == "" {
+            log.Printf("Error: Access token is empty")
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Empty access token"})
+            return
+        }
 
-		// Get or create the user
-		user, err := s.getOrCreateUser(email, userData)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user", "details": err.Error()})
-			return
-		}
+        // Retrieve user data from Google using the access token
+        userData, err := s.getUserDataFromGoogle(token)
+        if err != nil {
+            log.Printf("Error retrieving user data: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user data", "details": err.Error()})
+            return
+        }
 
-		// Generate a JWT token
-		tokenString, err := GenerateJWTTokenForUser(*user, s.Config.JWTSecret)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JWT token", "details": err.Error()})
-			return
-		}
+        // Extract and validate email
+        email, ok := userData["email"].(string)
+        if !ok || email == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user data: email missing"})
+            return
+        }
 
-		// Respond with token and user data
-		c.JSON(http.StatusOK, gin.H{
-			"token": tokenString,
-			"user": gin.H{
-				"email":   user.Email,
-				"name":    user.Fullname,
-				"picture": user.ThumbNailURL,
-			},
-		})
-	}
+        // Get or create the user
+        user, err := s.getOrCreateUser(email, userData)
+        if err != nil {
+            log.Printf("Error processing user: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user", "details": err.Error()})
+            return
+        }
+
+        // Generate a JWT token for the user
+        tokenString, err := GenerateJWTTokenForUser(*user, s.Config.JWTSecret)
+        if err != nil {
+            log.Printf("Error generating JWT token: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate JWT token", "details": err.Error()})
+            return
+        }
+
+        // Respond with token and user data
+        c.JSON(http.StatusOK, gin.H{
+            "token": tokenString,
+            "user": gin.H{
+                "email":   user.Email,
+                "name":    user.Fullname,
+                "picture": user.ThumbNailURL,
+            },
+        })
+    }
 }
-
 
 // Helper function: Get or create user
 func (s *Server) getOrCreateUser(email string, userData map[string]interface{}) (*models.User, error) {
@@ -559,47 +569,22 @@ func GenerateJWTTokenForUser(user models.User, secretKey string) (string, error)
 	return tokenString, nil
 }
 
-func (s *Server) exchangeCodeForToken(code string) (string, error) {
-    // Google OAuth token endpoint
-    tokenEndpoint := "https://oauth2.googleapis.com/token"
+func (s *Server) exchangeCodeForToken(code string) (*oauth2.Token, error) {
+	config := &oauth2.Config{
+		ClientID:     s.Config.GoogleClientID,
+		ClientSecret: s.Config.GoogleClientSecret,
+		RedirectURL:  s.Config.GoogleRedirectURL,
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+		Endpoint:     google.Endpoint,
+	}
 
-    // Prepare the request body for token exchange
-    data := url.Values{
-        "code":          {code},
-        "client_id":     {s.Config.GoogleClientID},
-        "client_secret": {s.Config.GoogleClientSecret},
-        "redirect_uri":  {s.Config.GoogleRedirectURL},
-        "grant_type":    {"authorization_code"},
-    }
+	// Exchange the authorization code for an access token
+	token, err := config.Exchange(context.Background(), code)
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange code for token: %v", err)
+	}
 
-    // Make the POST request to exchange the code for a token
-    response, err := http.PostForm(tokenEndpoint, data)
-    if err != nil {
-        return "", fmt.Errorf("failed to exchange code for token: %v", err)
-    }
-    defer response.Body.Close()
-
-    if response.StatusCode != http.StatusOK {
-        return "", fmt.Errorf("received non-200 status code from token endpoint: %d", response.StatusCode)
-    }
-
-    // Decode the JSON response into a struct
-    var tokenResponse struct {
-        AccessToken string `json:"access_token"`
-        TokenType   string `json:"token_type"`
-        ExpiresIn   int    `json:"expires_in"`
-        IDToken     string `json:"id_token"`
-    }
-
-    if err := json.NewDecoder(response.Body).Decode(&tokenResponse); err != nil {
-        return "", fmt.Errorf("failed to decode token response: %v", err)
-    }
-
-    if tokenResponse.AccessToken == "" {
-        return "", fmt.Errorf("access_token not found in response")
-    }
-
-    return tokenResponse.AccessToken, nil
+	return token, nil
 }
 
 // getUserDataFromGoogle retrieves the user data from Google using the access token
