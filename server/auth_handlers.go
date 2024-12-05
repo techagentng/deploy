@@ -360,8 +360,17 @@ func generateJWTState(secret string) (string, error) {
         "exp": time.Now().Add(10 * time.Minute).Unix(),
         "iat": time.Now().Unix(),
     }
+
+    // Create a new JWT token
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    return token.SignedString([]byte(secret))
+
+    // Sign the token using the provided secret
+    signedToken, err := token.SignedString([]byte(secret))
+    if err != nil {
+        return "", fmt.Errorf("failed to sign JWT token: %w", err)
+    }
+
+    return signedToken, nil
 }
 
 
@@ -396,33 +405,28 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 }
 
 func validateJWTState(state, secret string) error {
-    // Log the raw state
-    fmt.Printf("Validating state: %s\n", state)
-
-    // Attempt to parse the JWT
+    // Parse the JWT token
     token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
+        // Verify the signing method
         if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
             return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
         }
+
+        // Return the secret for verification
         return []byte(secret), nil
     })
 
     if err != nil {
-        fmt.Printf("JWT parsing error: %v\n", err)
         return fmt.Errorf("invalid state token: %w", err)
     }
 
+    // Ensure the token is valid
     if !token.Valid {
-        fmt.Println("Token is invalid")
         return fmt.Errorf("invalid state token")
     }
 
-    fmt.Println("State token validated successfully")
     return nil
 }
-
-
-
 
 // HandleGoogleCallback processes the Google OAuth callback
 func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
