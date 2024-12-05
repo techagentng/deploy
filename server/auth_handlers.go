@@ -357,12 +357,13 @@ func (s *Server) handleLogin() gin.HandlerFunc {
 
 func generateJWTState(secret string) (string, error) {
     claims := jwt.MapClaims{
-        "exp": time.Now().Add(time.Minute * 10).Unix(), // Token expires in 10 minutes
+        "exp": time.Now().Add(10 * time.Minute).Unix(),
         "iat": time.Now().Unix(),
     }
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
     return token.SignedString([]byte(secret))
 }
+
 
 
 func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
