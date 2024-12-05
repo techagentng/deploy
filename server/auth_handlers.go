@@ -396,6 +396,7 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 
 		// Generate the JWT state
 		state, err := generateJWTState(s.Config.JWTSecret)
+		log.Println("nnnnnnnnn",state)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate state"})
 			return
