@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
+	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"gorm.io/gorm"
@@ -356,13 +357,18 @@ func (s *Server) handleLogin() gin.HandlerFunc {
 }
 
 func generateJWTState(secret string) (string, error) {
+    // Use a more specific claim structure
     claims := jwt.MapClaims{
         "exp": time.Now().Add(10 * time.Minute).Unix(),
         "iat": time.Now().Unix(),
+        "state": uuid.New().String(), // Add a unique state identifier
     }
 
-    // Create a new JWT token
+    // Create a new JWT token with a specific key ID or audience
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    
+    // Optionally set a key ID
+    token.Header["kid"] = "your-key-identifier"
 
     // Sign the token using the provided secret
     signedToken, err := token.SignedString([]byte(secret))
@@ -405,8 +411,8 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 }
 
 func validateJWTState(state, secret string) error {
-    // Parse the JWT token
-    token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
+    // Use jwt.ParseWithClaims instead of jwt.Parse
+    token, err := jwt.ParseWithClaims(state, &jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
         // Verify the signing method
         if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
             return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -416,6 +422,7 @@ func validateJWTState(state, secret string) error {
         return []byte(secret), nil
     })
 
+    // Handle parsing errors
     if err != nil {
         return fmt.Errorf("invalid state token: %w", err)
     }
