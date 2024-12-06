@@ -460,6 +460,8 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		code := c.Query("code")
 		state := c.Query("state")
+		log.Println("Received state:", c.Query("state"))
+		log.Println("Received code:", c.Query("code"))
 
 		// Verify the state
 		if !verifyState(state) {
