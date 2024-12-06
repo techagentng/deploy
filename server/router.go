@@ -82,7 +82,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.GET("/fb/auth", s.handleFBLogin())
 	apirouter.GET("fb/callback", s.handleFBCallback())
 	apirouter.GET("/incident_reports", s.handleGetAllReport()) //
-	apirouter.POST("/google/login", s.HandleGoogleLogin())
+	apirouter.GET("/google/login", s.HandleGoogleLogin())
 	apirouter.GET("/auth/google/callback", s.HandleGoogleCallback()) //
 	apirouter.GET("/incident_reports/state/:state", s.handleGetAllReportsByState())
 	apirouter.GET("/incident_reports/lga/:lga", s.handleGetAllReportsByLGA())
