@@ -407,43 +407,6 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 	}
 }
 
-func validateJWTState(state string, secret string) error {
-    // Parse and validate the JWT token using the provided secret
-    token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
-        // Ensure the signing method is correct
-        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-            return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-        }
-        return []byte(secret), nil
-    })
-
-    if err != nil {
-        return fmt.Errorf("failed to parse JWT state: %v", err)
-    }
-
-    // Extract claims from the token (e.g., exp, iat, state)
-    claims, ok := token.Claims.(jwt.MapClaims)
-    if !ok || !token.Valid {
-        return fmt.Errorf("invalid JWT state token")
-    }
-
-    // Check if the token is expired
-    if exp, ok := claims["exp"].(int64); ok {
-        if exp < time.Now().Unix() {
-            return fmt.Errorf("JWT state token has expired")
-        }
-    }
-
-    // Optionally: Check for specific fields or values in the token (e.g., "state")
-    if stateValue, ok := claims["state"].(string); ok {
-        // Validate the state value here if needed
-        log.Println("Validated state:", stateValue)
-    } else {
-        return fmt.Errorf("missing 'state' field in JWT token")
-    }
-
-    return nil
-}
 // Thread-safe in-memory state store
 var stateStore = sync.Map{}
 
@@ -465,7 +428,7 @@ func (s *Server) HandleGoogleCallback() gin.HandlerFunc {
 
 		// Verify the state
 		if !verifyState(state) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid or expired state"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid or expired statexx"})
 			return
 		}
 
