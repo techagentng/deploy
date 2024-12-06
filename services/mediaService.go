@@ -1021,7 +1021,6 @@ func (s *mediaService) GenerateImageThumbnail(mediaFile *multipart.FileHeader, t
         return fmt.Errorf("error opening media file: %v", err)
     }
     defer file.Close()
-
     // Decode the image
     img, _, err := image.Decode(file)
     if err != nil {
