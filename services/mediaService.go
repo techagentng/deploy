@@ -1013,6 +1013,7 @@ func (s *mediaService) ProcessImageFile(mediaFile *multipart.FileHeader, userID 
     return feedURL, thumbnailURL, fullSizeURL, nil
 }
 
+
 func (s *mediaService) GenerateImageThumbnail(mediaFile *multipart.FileHeader, thumbnailPath string) error {
     // Open the file from the multipart.FileHeader
     file, err := mediaFile.Open()
