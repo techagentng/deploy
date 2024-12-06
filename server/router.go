@@ -40,17 +40,8 @@ func (s *Server) setupRouter() *gin.Engine {
 	}))
 	r.Use(gin.Recovery())
 
-	// CORS middleware configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{
-			"https://citizenx.ng",
-			"http://localhost:3001",
-			"https://citizenx-9hk2.onrender.com",
-			"https://www.citizenx-9hk2.onrender.com",
-			"https://www.citizenx.ng",
-			"https://citizenx-9hk2.onrender.com/api/v1/google/login",
-			"https://citizenx-9hk2.onrender.com/api/v1/auth/google/callback",
-		},
+		AllowOrigins: []string{"*"}, // Allows all origins
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{
 			"Origin", 
@@ -62,7 +53,7 @@ func (s *Server) setupRouter() *gin.Engine {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-
+	
 	// Increase memory limit for multipart forms
 	r.MaxMultipartMemory = 32 << 20
 	// Define application routes
