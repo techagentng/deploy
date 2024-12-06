@@ -1009,7 +1009,6 @@ func (s *mediaService) ProcessImageFile(mediaFile *multipart.FileHeader, userID 
     }
 
     log.Printf("Processed image file successfully: %s", mediaFile.Filename)
-
     return feedURL, thumbnailURL, fullSizeURL, nil
 }
 
