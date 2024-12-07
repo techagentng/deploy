@@ -452,30 +452,65 @@ func parseCoordinates(c *gin.Context) (float64, float64, error) {
 }
 
 func (s *Server) handleUploadMedia() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		reportID := c.PostForm("report_id")
-		if reportID == "" {
-			response.JSON(c, "Missing report type ID", http.StatusBadRequest, nil, nil)
-			return
-		}
+    return func(c *gin.Context) {
+        // Retrieve report ID
+        reportID := c.PostForm("report_id")
+        if reportID == "" {
+            response.JSON(c, "Missing report type ID", http.StatusBadRequest, nil, nil)
+            return
+        }
 
-		// Process media files and collect URLs and types
-		feedURLs, fullsizeURLs, _,_,fileTypes, err := s.processAndSaveMedia(c)
-		if err != nil {
-			log.Printf("Error processing media: %v", err)
-			response.JSON(c, "Unable to process media files", http.StatusInternalServerError, nil, err)
-			return
-		}
+        // Process media files and collect URLs and types
+        feedURLs, fullsizeURLs, _, _, fileTypes, err := s.processAndSaveMedia(c)
+        if err != nil {
+            log.Printf("Error processing media: %v", err)
+            response.JSON(c, "Unable to process media files", http.StatusInternalServerError, nil, err)
+            return
+        }
 
-		// Respond with successful media upload details
-		response.JSON(c, "Media added to report successfully", http.StatusOK, gin.H{
-			"reportID":     reportID,
-			"feedURLs":     feedURLs,
-			"fullsizeURLs": fullsizeURLs,
-			"fileTypes":    fileTypes,
-		}, nil)
-	}
+        // Calculate points (10 points per media file)
+        mediaCount := len(feedURLs) + len(fileTypes) // Count all media items
+        points := mediaCount * 10
+
+        // Retrieve user ID from context
+        userI, exists := c.Get("user")
+        if !exists {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+            return
+        }
+
+        user, ok := userI.(*models.User)
+        if !ok {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type"})
+            return
+        }
+
+        // Save the reward
+        reward := &models.Reward{
+            IncidentReportID: reportID,
+            UserID:           user.ID,
+            RewardType:       "media_upload",
+            Point:            points,
+            Balance:          points, // Start with the same value for new rewards
+        }
+
+        if err := s.RewardRepository.SaveReward(reward); err != nil {
+            log.Printf("Error saving reward: %v\n", err)
+            response.JSON(c, "Unable to save reward", http.StatusInternalServerError, nil, err)
+            return
+        }
+
+        // Respond with successful media upload and reward details
+        response.JSON(c, "Media added to report successfully", http.StatusOK, gin.H{
+            "reportID":     reportID,
+            "feedURLs":     feedURLs,
+            "fullsizeURLs": fullsizeURLs,
+            "fileTypes":    fileTypes,
+            "reward":       gin.H{"points": points, "balance": reward.Balance},
+        }, nil)
+    }
 }
+
 
 
 func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []string, []string, []string, error) {
