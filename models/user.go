@@ -185,3 +185,11 @@ func (u *User) VerifyPassword(password string) error {
 	}
 	return nil // Passwords match
 }
+
+// OAuthState struct to store the state in the database
+type OAuthState struct {
+	ID        string    `json:"id"`        // Unique identifier for the state
+	State     string    `json:"state"`     // The generated state
+	UserID    string    `json:"user_id"`   // The user associated with this state (if applicable)
+	CreatedAt time.Time `json:"created_at"` // Timestamp for when the state was created
+}

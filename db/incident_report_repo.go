@@ -90,6 +90,8 @@ type IncidentReportRepository interface {
 	ReportUser(ctx context.Context, userID uint) error
 	CreateFollow(follow models.Follow) error
 	GetFollowersByReport(reportID uuid.UUID) ([]models.User, error)
+	GetOAuthState(state string) (*models.OAuthState, error)
+	SaveOAuthState(oauthState *models.OAuthState) error
 }
 
 type incidentReportRepo struct {
@@ -1546,3 +1548,17 @@ func (repo *incidentReportRepo) GetFollowersByReport(reportID uuid.UUID) ([]mode
 	return followers, err
 }
 
+func (repo *incidentReportRepo) GetOAuthState(state string) (*models.OAuthState, error) {
+    var oauthState models.OAuthState
+    if err := repo.DB.Where("state = ?", state).First(&oauthState).Error; err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, nil // State not found
+        }
+        return nil, err // Other errors
+    }
+    return &oauthState, nil
+}
+
+func (repo *incidentReportRepo) SaveOAuthState(oauthState *models.OAuthState) error {
+    return repo.DB.Create(oauthState).Error
+}
