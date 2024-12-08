@@ -83,7 +83,7 @@ type IncidentReportRepository interface {
 	GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error)
 	GetReportTypeeByID(reportTypeID string) (*models.ReportType, error)
 	GetLastReportIDByUserID(userID uint) (string, error)
-	GetAllIncidentReportsByUser(userID uint) ([]map[string]interface{}, error)
+	GetAllIncidentReportsByUser(userID uint, page int) ([]map[string]interface{}, error)
 	ReportExists(reportID uuid.UUID) (bool, error)
 	UpdateBlockRequest(ctx context.Context, reportID uuid.UUID) error
 	BlockUser(ctx context.Context, userID uint) error
