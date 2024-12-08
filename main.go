@@ -1,30 +1,55 @@
 package main
 
 import (
+	"context"
+	"log"
+
+	"firebase.google.com/go"
+	"google.golang.org/api/option"
+
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
 	"github.com/techagentng/citizenx/mailingservices"
 	"github.com/techagentng/citizenx/server"
 	"github.com/techagentng/citizenx/services"
-	"log"
-	_ "net/url"
 )
 
+var firebaseApp *firebase.App
+
+func InitFirebase() {
+	// Load Firebase credentials JSON file
+	opt := option.WithCredentialsFile("path/to/firebase-credentials.json")
+	app, err := firebase.NewApp(context.Background(), nil, opt)
+	if err != nil {
+		log.Fatalf("error initializing Firebase app: %v", err)
+	}
+	firebaseApp = app
+	log.Println("Firebase initialized")
+}
+
 func main() {
+	// Load configuration
 	conf, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Initialize Firebase
+	InitFirebase()
+
 	// Initialize Mailgun client
 	mailgunClient := &mailingservices.Mailgun{}
 	mailgunClient.Init()
 
+	// Initialize database
 	gormDB := db.GetDB(conf)
+
 	// Seed roles
 	if err := db.SeedRoles(gormDB.DB); err != nil {
 		log.Fatalf("error seeding roles: %v", err)
 	}
+
+	// Repositories
 	authRepo := db.NewAuthRepo(gormDB)
 	mediaRepo := db.NewMediaRepo(gormDB)
 	incidentReportRepo := db.NewIncidentReportRepo(gormDB)
@@ -32,6 +57,7 @@ func main() {
 	likeRepo := db.NewLikeRepo(gormDB)
 	postRepo := db.NewPostRepo(gormDB)
 
+	// Services
 	authService := services.NewAuthService(authRepo, conf)
 	mediaService := services.NewMediaService(mediaRepo, rewardRepo, incidentReportRepo, conf)
 	incidentReportService := services.NewIncidentReportService(incidentReportRepo, rewardRepo, mediaRepo, conf)
@@ -39,6 +65,7 @@ func main() {
 	likeService := services.NewLikeService(likeRepo, conf)
 	postService := services.NewPostService(postRepo, conf)
 
+	// Server setup
 	s := &server.Server{
 		Mail:                     mailgunClient,
 		Config:                   conf,
@@ -56,11 +83,6 @@ func main() {
 		DB:                       db.GormDB{},
 	}
 
-	// r := gin.Default()
-	// r.Use(cors.Default())
-	// r.ForwardedByClientIP = true
-	// r.SetTrustedProxies([]string{"127.0.0.1"})
-
-	// r.Run(":8080")
+	// Start server
 	s.Start()
 }
