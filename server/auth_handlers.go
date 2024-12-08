@@ -399,16 +399,16 @@ func generateState(length int) (string, error) {
 func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
     return func(c *gin.Context) {
         // Google OAuth2 configuration
-        config := &oauth2.Config{
-            ClientID:     s.Config.GoogleClientID,
-            ClientSecret: s.Config.GoogleClientSecret,
-            RedirectURL:  s.Config.GoogleRedirectURL,
-            Endpoint:     google.Endpoint,
-            Scopes: []string{
-                "https://www.googleapis.com/auth/userinfo.email",
-                "https://www.googleapis.com/auth/userinfo.profile",
-            },
-        }
+        // config := &oauth2.Config{
+        //     ClientID:     s.Config.GoogleClientID,
+        //     ClientSecret: s.Config.GoogleClientSecret,
+        //     RedirectURL:  s.Config.GoogleRedirectURL,
+        //     Endpoint:     google.Endpoint,
+        //     Scopes: []string{
+        //         "https://www.googleapis.com/auth/userinfo.email",
+        //         "https://www.googleapis.com/auth/userinfo.profile",
+        //     },
+        // }
 
         // Generate the state
         state, err := generateState(32) // Implement this function to generate a random state
@@ -432,29 +432,19 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
         }
 
         // Create the Google Auth URL
-        authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+        // authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+		url := "https://accounts.google.com/o/oauth2/auth?client_id=3542246689-jutm6p6ctc8he0k9ec4rg4f2eid0krmb.apps.googleusercontent.com&redirect_uri=https://www.citizenx.ng/api/v1/auth/google/callback&response_type=code&scope=openid%20profile%20email&state=SOME_GENERATED_STATE"
 
         // Redirect the user to the Google Auth URL
-        c.Redirect(http.StatusTemporaryRedirect, authURL)
+        c.Redirect(http.StatusTemporaryRedirect, url)
     }
 }
-
-
 
 func verifyState(state string, secret string) bool {
     token, err := jwt.Parse(state, func(token *jwt.Token) (interface{}, error) {
         return []byte(secret), nil
     })
     return err == nil && token.Valid
-}
-
-func validateAccessToken(token string) (bool, error) {
-	resp, err := http.Get("https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=" + token)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK, nil
 }
 
 func generateJWT(user *models.User) (string, error) {
