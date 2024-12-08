@@ -433,7 +433,7 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
 
         // Create the Google Auth URL
         // authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
-		url := "https://accounts.google.com/o/oauth2/auth?client_id=3542246689-jutm6p6ctc8he0k9ec4rg4f2eid0krmb.apps.googleusercontent.com&redirect_uri=https://www.citizenx.ng/api/v1/auth/google/callback&response_type=code&scope=openid%20profile%20email&state=SOME_GENERATED_STATE"
+		url := "https://accounts.google.com/o/oauth2/auth?client_id=3542246689-jutm6p6ctc8he0k9ec4rg4f2eid0krmb.apps.googleusercontent.com&redirect_uri=https://citizenx-9hk2.onrender.com/api/v1/auth/google/callback&response_type=code&scope=openid%20profile%20email&state=SOME_GENERATED_STATE"
 
         // Redirect the user to the Google Auth URL
         c.Redirect(http.StatusTemporaryRedirect, url)
