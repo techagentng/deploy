@@ -83,13 +83,14 @@ func (r *rewardRepo) GetUserRewardBalance(userID uint) (int, error) {
 	var balance int
 	err := r.DB.Model(&models.Reward{}).
 		Where("user_id = ?", userID).
-		Select("COALESCE(SUM(balance), 0)"). // Use COALESCE to handle NULL values
+		Select("COALESCE(SUM(point), 0) AS balance"). // Sum the `Point` field
 		Scan(&balance).Error
 	if err != nil {
 		return 0, err
 	}
 	return balance, nil
 }
+
 
 func (r *rewardRepo) GetRewardPointByReportID(reportID string) (int, error) {
 	// Initialize a variable to store the reward point
