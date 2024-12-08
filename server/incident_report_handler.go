@@ -1372,23 +1372,27 @@ func (s *Server) HandleGetSubReportsByCategory() gin.HandlerFunc {
 func (s *Server) HandleGetAllReportsByUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract user ID from the context
-		userIDCtx, ok := c.Get("userID")
-		if !ok {
-			response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("userID not found in context", http.StatusInternalServerError))
+		userIDCtx, exists := c.Get("userID")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
 			return
 		}
 
 		// Assert the type of userID as uint
 		userID, ok := userIDCtx.(uint)
 		if !ok {
-			response.JSON(c, "", http.StatusInternalServerError, nil, errors.New("userID is not of type uint", http.StatusInternalServerError))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
 			return
 		}
 
+		// Fetch page and limit query parameters for pagination
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))  // Default to page 1
+		// limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20")) 
+
 		// Fetch reports for the user
-		reports, err := s.IncidentReportRepository.GetAllIncidentReportsByUser(userID)
+		reports, err := s.IncidentReportRepository.GetAllIncidentReportsByUser(userID, page)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports: " + err.Error()})
 			return
 		}
 
@@ -1396,6 +1400,7 @@ func (s *Server) HandleGetAllReportsByUser() gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"reports": reports})
 	}
 }
+
 
 func (s *Server) HandleGetVoteCounts() gin.HandlerFunc {
 	return func(c *gin.Context) {
