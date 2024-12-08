@@ -964,7 +964,6 @@ func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]map[
 }
 
 
-
 func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID uuid.UUID, bookmark *models.Bookmark) error {
 	return repo.DB.Where("user_id = ? AND report_id = ?", userID, reportID).
 		First(bookmark).Error
