@@ -925,15 +925,15 @@ func (repo *incidentReportRepo) GetSubReportsByCategory(category string) ([]mode
 }
 
 func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]map[string]interface{}, error) {
-	var reports []map[string]interface{} // Change to map for dynamic fields
+	var reports []map[string]interface{} // For dynamic fields
 
-	// Query the incident_reports table by user_id, join with users table to get thumbnail
+	// Query the incident_reports table by user_id, join with users table to get profile image
 	err := repo.DB.
 		Table("incident_reports").
 		Select(`
 			incident_reports.*, 
-			users.thumb_nail_url AS profile_image,  -- Renaming thumbnail to profile_image
-			users.profile_image AS user_profile_image  -- Keeping original user_profile_image for reference if needed
+			users.thumb_nail_url AS profile_image,  
+			users.profile_image AS user_profile_image 
 		`).
 		Joins("JOIN users ON users.id = incident_reports.user_id").
 		Where("incident_reports.user_id = ?", userID).
@@ -941,25 +941,28 @@ func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]map[
 		Find(&reports).Error
 
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("no incident reports found for this user")
-		}
 		return nil, err // Return the error if something went wrong in the query
 	}
 
-	// Iterate over the reports to ensure profile_image is set from thumbnail_url
+	// If no reports are found, return an empty slice instead of an error
+	if len(reports) == 0 {
+		return []map[string]interface{}{}, nil
+	}
+
+	// Process the reports to set profile_image
 	for _, report := range reports {
 		if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
 			report["profile_image"] = profileImage
 		} else if userProfileImage, exists := report["user_profile_image"]; exists && userProfileImage != "" {
-			report["profile_image"] = userProfileImage // Fallback to the original profile_image if necessary
+			report["profile_image"] = userProfileImage
 		} else {
-			report["profile_image"] = nil // Or set a default value if required
+			report["profile_image"] = nil // Or set a default fallback value
 		}
 	}
 
 	return reports, nil
 }
+
 
 
 func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID uuid.UUID, bookmark *models.Bookmark) error {
