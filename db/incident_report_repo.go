@@ -924,24 +924,35 @@ func (repo *incidentReportRepo) GetSubReportsByCategory(category string) ([]mode
 	return subReports, nil
 }
 
-func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]map[string]interface{}, error) {
+func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint, page int) ([]map[string]interface{}, error) {
 	var reports []map[string]interface{} // For dynamic fields
+
+	if page < 1 {
+		page = 1
+	}
+
+	offset := (page - 1) * 20
 
 	// Query the incident_reports table by user_id, join with users table to get profile image
 	err := repo.DB.
 		Table("incident_reports").
 		Select(`
 			incident_reports.*, 
-			users.thumb_nail_url AS profile_image,  
-			users.profile_image AS user_profile_image 
+			users.thumb_nail_url AS thumbnail_urls,  -- Align naming to match GetAllReports
+			users.profile_image AS profile_image 
 		`).
 		Joins("JOIN users ON users.id = incident_reports.user_id").
 		Where("incident_reports.user_id = ?", userID).
-		Order("incident_reports.timeof_incidence DESC").
-		Find(&reports).Error
+		Order("incident_reports.created_at DESC"). // Use the same ordering as GetAllReports
+		Limit(20).
+		Offset(offset).
+		Scan(&reports).Error
 
 	if err != nil {
-		return nil, err // Return the error if something went wrong in the query
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("no incident reports found for the user")
+		}
+		return nil, err
 	}
 
 	// If no reports are found, return an empty slice instead of an error
@@ -949,19 +960,25 @@ func (repo *incidentReportRepo) GetAllIncidentReportsByUser(userID uint) ([]map[
 		return []map[string]interface{}{}, nil
 	}
 
-	// Process the reports to set profile_image
+	// Process the reports to set profile_image and handle feed_urls
 	for _, report := range reports {
 		if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
 			report["profile_image"] = profileImage
-		} else if userProfileImage, exists := report["user_profile_image"]; exists && userProfileImage != "" {
-			report["profile_image"] = userProfileImage
+		} else if thumbnailUrl, exists := report["thumbnail_urls"]; exists && thumbnailUrl != "" {
+			report["profile_image"] = thumbnailUrl
 		} else {
-			report["profile_image"] = nil // Or set a default fallback value
+			report["profile_image"] = nil
+		}
+
+		// Ensure feed_urls is properly handled
+		if feedUrls, exists := report["feed_urls"]; exists {
+			report["feed_urls"] = feedUrls
 		}
 	}
 
 	return reports, nil
 }
+
 
 
 func (repo *incidentReportRepo) IsBookmarked(userID uint, reportID uuid.UUID, bookmark *models.Bookmark) error {
