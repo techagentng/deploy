@@ -41,17 +41,12 @@ func (s *Server) setupRouter() *gin.Engine {
 	r.Use(gin.Recovery())
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"*"}, // Allows all origins
+		AllowOrigins: []string{"https://www.citizenx.ng"}, // Replace with your frontend's origin
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders: []string{
-			"Origin", 
-			"Authorization", 
-			"Content-Type", 
-			"X-Client-State", // Add this header
-		},
-		ExposeHeaders:    []string{"Content-Length", "X-Client-State"},
+		AllowHeaders: []string{"Origin", "Authorization", "Content-Type", "X-Client-State"},
+		ExposeHeaders: []string{"Content-Length", "X-Client-State"},
 		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
+		MaxAge: 12 * time.Hour,
 	}))
 	
 	// Increase memory limit for multipart forms
