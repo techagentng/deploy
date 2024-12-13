@@ -210,90 +210,116 @@ func init() {
 }
 
 func (s *Server) handleSignup() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Parse multipart form data
-		if err := c.Request.ParseMultipartForm(10 << 20); err != nil { // 10 MB max size
-			response.JSON(c, "", http.StatusBadRequest, nil, err)
-			return
-		}
+    return func(c *gin.Context) {
+        // Parse multipart form data
+        if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
+            response.JSON(c, "", http.StatusBadRequest, nil, err)
+            return
+        }
 
-		var filePath string // This will hold the S3 URL
+        var filePath string // This will hold the S3 URL
 
-		// Get the profile image from the form
-		file, handler, err := c.Request.FormFile("profile_image")
-		if err == nil {
-			defer file.Close()
+        // Get the profile image from the form
+        file, handler, err := c.Request.FormFile("profile_image")
+        if err == nil {
+            defer file.Close()
 
-			// Create S3 client
-			s3Client, err := createS3Client()
-			if err != nil {
-				response.JSON(c, "", http.StatusInternalServerError, nil, err)
-				return
-			}
+            // Create S3 client
+            s3Client, err := createS3Client()
+            if err != nil {
+                response.JSON(c, "", http.StatusInternalServerError, nil, err)
+                return
+            }
 
-			// Generate unique filename
-			userID := c.PostForm("user_id")
-			filename := fmt.Sprintf("%s_%s", userID, handler.Filename)
+            // Generate unique filename
+            userID := c.PostForm("user_id")
+            filename := fmt.Sprintf("%s_%s", userID, handler.Filename)
 
-			// Upload file to S3
-			filePath, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
-			if err != nil {
-				response.JSON(c, "", http.StatusInternalServerError, nil, err)
-				return
-			}
-		} else if err == http.ErrMissingFile {
-			filePath = "uploads/default-profile.png" // Adjust this to a default S3 URL if necessary
-		} else {
-			response.JSON(c, "", http.StatusBadRequest, nil, err)
-			return
-		}
+            // Upload file to S3
+            filePath, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), filename)
+            if err != nil {
+                response.JSON(c, "", http.StatusInternalServerError, nil, err)
+                return
+            }
+        } else if err == http.ErrMissingFile {
+            filePath = "uploads/default-profile.png" // Adjust this to a default S3 URL if necessary
+        } else {
+            response.JSON(c, "", http.StatusBadRequest, nil, err)
+            return
+        }
 
-		// Decode the other form data into the user struct
-		var user models.User
-		user.Fullname = c.PostForm("fullname")
-		user.Username = c.PostForm("username")
-		user.Telephone = c.PostForm("telephone")
-		user.Email = c.PostForm("email")
-		user.Password = c.PostForm("password")
-		user.ThumbNailURL = filePath // Set the S3 URL in the user struct
+        // Decode the other form data into the user struct
+        var user models.User
+        user.Fullname = c.PostForm("fullname")
+        user.Username = c.PostForm("username")
+        user.Telephone = c.PostForm("telephone")
+        user.Email = c.PostForm("email")
+        user.Password = c.PostForm("password")
+        user.ThumbNailURL = filePath // Set the S3 URL in the user struct
 
-		// Fetch the UUID for the role
-		role, err := s.AuthService.GetRoleByName("User") // Use a service method to fetch the role by name
-		if err != nil {
-			response.JSON(c, "", http.StatusInternalServerError, nil, err)
-			return
-		}
-		log.Printf("Fetched role ID for 'User': %s", role.ID.String())
+        // Fetch the UUID for the role
+        role, err := s.AuthService.GetRoleByName("User") // Use a service method to fetch the role by name
+        if err != nil {
+            response.JSON(c, "", http.StatusInternalServerError, nil, err)
+            return
+        }
+        log.Printf("Fetched role ID for 'User': %s", role.ID.String())
 
-		// Assign the role UUID directly to RoleID
-		user.RoleID = role.ID
+        // Assign the role UUID directly to RoleID
+        user.RoleID = role.ID
 
-		// Validate the user data using the validator package
-		validate := validator.New()
-		if err := validate.Struct(user); err != nil {
-			response.JSON(c, "", http.StatusBadRequest, nil, err)
-			return
-		}
+        // Validate the user data using the validator package
+        validate := validator.New()
+        if err := validate.Struct(user); err != nil {
+            response.JSON(c, "", http.StatusBadRequest, nil, err)
+            return
+        }
 
-		// Signup the user using the service
-		userResponse, err := s.AuthService.SignupUser(&user)
-		if err != nil {
-			response.HandleErrors(c, err) // Use HandleErrors to handle different error types
-			return
-		}
+        // Signup the user using the service
+        createdUser, err := s.AuthService.SignupUser(&user)
+        if err != nil {
+            response.HandleErrors(c, err) // Use HandleErrors to handle different error types
+            return
+        }
 
-		// Send welcome email
-		subject := "Welcome to Our Platform!"
+        // Generate tokens for the newly created user
+        accessToken, refreshToken, err := jwtPackage.GenerateTokenPair(
+            createdUser.Email, 
+            s.Config.JWTSecret, 
+            createdUser.AdminStatus, 
+            createdUser.ID, 
+            role.Name,
+        )
+        if err != nil {
+            log.Printf("Error generating tokens for user %s: %v", createdUser.Email, err)
+            response.JSON(c, "Failed to generate tokens", http.StatusInternalServerError, nil, err)
+            return
+        }
 
-		_, err = s.Mail.SendWelcomeMessage(user.Email, subject)
-		if err != nil {
-			log.Printf("Error sending welcome email: %v", err)
-			// Log the error but do not interrupt the signup flow
-		}
+        // Send welcome email
+        subject := "Welcome to Our Platform!"
+        _, err = s.Mail.SendWelcomeMessage(createdUser.Email, subject)
+        if err != nil {
+            log.Printf("Error sending welcome email: %v", err)
+            // Log the error but do not interrupt the signup flow
+        }
 
-		response.JSON(c, "Signup successful, check your email for verification", http.StatusCreated, userResponse, nil)
-	}
+        // Return response including tokens
+        response.JSON(c, "Signup successful", http.StatusCreated, models.LoginResponse{
+            UserResponse: models.UserResponse{
+                ID:        createdUser.ID,
+                Fullname:  createdUser.Fullname,
+                Username:  createdUser.Username,
+                Telephone: createdUser.Telephone,
+                Email:     createdUser.Email,
+                RoleName:  role.Name,
+            },
+            AccessToken:  accessToken,
+            RefreshToken: refreshToken,
+        }, nil)
+    }
 }
+
 
 
 // Middleware to redirect non-credential users to sign-in page for certain actions
@@ -399,16 +425,16 @@ func generateState(length int) (string, error) {
 func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
     return func(c *gin.Context) {
         // Google OAuth2 configuration
-        // config := &oauth2.Config{
-        //     ClientID:     s.Config.GoogleClientID,
-        //     ClientSecret: s.Config.GoogleClientSecret,
-        //     RedirectURL:  s.Config.GoogleRedirectURL,
-        //     Endpoint:     google.Endpoint,
-        //     Scopes: []string{
-        //         "https://www.googleapis.com/auth/userinfo.email",
-        //         "https://www.googleapis.com/auth/userinfo.profile",
-        //     },
-        // }
+        config := &oauth2.Config{
+            ClientID:     s.Config.GoogleClientID,
+            ClientSecret: s.Config.GoogleClientSecret,
+            RedirectURL:  s.Config.GoogleRedirectURL,
+            Endpoint:     google.Endpoint,
+            Scopes: []string{
+                "https://www.googleapis.com/auth/userinfo.email",
+                "https://www.googleapis.com/auth/userinfo.profile",
+            },
+        }
 
         // Generate the state
         state, err := generateState(32) // Implement this function to generate a random state
@@ -432,11 +458,11 @@ func (s *Server) HandleGoogleLogin() gin.HandlerFunc {
         }
 
         // Create the Google Auth URL
-        // authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
-		url := "https://accounts.google.com/o/oauth2/auth?client_id=3542246689-jutm6p6ctc8he0k9ec4rg4f2eid0krmb.apps.googleusercontent.com&redirect_uri=https://citizenx-9hk2.onrender.com/api/v1/auth/google/callback&response_type=code&scope=openid%20profile%20email&state=SOME_GENERATED_STATE"
+        authURL := config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+		// url := "https://accounts.google.com/o/oauth2/auth?client_id=3542246689-jutm6p6ctc8he0k9ec4rg4f2eid0krmb.apps.googleusercontent.com&redirect_uri=https://citizenx-9hk2.onrender.com/api/v1/auth/google/callback&response_type=code&scope=openid%20profile%20email&state=SOME_GENERATED_STATE"
 
         // Redirect the user to the Google Auth URL
-        c.Redirect(http.StatusTemporaryRedirect, url)
+        c.Redirect(http.StatusTemporaryRedirect, authURL)
     }
 }
 

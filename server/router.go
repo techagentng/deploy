@@ -41,7 +41,7 @@ func (s *Server) setupRouter() *gin.Engine {
 	r.Use(gin.Recovery())
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"https://www.citizenx.ng","https://citizenx-dashboard-sbqx.onrender.com/"}, // Replace with your frontend's origin
+		AllowOrigins: []string{"https://www.citizenx.ng","https://citizenx-dashboard-sbqx.onrender.com"}, // Replace with your frontend's origin
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{"Origin", "Authorization", "Content-Type", "X-Client-State"},
 		ExposeHeaders: []string{"Content-Length", "X-Client-State"},
