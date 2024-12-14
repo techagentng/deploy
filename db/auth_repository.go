@@ -560,3 +560,4 @@ func (a *authRepo) FindOrCreateUser(email, name string) (*models.User, error) {
 
     return &user, nil
 }
+

@@ -292,6 +292,80 @@ func generateIDls() uuid.UUID {
 	return id
 }
 
+var vulgarWords = []string {
+    "Arsehole",
+    "Asshat",
+    "Asshole",
+    "Bastard (slang)",
+    "Big black cock",
+    "Bitch (slang)",
+    "Bloody",
+    "Blowjob",
+    "Bollocks",
+    "Bugger",
+    "Bullshit",
+    "Chicken shit",
+    "Clusterfuck",
+    "Cock (slang)",
+    "Cocksucker",
+    "Coonass",
+    "Cornhole (slang)",
+    "Cox–Zucker machine",
+    "Cracker (term)",
+    "Cunt",
+    "Damn",
+    "Dick (slang)",
+    "Enshittification",
+    "Faggot",
+    "Feck",
+    "Fuck",
+    "Fuck her right in the pussy",
+    "Fuck Joe Biden",
+    "Fuck, marry, kill",
+    "Fuckery",
+    "Grab 'em by the pussy",
+    "Healslut",
+    "Jesus fucking christ",
+    "Kike",
+    "Motherfucker",
+    "Nigga",
+    "Nigger",
+    "Paki (slur)",
+    "Poof",
+    "Poofter",
+    "Prick (slang)",
+    "Pussy",
+    "Ratfucking",
+    "Retard (pejorative)",
+    "Russian warship, go fuck yourself",
+    "Shit",
+    "Shit happens",
+    "Shithouse",
+    "Shitposting",
+    "Shitter",
+    "Shut the fuck up",
+    "Shut the hell up",
+    "Slut",
+    "Son of a bitch",
+    "Spic",
+    "Taking the piss",
+    "Twat",
+    "Unclefucker",
+    "Wanker",
+    "Whore",
+}
+
+
+func containsVulgarWords(description string, words []string) bool {
+	lowerDescription := strings.ToLower(description)
+	for _, word := range words {
+		if strings.Contains(lowerDescription, strings.ToLower(word)) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) handleIncidentReport() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Retrieve user from the context
@@ -317,52 +391,27 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
-		// Retrieve full name and profile image from context
-		fullNameInterface, exists := c.Get("fullName")
-		if !exists {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Full name not found"})
+		// Retrieve description from the form
+		description := c.PostForm("description")
+
+		// Check for vulgar words in the description
+		if containsVulgarWords(description, vulgarWords) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Description contains inappropriate language"})
 			return
 		}
 
-		fullName, ok := fullNameInterface.(string)
-		if !ok {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid type for full name"})
-			return
-		}
-		
-		// Extract username and profile image from context
-		usernameInterface, exists := c.Get("username")
-		if !exists {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Username not found"})
-			return
-		}
+		// Other data retrieval and processing...
+		fullName := c.GetString("fullName")
+		username := c.GetString("username")
+		profileImage := c.GetString("profile_image")
 
-		username, ok := usernameInterface.(string)
-		if !ok {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid type for username"})
-			return
-		}
-
-		profileImageInterface, exists := c.Get("profile_image")
-		if !exists {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Profile image not found"})
-			return
-		}
-
-		profileImage, ok := profileImageInterface.(string)
-		if !ok {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid type for profile image"})
-			return
-		}
-
-		// Create and populate the IncidentReport model
 		incidentReport := &models.IncidentReport{
 			ID:              reportID,
-			UserID:          user.ID,  // Add the user ID to the incident report
+			UserID:          user.ID,
 			UserFullname:    fullName,
 			UserUsername:    username,
 			DateOfIncidence: c.PostForm("date_of_incidence"),
-			Description:     c.PostForm("description"),
+			Description:     description,
 			StateName:       c.PostForm("state_name"),
 			LGAName:         c.PostForm("lga_name"),
 			Latitude:        lat,
@@ -373,45 +422,10 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			Rating:          c.PostForm("rating"),
 			Category:        c.PostForm("category"),
 			ThumbnailURLs:   profileImage,
-			// Set TimeOfIncidence to the current time
-			TimeofIncidence: time.Now(),  // Set the current time here
+			TimeofIncidence: time.Now(),
 		}
 
-		// Create and populate the ReportType model
-		reportType := &models.ReportType{
-			ID:                   uuid.New(),
-			UserID:               user.ID,  // Ensure the report type is associated with the user
-			IncidentReportID:     reportID,
-			Category:             incidentReport.Category,
-			StateName:            incidentReport.StateName,
-			LGAName:              incidentReport.LGAName,
-			IncidentReportRating: incidentReport.Rating,
-			DateOfIncidence:      time.Now(),
-		}
-
-		// Save ReportType
-		if _, err := s.IncidentReportRepository.SaveReportType(reportType); err != nil {
-			log.Printf("Error saving report type: %v\n", err)
-			response.JSON(c, "Unable to save report type", http.StatusInternalServerError, nil, err)
-			return
-		}
-
-		// Create and populate the SubReport model
-		subReport := &models.SubReport{
-			ID:            uuid.New(),
-			ReportTypeID:  reportType.ID,
-			SubReportType: c.PostForm("sub_report_type"),
-		}
-
-		// Save SubReport
-		savedSubReport, err := s.IncidentReportRepository.SaveSubReport(subReport)
-		if err != nil {
-			log.Printf("Error saving sub-report: %v\n", err)
-			response.JSON(c, "Unable to save sub-report", http.StatusInternalServerError, nil, err)
-			return
-		}
-
-		// Save the incident report to the database
+		// Save incident report and respond...
 		savedIncidentReport, err := s.IncidentReportService.SaveReport(user.ID, lat, lng, incidentReport, reportID.String(), 0)
 		if err != nil {
 			log.Printf("Error saving incident report: %v\n", err)
@@ -419,13 +433,11 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
-		// Return reportID, reportTypeID, and subReportID in the response
-		response.JSON(c, "Incident Report Submitted Successfully", http.StatusCreated, gin.H{
+		c.JSON(http.StatusCreated, gin.H{
+			"message":             "Incident Report Submitted Successfully",
 			"reportID":            reportID.String(),
-			"reportTypeID":        reportType.ID.String(),
-			"subReportID":         savedSubReport.ID.String(),
 			"savedIncidentReport": savedIncidentReport,
-		}, nil)
+		})
 	}
 }
 

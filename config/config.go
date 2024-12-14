@@ -37,6 +37,7 @@ type Config struct {
 	AWS_ACCESS_KEY_ID            string `envconfig:"aws_access_key_id"`
 	AWS_SECRET_ACCESS_KEY        string `envconfig:"aws_secret_access_key"`
 	FRONTEND_URL        string `envconfig:"frontend_url"`
+	GOOGLE_CLOUD_PROJECT string `envconfig:"google_cloud_project"`
 }
 
 func Load() (*Config, error) {
