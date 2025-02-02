@@ -36,7 +36,7 @@ const AuthForgotPassword = ({ ...others }) => {
             onSubmit={async (values, { setErrors, setStatus, setSubmitting }) => {
                 try {
                     await forgotPassword(values.email); // Call forgotPassword function
-
+            
                     if (scriptedRef.current) {
                         setStatus({ success: true });
                         setSubmitting(false);
@@ -59,7 +59,9 @@ const AuthForgotPassword = ({ ...others }) => {
                     console.error(err);
                     if (scriptedRef.current) {
                         setStatus({ success: false });
-                        setErrors({ submit: err.message });
+                        // Extract the error message from the response
+                        const errorMessage = err.errors || 'An error occurred. Please try again.';
+                        setErrors({ submit: errorMessage }); // Set the error message
                         setSubmitting(false);
                     }
                 }

@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getSubReportsByCategory } from 'services/reportService';
-import { useSelector, useDispatch } from 'react-redux';
-import { Card, CardContent, Grid, Typography, MenuItem, TextField } from '@mui/material';
+import { useSelector } from 'react-redux';
+import { Card, CardContent, Grid, Typography } from '@mui/material';
 import tin from './tin.jpg';
 import BarChart from './barchart';
 import PieChart from './piechart';
 import MainCard from 'ui-component/cards/MainCard';
 import { gridSpacing } from 'store/constant';
-import statesAndLgas from 'layout/MainLayout/Header/statesAndLgas.json';
 // import { getPercentCount } from 'store/slices/graphs';
 // import PieChart from './piechart';
 
@@ -19,9 +18,7 @@ const SubReportDetailsPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { state: selectedState, lga } = useSelector((state) => state.graphs.lgaState);
-    const [lgas, setLgas] = useState('');
-    const [selectedLga, setSelectedLga] = useState('');
-    const dispatch = useDispatch();
+    // const dispatch = useDispatch();
 
     useEffect(() => {
         if (state) {
@@ -50,22 +47,6 @@ const SubReportDetailsPage = () => {
                 });
         }
     }, [state]);
-
-    useEffect(() => {
-        if (selectedState) {
-            const stateData = statesAndLgas.find((stateObj) => stateObj.state === selectedState);
-            if (stateData) {
-                console.log('xxxxxxxxx', stateData);
-                setLgas(stateData.lgas);
-            }
-        }
-    }, [selectedState]);
-
-    const handleLgaChange = (event) => {
-        const lgaName = event.target.value;
-        setSelectedLga(lgaName);
-        dispatch(setLga(lgaName)); // Dispatch to Redux
-    };
 
     return (
         <div>
@@ -124,60 +105,19 @@ const SubReportDetailsPage = () => {
                             <Card variant="outlined" sx={{ border: '1px solid #ccc', boxShadow: 'none', padding: 2 }}>
                                 <CardContent>
                                     <Grid container direction="column" alignItems="flex-start">
-                                        {/* Dropdown for selecting LGA */}
                                         <Grid item>
-                                            <TextField
-                                                id="lga-select"
-                                                select
-                                                fullWidth
-                                                label="Know Your LGA Chairman"
-                                                value={selectedLga}
-                                                onChange={handleLgaChange} // On change, it will update selectedLga
-                                                helperText="Please select an LGA"
-                                                disabled={loading || lgas.length === 0}
-                                            >
-                                                <MenuItem value="">
-                                                    <em>Select an LGA</em>
-                                                </MenuItem>
-                                                {lgas.length > 0 ? (
-                                                    lgas.map((lga) => (
-                                                        <MenuItem key={lga.id} value={lga.id}>
-                                                            {lga}
-                                                        </MenuItem>
-                                                    ))
-                                                ) : (
-                                                    <MenuItem disabled>No LGAs available</MenuItem>
-                                                )}
-                                            </TextField>
+                                            <img alt="Icon" src={tin} style={{ width: 56, height: 56, borderRadius: '50%' }} />
                                         </Grid>
-
-                                        {/* Show content only if an LGA is selected */}
-                                        {selectedLga && (
-                                            <>
-                                                <Grid item>
-                                                    <img
-                                                        alt="Icon"
-                                                        src={`path_to_image_or_dynamic_url/${selectedLga}`} // Use dynamic URL or a static path as needed
-                                                        style={{
-                                                            width: 56,
-                                                            height: 56,
-                                                            borderRadius: '50%'
-                                                        }}
-                                                    />
-                                                </Grid>
-                                                <Grid item>
-                                                    <Typography variant="subtitle2" color="textSecondary">
-                                                        Local Government Chairman
-                                                    </Typography>
-                                                </Grid>
-                                                <Grid item>
-                                                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                                                        {/* Replace with actual data based on selected LGA */}
-                                                        50
-                                                    </Typography>
-                                                </Grid>
-                                            </>
-                                        )}
+                                        <Grid item>
+                                            <Typography variant="subtitle2" color="textSecondary">
+                                                Local Government Chairman
+                                            </Typography>
+                                        </Grid>
+                                        <Grid item>
+                                            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                                50
+                                            </Typography>
+                                        </Grid>
                                     </Grid>
                                 </CardContent>
                             </Card>

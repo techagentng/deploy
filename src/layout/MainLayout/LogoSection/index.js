@@ -16,8 +16,8 @@ const LogoSection = () => (
         aria-label="berry logo"
         sx={{ display: 'flex', alignItems: 'space-between', textDecoration: 'none' }}
     >
-        <h2>Citizen</h2> 
-       
+        <h2>Citizen</h2>
+        <img src={logo} alt="logo" />
     </Link>
 );
 

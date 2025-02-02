@@ -131,7 +131,7 @@ const MainLayout = () => {
             {/* main content */}
             <Main theme={theme} open={drawerOpen} layout={layout}>
                 <Container maxWidth={container ? 'lg' : false} {...(!container && { sx: { px: { xs: 0 } } })}>
-                    {/* breadcrumb */}
+                    breadcrumb
                     <Outlet />
                 </Container>
             </Main>
