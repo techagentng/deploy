@@ -1,11 +1,11 @@
 package main
 
 import (
-	"context"
+	// "context"
 	"log"
 
-	"firebase.google.com/go"
-	"google.golang.org/api/option"
+	// "firebase.google.com/go"
+	// "google.golang.org/api/option"
 
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
@@ -14,18 +14,18 @@ import (
 	"github.com/techagentng/citizenx/services"
 )
 
-var firebaseApp *firebase.App
+// var firebaseApp *firebase.App
 
-func InitFirebase() {
-	// Load Firebase credentials JSON file
-	opt := option.WithCredentialsFile("path/to/firebase-credentials.json")
-	app, err := firebase.NewApp(context.Background(), nil, opt)
-	if err != nil {
-		log.Fatalf("error initializing Firebase app: %v", err)
-	}
-	firebaseApp = app
-	log.Println("Firebase initialized")
-}
+// func InitFirebase() {
+// 	// Load Firebase credentials JSON file
+// 	opt := option.WithCredentialsFile("path/to/firebase-credentials.json")
+// 	app, err := firebase.NewApp(context.Background(), nil, opt)
+// 	if err != nil {
+// 		log.Fatalf("error initializing Firebase app: %v", err)
+// 	}
+// 	firebaseApp = app
+// 	log.Println("Firebase initialized")
+// }
 
 func main() {
 	// Load configuration
@@ -35,7 +35,7 @@ func main() {
 	}
 
 	// Initialize Firebase
-	InitFirebase()
+	// InitFirebase()
 
 	// Initialize Mailgun client
 	mailgunClient := &mailingservices.Mailgun{}

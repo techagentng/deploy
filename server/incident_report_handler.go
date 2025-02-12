@@ -240,7 +240,7 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 
 	stateStruct := &models.State{
 		ID:   generateIDx(),
-		Name: state,
+		State: state,
 	}
 
 	// Check if user exists in the context
