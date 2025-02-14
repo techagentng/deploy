@@ -14,9 +14,9 @@ import NigerianMap from './nigeria-map';
 import { gridSpacing } from 'store/constant';
 import JWTContext from 'contexts/JWTContext';
 import { getAllUserCount, getAllReportsToday, getOnlineUsers } from 'services/userService';
-import { getStateReportCountList } from 'services/reportService';
+import { getStateReportCountList, getReportCountsByLGA } from 'services/reportService';
 import { getGraph, getPercentCount, setReportType } from 'store/slices/graphs';
-import { getCategories, getReportCountsByState } from 'services/reportService';
+import { getCategories, getReportCountsByState, getReportCount } from 'services/reportService';
 import CompareForms from './CompareForms';
 
 const DashboardPage = () => {
@@ -35,6 +35,33 @@ const DashboardPage = () => {
     // const [lgas, setLgas] = useState([]);
     // const [lgareportCounts, setLgaReportCounts] = useState([]);
     const [reportData, setReportData] = useState(null);
+    const [, setTotalOverallReports] = useState(0);
+    const [, setTotalStateReports] = useState(0);
+    const [totalLGAReports, setTotalLGAReports] = useState(0);
+    const token = localStorage.getItem('serviceToken');
+    useEffect(() => {
+        if (token) {
+            // Fetch overall report count
+            getReportCount(token)
+                .then((data) => setTotalOverallReports(data.total_reports || 0))
+                .catch((error) => console.error('Error fetching overall reports:', error));
+
+            // Fetch state report count
+            if (selectedState) {
+                getReportCountsByState(selectedState, token)
+                    .then((data) => setTotalStateReports(data.total_reports || 0))
+                    .catch((error) => console.error('Error fetching state reports:', error));
+            }
+
+            // Fetch LGA report count
+            if (selectedLga) {
+                getReportCountsByLGA(selectedLga, token)
+                    .then((data) => setTotalLGAReports(data.total_reports || 0))
+                    .catch((error) => console.error('Error fetching LGA reports:', error));
+            }
+        }
+    }, [token, selectedState, selectedLga]);
+
     useEffect(() => {
         if (selectedState) {
             // setLoading(true);
@@ -212,12 +239,13 @@ const DashboardPage = () => {
                     </Grid>
                     <Grid item xs={6} md={4}>
                         <PopularCard
-                            title={`Top Reported cases in ${selectedLga || 'State'}`}
+                            title={`Top Reported cases in ${selectedLga || 'LGA'}`}
                             data={reportTypes?.map((type, index) => ({
                                 reportType: type,
                                 reportCount: reportCounts[index]
                             }))}
                             type="reportTypes"
+                            totalReportCount={totalLGAReports} // Pass the correct count for LGA
                         />
                     </Grid>
                     <Grid item xs={6} md={4}>

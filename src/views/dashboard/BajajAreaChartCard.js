@@ -5,14 +5,14 @@ import ApexCharts from 'apexcharts';
 import Chart from 'react-apexcharts';
 import useConfig from 'hooks/useConfig';
 import getChartData from './bajaj-area-chart';
-import { getTotalReportCount, getReportCountsByState } from 'services/reportService';
+import { getReportCountsByState } from 'services/reportService';
 
-const BajajAreaChartCard = ({ reportType, stateName }) => {
+const BajajAreaChartCard = ({ reportType, stateName, totalReportCount }) => {
     const theme = useTheme();
     const { navType } = useConfig();
     const orangeDark = theme.palette.secondary[800];
-
-    const [totalReportCount, setTotalReportCount] = useState(null);
+ 
+    // const [totalReportCount, setTotalReportCount] = useState(null);
     const [chartData, setChartData] = useState({
         type: 'area',
         height: 95,
@@ -54,22 +54,22 @@ const BajajAreaChartCard = ({ reportType, stateName }) => {
         ]
     });
     const [, setError] = useState('');
-    const [loading, setLoading] = useState(true);
+    // const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchReportCount = async () => {
-            try {
-                const count = await getTotalReportCount();
-                setTotalReportCount(count);
-                setLoading(false);
-            } catch (err) {
-                setError(err.message);
-                setLoading(false);
-            }
-        };
+    // useEffect(() => {
+    //     const fetchReportCount = async () => {
+    //         try {
+    //             const count = await getTotalReportCount();
+    //             setTotalReportCount(count);
+    //             setLoading(false);
+    //         } catch (err) {
+    //             setError(err.message);
+    //             setLoading(false);
+    //         }
+    //     };
 
-        fetchReportCount();
-    }, []);
+    //     fetchReportCount();
+    // }, []);
 
     useEffect(() => {
         if (stateName) {
@@ -109,13 +109,13 @@ const BajajAreaChartCard = ({ reportType, stateName }) => {
                                 {reportType === 'topReports'
                                     ? `Top Reports for ${stateName}`
                                     : reportType === 'topLGAs'
-                                    ? `Top LGAs for ${stateName}`
-                                    : 'Overall Report Count'}
+                                      ? `Top LGAs for ${stateName}`
+                                      : 'Overall Report Count'}
                             </Typography>
                         </Grid>
                         <Grid item>
                             <Typography variant="h4" sx={{ color: theme.palette.grey[800] }}>
-                                {loading ? 'Loading...' : totalReportCount || 'No Data'}
+                            {totalReportCount !== null ? totalReportCount : 'Loading...'}
                             </Typography>
                         </Grid>
                     </Grid>

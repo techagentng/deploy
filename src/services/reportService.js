@@ -274,3 +274,83 @@ export const getReportCountsByState = (state) => {
             });
     });
 };
+
+export const getReportCountsByLGA = (lga, token) => {
+    return new Promise((resolve, reject) => {
+        if (!token) {
+            return reject(new Error('No token found'));
+        }
+
+        axios
+            .get(`${process.env.REACT_APP_API_URL}/incident_reports/lga/${lga}/count`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            })
+            .then((response) => {
+                if (response && response.data) {
+                    resolve(response.data);
+                } else {
+                    reject(new Error('No data found'));
+                }
+            })
+            .catch((error) => {
+                reject(error);
+            });
+    });
+};
+
+export const getReportCount = () => {
+    return new Promise((resolve) => {
+        resolve([]); // Return an empty array or default data
+    });
+};
+
+// export const getReportCountsByState = (state, token) => {
+//     return new Promise((resolve, reject) => {
+//         if (!token) {
+//             return reject(new Error('No token found'));
+//         }
+
+//         axios
+//             .get(`${process.env.REACT_APP_API_URL}/incident_reports/state/${state}/count`, {
+//                 headers: {
+//                     Authorization: `Bearer ${token}`
+//                 }
+//             })
+//             .then((response) => {
+//                 if (response && response.data) {
+//                     resolve(response.data);
+//                 } else {
+//                     reject(new Error('No data found'));
+//                 }
+//             })
+//             .catch((error) => {
+//                 reject(error);
+//             });
+//     });
+// };
+
+{/* <Grid item xs={6} md={4}>
+    <PopularCard
+        title="Total Reports (Overall)"
+        data={[{ reportType: 'Total Reports', reportCount: totalOverallReports }]}
+        type="reportTypes"
+    />
+</Grid>
+
+<Grid item xs={6} md={4}>
+    <PopularCard
+        title={`Total Reports in ${selectedState || 'State'}`}
+        data={[{ reportType: 'Total Reports', reportCount: totalStateReports }]}
+        type="reportTypes"
+    />
+</Grid>
+
+<Grid item xs={6} md={4}>
+    <PopularCard
+        title={`Total Reports in ${selectedLga || 'LGA'}`}
+        data={[{ reportType: 'Total Reports', reportCount: totalLGAReports }]}
+        type="reportTypes"
+    />
+</Grid> */}

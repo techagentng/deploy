@@ -94,7 +94,7 @@ const PopularCard = ({ isLoading, title, data = [], type }) => {  // Default to 
                         </Grid>
                     </Grid>
                     <Grid item xs={12} sx={{ pt: '16px !important' }}>
-                        <BajajAreaChartCard />
+                        <BajajAreaChartCard totalReportCount={totalReportCount} />
                     </Grid>
                     <Grid item xs={12}>
                         <Grid container direction="column">
