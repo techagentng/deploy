@@ -33,6 +33,7 @@ type IncidentReportService interface {
 	AddMediaToReport(reportTypeID string, feedURLs, thumbnailURLs, fullsizeURLs []string) error
 	GetReportCountByLGA(lga string) (int, error)
 	GetReportCountByState(state string) (int, error)
+	GetOverallReportCount() (int, error)
 }
 
 type IncidentService struct {
@@ -302,3 +303,4 @@ func (s *IncidentService) GetReportCountByState(state string) (int, error) {
 func (s *IncidentService) GetOverallReportCount() (int, error) {
     return s.incidentRepo.GetOverallReportCount()
 }
+
