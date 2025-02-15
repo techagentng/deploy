@@ -139,4 +139,6 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.GET("/reports/followers/:report_id", s.HandleGetFollowersByReport())
 	apirouter.GET("/incident_reports/lga/:lga/count", s.handleGetReportCountByLGA())
 	apirouter.GET("/incident_reports/state/:state/count", s.handleGetReportCountByState())
+	apirouter.GET("/incident_reports/count", s.handleGetOverallReportCount())
+
 }

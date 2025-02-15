@@ -1898,3 +1898,15 @@ func (s *Server) handleGetReportCountByState() gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{"total_reports": count})
     }
 }
+
+func (s *Server) handleGetOverallReportCount() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        count, err := s.IncidentReportService.GetOverallReportCount()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"total_reports": count})
+    }
+}

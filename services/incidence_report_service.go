@@ -298,3 +298,7 @@ func (s *IncidentService) GetReportCountByLGA(lga string) (int, error) {
 func (s *IncidentService) GetReportCountByState(state string) (int, error) {
     return s.incidentRepo.GetReportCountByState(state)
 }
+
+func (s *IncidentService) GetOverallReportCount() (int, error) {
+    return s.incidentRepo.GetOverallReportCount()
+}
