@@ -137,5 +137,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.GET("/auth/google/state", s.GenerateGoogleState())
 	authorized.POST("/reports/follow/:report_id", s.HandleFollowReport())
 	authorized.GET("/reports/followers/:report_id", s.HandleGetFollowersByReport())
+	apirouter.GET("/incident_reports/lga/:lga/count", s.handleGetReportCountByLGA())
+
 
 }

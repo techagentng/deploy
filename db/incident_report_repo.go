@@ -92,6 +92,7 @@ type IncidentReportRepository interface {
 	GetFollowersByReport(reportID uuid.UUID) ([]models.User, error)
 	GetOAuthState(state string) (*models.OAuthState, error)
 	SaveOAuthState(oauthState *models.OAuthState) error
+	GetReportCountByLGA(lga string) (int, error)
 }
 
 type incidentReportRepo struct {
@@ -1581,3 +1582,15 @@ func (repo *incidentReportRepo) GetOAuthState(state string) (*models.OAuthState,
 func (repo *incidentReportRepo) SaveOAuthState(oauthState *models.OAuthState) error {
     return repo.DB.Create(oauthState).Error
 }
+
+func (repo *incidentReportRepo) GetReportCountByLGA(lga string) (int, error) {
+    var count int64
+    err := repo.DB.Model(&models.ReportType{}). // Query the report_types table
+        Where("lga_name = ?", lga). 
+        Count(&count).Error
+    if err != nil {
+        return 0, err
+    }
+    return int(count), nil
+}
+

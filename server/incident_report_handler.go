@@ -1851,4 +1851,22 @@ func (s *Server) HandleGetFollowersByReport() gin.HandlerFunc {
 	}
 }
 
+func (s *Server) handleGetReportCountByLGA() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        lga := c.Param("lga")
+        if lga == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "LGA parameter is required"})
+            return
+        }
+
+        count, err := s.IncidentReportService.GetReportCountByLGA(lga)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"total_reports": count})
+    }
+}
+
 
