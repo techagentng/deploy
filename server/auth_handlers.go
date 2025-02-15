@@ -320,8 +320,6 @@ func (s *Server) handleSignup() gin.HandlerFunc {
     }
 }
 
-
-
 // Middleware to redirect non-credential users to sign-in page for certain actions
 func (s *Server) handleNonCredentialLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {

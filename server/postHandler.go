@@ -175,3 +175,4 @@ func (s *Server) GetPostByID() gin.HandlerFunc {
 		c.JSON(http.StatusOK, post)
 	}
 }
+

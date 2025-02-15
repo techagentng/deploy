@@ -1,0 +1,31 @@
+{
+  "project_info": {
+    "project_number": "1070449198763",
+    "firebase_url": "https://achat-f2008-default-rtdb.firebaseio.com",
+    "project_id": "achat-f2008",
+    "storage_bucket": "achat-f2008.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1070449198763:android:e66373df13c53dd18919ee",
+        "android_client_info": {
+          "package_name": "com.citadel.achat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAYmAInUwsUXyfxBMpENKy5ubt6pXWP80"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1",
+  "type": "service_account"
+}
