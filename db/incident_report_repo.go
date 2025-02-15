@@ -93,6 +93,7 @@ type IncidentReportRepository interface {
 	GetOAuthState(state string) (*models.OAuthState, error)
 	SaveOAuthState(oauthState *models.OAuthState) error
 	GetReportCountByLGA(lga string) (int, error)
+	GetReportCountByState(state string) (int, error)
 }
 
 type incidentReportRepo struct {
@@ -1594,3 +1595,13 @@ func (repo *incidentReportRepo) GetReportCountByLGA(lga string) (int, error) {
     return int(count), nil
 }
 
+func (repo *incidentReportRepo) GetReportCountByState(state string) (int, error) {
+    var count int64
+    err := repo.DB.Model(&models.ReportType{}). // Query the report_types table
+        Where("state_name = ?", state). 
+        Count(&count).Error
+    if err != nil {
+        return 0, err
+    }
+    return int(count), nil
+}

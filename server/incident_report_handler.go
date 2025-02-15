@@ -1869,4 +1869,20 @@ func (s *Server) handleGetReportCountByLGA() gin.HandlerFunc {
     }
 }
 
+func (s *Server) handleGetReportCountByState() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        state := c.Param("state")
+        if state == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "State parameter is required"})
+            return
+        }
 
+        count, err := s.IncidentReportService.GetReportCountByState(state)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"total_reports": count})
+    }
+}
