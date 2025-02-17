@@ -554,7 +554,7 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 	// Fetch the last report ID of the current user
 	reportIDStr, err := s.IncidentReportRepository.GetLastReportIDByUserID(userIDUint)
 	if err != nil {
-		log.Printf("Error fetching last report ID: %v\n", err)
+		log.Printf("Error fetching lastx report ID: %v\n", err)
 		return nil, nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
 	}
 

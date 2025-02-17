@@ -12,6 +12,7 @@ type ReportType struct {
 	IncidentReportID     uuid.UUID        `json:"incident_report_id"`
 	IncidentReports      []IncidentReport `gorm:"foreignKey:ReportTypeID;references:ID"`
 	Category             string           `json:"category" binding:"required"`
+	Name                 string           `json:"name" binding:"required"` // Added Name field
 	StateName            string           `json:"state_name"`
 	LGAName              string           `json:"lga_name"`
 	IncidentReportRating string           `json:"incident_report_rating"`
@@ -19,6 +20,7 @@ type ReportType struct {
 	SubReports           []SubReport      `gorm:"foreignKey:ReportTypeID"`
 	CreatedAt            time.Time        `gorm:"autoCreateTime" json:"created_at"`
 }
+
 
 type SubReport struct {
 	ID               uuid.UUID  `gorm:"type:uuid;primary_key" json:"id"`

@@ -95,6 +95,7 @@ type IncidentReportRepository interface {
 	GetReportCountByLGA(lga string) (int, error)
 	GetReportCountByState(state string) (int, error)
 	GetOverallReportCount() (int, error)
+	CreateReportType(reportType *models.ReportType) error
 }
 
 type incidentReportRepo struct {
@@ -1401,6 +1402,13 @@ func (i *incidentReportRepo) GetReportTypeByCategory(category string) (*models.R
 		return nil, err // Return any other error
 	}
 	return &reportType, nil // Return the found report type
+}
+
+func (i *incidentReportRepo) CreateReportType(reportType *models.ReportType) error {
+    if err := i.DB.Create(reportType).Error; err != nil {
+        return fmt.Errorf("error creating report type: %v", err)
+    }
+    return nil
 }
 
 // GetIncidentReportByReportTypeID fetches the incident report associated with the given reportTypeID.

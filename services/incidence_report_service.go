@@ -3,13 +3,15 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
+	"math"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
 	"github.com/techagentng/citizenx/models"
 	"gorm.io/gorm"
-	"math"
-	"strings"
 )
 
 type IncidentReportService interface {
@@ -54,95 +56,122 @@ func NewIncidentReportService(incidentReportRepo db.IncidentReportRepository, re
 }
 
 func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error) {
-	fmt.Println("Report ID:", reportID)
+    fmt.Println("Report ID:", reportID)
 
-	var reward *models.Reward
-	mediaPoints := totalPoints * 10
-	var descPoint, locationPoint int
+    var reward *models.Reward
+    mediaPoints := totalPoints * 10
+    var descPoint, locationPoint int
 
-	if report.Description != "" {
-		descPoint += 10
-	}
-	if !math.IsNaN(lat) && !math.IsNaN(lng) {
-		locationPoint += 10
-	}
+    if report.Description != "" {
+        descPoint += 10
+    }
+    if !math.IsNaN(lat) && !math.IsNaN(lng) {
+        locationPoint += 10
+    }
 
-	reportPoints := locationPoint + descPoint + mediaPoints
+    reportPoints := locationPoint + descPoint + mediaPoints
 
-	hasRewardPoints, err := s.incidentRepo.HasPreviousReports(userID)
-	if err != nil {
-		return nil, err
-	}
+    // Check if user has previous reports
+    hasRewardPoints, err := s.incidentRepo.HasPreviousReports(userID)
+    if err != nil {
+        return nil, fmt.Errorf("error checking previous reports: %v", err)
+    }
 
-	if !hasRewardPoints {
-		reward = &models.Reward{
-			UserID:           userID,
-			RewardType:       "New entry",
-			Point:            reportPoints,
-			IncidentReportID: reportID,
-			Balance:          10,
-		}
-	} else {
-		reward = &models.Reward{
-			UserID:           userID,
-			RewardType:       "Another entry",
-			Point:            reportPoints,
-			IncidentReportID: reportID,
-		}
-	}
+    // Set reward details based on the user's previous reports
+    if !hasRewardPoints {
+        reward = &models.Reward{
+            UserID:           userID,
+            RewardType:       "New entry",
+            Point:            reportPoints,
+            IncidentReportID: reportID,
+            Balance:          10, // Assuming new users get a balance of 10
+        }
+    } else {
+        reward = &models.Reward{
+            UserID:           userID,
+            RewardType:       "Another entry",
+            Point:            reportPoints,
+            IncidentReportID: reportID,
+        }
+    }
 
-	if err := s.incidentRepo.UpdateReward(userID, reward); err != nil {
-		return nil, fmt.Errorf("error creating reward: %v", err)
-	}
+    // Update the reward record in the repository
+    if err := s.incidentRepo.UpdateReward(userID, reward); err != nil {
+        return nil, fmt.Errorf("error creating reward: %v", err)
+    }
 
-	report.RewardPoint = reportPoints
+    // Set the reward points on the report
+    report.RewardPoint = reportPoints
 
-	// Fetch the ReportTypeID based on category
-	reportType, err := s.incidentRepo.GetReportTypeByCategory(report.Category)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching report type: %v", err)
-	}
+    log.Printf("Fetching report type for category: %s", report.Category)
 
-	// Assign the fetched ReportTypeID
-	report.ReportTypeID = reportType.ID
+    // Fetch the ReportType based on category
+    reportType, err := s.incidentRepo.GetReportTypeByCategory(report.Category)
+    if err != nil {
+        return nil, fmt.Errorf("error fetching report type: %v", err)
+    }
 
-	savedReport, err := s.incidentRepo.SaveIncidentReport(report)
-	if err != nil {
-		return nil, fmt.Errorf("error saving report: %v", err)
-	}
+    // Check if the reportType was found
+    if reportType == nil {
+        // If no report type found, we should either create it or return an error
+        newReportType := &models.ReportType{
+            Category: report.Category,
+            Name:     report.Category + " Report", // or any other default name logic
+        }
 
-	reportResponse := &models.IncidentReport{
-		DateOfIncidence:      savedReport.DateOfIncidence,
-		Description:          savedReport.Description,
-		FeedURLs:             savedReport.FeedURLs,
-		RewardPoint:          savedReport.RewardPoint,
-		ActionTypeName:       savedReport.ActionTypeName,
-		Rating:               savedReport.Rating,
-		HospitalName:         savedReport.HospitalName,
-		Department:           savedReport.Department,
-		DepartmentHeadName:   savedReport.DepartmentHeadName,
-		AccidentCause:        savedReport.AccidentCause,
-		SchoolName:           savedReport.SchoolName,
-		VicePrincipal:        savedReport.VicePrincipal,
-		OutageLength:         savedReport.OutageLength,
-		AirportName:          savedReport.AirportName,
-		Country:              savedReport.Country,
-		StateEmbassyLocation: savedReport.StateEmbassyLocation,
-		NoWater:              savedReport.NoWater,
-		AmbassedorsName:      savedReport.AmbassedorsName,
-		HospitalAddress:      savedReport.HospitalAddress,
-		RoadName:             savedReport.RoadName,
-		AirlineName:          savedReport.AirlineName,
-		Category:             savedReport.Category,
-		UserFullname:         savedReport.UserFullname,
-		UserUsername:         savedReport.UserUsername,
-		ThumbnailURLs:        savedReport.ThumbnailURLs,
-		StateName:            savedReport.StateName,
-		LGAName:              savedReport.LGAName,
-	}
+        // Create a new report type
+        if err := s.incidentRepo.CreateReportType(newReportType); err != nil {
+            return nil, fmt.Errorf("error creating new report type: %v", err)
+        }
 
-	return reportResponse, nil
+        // Fetch the newly created ReportTypeID
+        reportType = newReportType
+    }
+
+    // Assign the fetched (or newly created) ReportTypeID
+    report.ReportTypeID = reportType.ID
+
+    // Save the incident report
+    savedReport, err := s.incidentRepo.SaveIncidentReport(report)
+    if err != nil {
+        return nil, fmt.Errorf("error saving report: %v", err)
+    }
+
+    // Construct the response object with saved report data
+    reportResponse := &models.IncidentReport{
+        DateOfIncidence:      savedReport.DateOfIncidence,
+        Description:          savedReport.Description,
+        FeedURLs:             savedReport.FeedURLs,
+        RewardPoint:          savedReport.RewardPoint,
+        ActionTypeName:       savedReport.ActionTypeName,
+        Rating:               savedReport.Rating,
+        HospitalName:         savedReport.HospitalName,
+        Department:           savedReport.Department,
+        DepartmentHeadName:   savedReport.DepartmentHeadName,
+        AccidentCause:        savedReport.AccidentCause,
+        SchoolName:           savedReport.SchoolName,
+        VicePrincipal:        savedReport.VicePrincipal,
+        OutageLength:         savedReport.OutageLength,
+        AirportName:          savedReport.AirportName,
+        Country:              savedReport.Country,
+        StateEmbassyLocation: savedReport.StateEmbassyLocation,
+        NoWater:              savedReport.NoWater,
+        AmbassedorsName:      savedReport.AmbassedorsName,
+        HospitalAddress:      savedReport.HospitalAddress,
+        RoadName:             savedReport.RoadName,
+        AirlineName:          savedReport.AirlineName,
+        Category:             savedReport.Category,
+        UserFullname:         savedReport.UserFullname,
+        UserUsername:         savedReport.UserUsername,
+        ThumbnailURLs:        savedReport.ThumbnailURLs,
+        StateName:            savedReport.StateName,
+        LGAName:              savedReport.LGAName,
+    }
+
+    return reportResponse, nil
 }
+
+
 
 func (s *IncidentService) GetAllReports(page int) ([]map[string]interface{}, error) {
 	// Delegate the call to the repository

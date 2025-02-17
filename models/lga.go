@@ -12,7 +12,7 @@ type LGA struct {
 
 type State struct {
     ID       uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
-    StateName     string    `gorm:"" json:"state_name"`
+    State     string    `gorm:"" json:"state"`
     Governor string    `gorm:"" json:"governor"`
     LGAC   string    `gorm:"" json:"lgac"`
     GovernorImage string `gorm:"" json:"governor_image"`  // Image URL for the Governor
