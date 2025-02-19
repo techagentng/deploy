@@ -8,18 +8,23 @@ import (
 
 type ReportType struct {
 	ID                   uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID               uint             `json:"user_id"`
-	IncidentReportID     uuid.UUID        `json:"incident_report_id"`
-	IncidentReports      []IncidentReport `gorm:"foreignKey:ReportTypeID;references:ID"`
+	UserID               uint             `gorm:"not null" json:"user_id"`
+	IncidentReportID     uuid.UUID        `gorm:"type:uuid" json:"incident_report_id"`  // Add this
 	Category             string           `json:"category" binding:"required"`
-	Name                 string           `json:"name" binding:"required"` // Added Name field
+	Name                 string           `json:"name" binding:"required"`
 	StateName            string           `json:"state_name"`
 	LGAName              string           `json:"lga_name"`
 	IncidentReportRating string           `json:"incident_report_rating"`
 	DateOfIncidence      time.Time        `json:"date_of_incidence"`
-	SubReports           []SubReport      `gorm:"foreignKey:ReportTypeID"`
 	CreatedAt            time.Time        `gorm:"autoCreateTime" json:"created_at"`
+
+	// Relationship with IncidentReports (one-to-many)
+	IncidentReports []IncidentReport `gorm:"foreignKey:ReportTypeID"`
+
+	// Relationship with SubReports (if applicable)
+	SubReports []SubReport `gorm:"foreignKey:ReportTypeID"`
 }
+
 
 
 type SubReport struct {

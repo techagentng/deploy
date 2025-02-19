@@ -82,7 +82,7 @@ type IncidentReportRepository interface {
 	SaveMedia(media *models.Media) error
 	GetReportIDByUser(ctx context.Context, userID uint) (uuid.UUID, error)
 	GetReportTypeeByID(reportTypeID string) (*models.ReportType, error)
-	GetLastReportIDByUserID(userID uint) (string, error)
+	// GetLastReportIDByUserID(userID uint) (string, error)
 	GetAllIncidentReportsByUser(userID uint, page int) ([]map[string]interface{}, error)
 	ReportExists(reportID uuid.UUID) (bool, error)
 	UpdateBlockRequest(ctx context.Context, reportID uuid.UUID) error
@@ -96,6 +96,7 @@ type IncidentReportRepository interface {
 	GetReportCountByState(state string) (int, error)
 	GetOverallReportCount() (int, error)
 	CreateReportType(reportType *models.ReportType) error
+	GetLastReportIDByUserID(userID uint) (string, error)
 }
 
 type incidentReportRepo struct {
@@ -105,6 +106,31 @@ type incidentReportRepo struct {
 func NewIncidentReportRepo(db *GormDB) IncidentReportRepository {
 	return &incidentReportRepo{db.DB}
 }
+
+// GetLastReportIDByUserID fetches the last report ID created by a given user.
+func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error) {
+	var reportID string
+
+	// Query to get the last report ID for the given user
+	err := i.DB.Raw(`
+		SELECT id FROM incident_reports 
+		WHERE user_id = ? 
+		ORDER BY created_at DESC 
+		LIMIT 1
+	`, userID).Scan(&reportID).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("No reports found for user ID: %d", userID)
+			return "", fmt.Errorf("no reports found for user ID: %d", userID)
+		}
+		log.Printf("Error fetching last report ID: %v", err)
+		return "", err
+	}
+
+	return reportID, nil
+}
+
 
 func (i *incidentReportRepo) UpdateReward(userID uint, reward *models.Reward) error {
 	// Find the existing reward for the user
@@ -1367,7 +1393,6 @@ func (i *incidentReportRepo) UpdateReportTypeWithIncidentReport(report *models.I
 	// Update fields as necessary
 	reportType.IncidentReportRating = report.Rating
 	reportType.DateOfIncidence = report.TimeofIncidence
-	reportType.UserID = report.UserID
 
 	// Save the updated report type
 	if err := i.DB.Save(&reportType).Error; err != nil {
@@ -1473,14 +1498,14 @@ func (i *incidentReportRepo) GetReportIDByUser(ctx context.Context, userID uint)
 	return incidentReport.ID, nil
 }
 
-func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error) {
-	var reportType models.ReportType
-	result := i.DB.Order("created_at DESC").First(&reportType, "user_id = ?", userID)
-	if result.Error != nil {
-		return "", result.Error
-	}
-	return reportType.IncidentReportID.String(), nil
-}
+// func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error) {
+// 	var reportType models.ReportType
+// 	result := i.DB.Order("created_at DESC").First(&reportType, "user_id = ?", userID)
+// 	if result.Error != nil {
+// 		return "", result.Error
+// 	}
+// 	return reportType.IncidentReportID.String(), nil
+// }
 
 func (repo *incidentReportRepo) ReportExists(reportID uuid.UUID) (bool, error) {
 	var count int64
@@ -1624,3 +1649,4 @@ func (repo *incidentReportRepo) GetOverallReportCount() (int, error) {
     }
     return int(count), nil
 }
+

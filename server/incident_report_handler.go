@@ -391,8 +391,9 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
-		// Retrieve description from the form
+		// Retrieve form data
 		description := c.PostForm("description")
+		category := c.PostForm("category")
 
 		// Check for vulgar words in the description
 		if containsVulgarWords(description, vulgarWords) {
@@ -400,11 +401,41 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			return
 		}
 
-		// Other data retrieval and processing...
+		// Retrieve additional user data
 		fullName := c.GetString("fullName")
 		username := c.GetString("username")
 		profileImage := c.GetString("profile_image")
 
+		reportType, err := s.IncidentReportRepository.GetReportTypeByCategory(category)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			log.Printf("Error fetching report type: %v\n", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching report type"})
+			return
+		}
+
+		if reportType == nil {
+			log.Printf("Creating new ReportType for category: %s", category)
+
+			newReportType := &models.ReportType{
+				ID:       uuid.New(), // Generate a new UUID for the report type
+				Category: category,
+				Name:     category + " Report",
+			}
+
+			// Save the new ReportType
+			if err := s.IncidentReportRepository.CreateReportType(newReportType); err != nil {
+				log.Printf("Error creating new report type: %v\n", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating new report type"})
+				return
+			}
+
+			// Assign the new report type
+			reportType = newReportType
+		}
+
+		log.Printf("Using ReportTypeID: %s for category: %s", reportType.ID, category)
+
+		// Construct the IncidentReport
 		incidentReport := &models.IncidentReport{
 			ID:              reportID,
 			UserID:          user.ID,
@@ -420,12 +451,12 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			Email:           c.PostForm("email"),
 			Address:         c.PostForm("address"),
 			Rating:          c.PostForm("rating"),
-			Category:        c.PostForm("category"),
+			Category:        category,
 			ThumbnailURLs:   profileImage,
 			TimeofIncidence: time.Now(),
+			ReportTypeID:    reportType.ID, 
 		}
 
-		// Save incident report and respond...
 		savedIncidentReport, err := s.IncidentReportService.SaveReport(user.ID, lat, lng, incidentReport, reportID.String(), 0)
 		if err != nil {
 			log.Printf("Error saving incident report: %v\n", err)
@@ -440,6 +471,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		})
 	}
 }
+
 
 // Helper function to parse coordinates from the request form
 func parseCoordinates(c *gin.Context) (float64, float64, error) {
@@ -527,14 +559,14 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
 
 func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []string, []string, []string, error) {
 	// Parse multipart form with a size limit
-	if err := c.Request.ParseMultipartForm(100 << 20); err != nil { // 100 MB limit
+	if err := c.Request.ParseMultipartForm(100 << 20); err != nil {
 		log.Printf("Error parsing multipart form: %v", err)
 		return nil, nil, nil, nil, nil, fmt.Errorf("error parsing multipart form: %v", err)
 	}
 
 	// Retrieve files
 	formMedia := c.Request.MultipartForm.File["mediaFiles"]
-	if formMedia == nil {
+	if len(formMedia) == 0 {
 		log.Println("No media files found in the request")
 		return nil, nil, nil, nil, nil, fmt.Errorf("no media files found in the request")
 	}
@@ -543,18 +575,25 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 	var feedURLs, thumbnailURLs, fullsizeURLs, fileTypes []string
 	var videoURL, audioURL string
 
-	userID, exists := c.Get("userID")
-	if !exists {
-		log.Println("Error: userID not found in context")
-		return nil, nil, nil, nil, nil, fmt.Errorf("unauthorized: userID not found in context")
-	}
+	// Retrieve userID from context
+// Retrieve userID from context
+userIDValue, exists := c.Get("userID")
+if !exists {
+	log.Println("Error: userID not found in context")
+	return nil, nil, nil, nil, nil, fmt.Errorf("unauthorized: userID not found in context")
+}
 
-	userIDUint := userID.(uint)
+// Ensure userID is of type uint
+userID, ok := userIDValue.(uint)
+if !ok {
+	log.Println("Error: userID is not a valid uint")
+	return nil, nil, nil, nil, nil, fmt.Errorf("invalid user ID format")
+}
 
 	// Fetch the last report ID of the current user
-	reportIDStr, err := s.IncidentReportRepository.GetLastReportIDByUserID(userIDUint)
+	reportID, err := s.IncidentReportRepository.GetLastReportIDByUserID(userID)
 	if err != nil {
-		log.Printf("Error fetching lastx report ID: %v\n", err)
+		log.Printf("Error fetching last report ID: %v", err)
 		return nil, nil, nil, nil, nil, fmt.Errorf("error fetching last report ID: %v", err)
 	}
 
@@ -567,7 +606,7 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 
 		switch fileType {
 		case "image":
-			processedFeedURL, processedThumbnailURL, processedFullsizeURL, err = s.MediaService.ProcessImageFile(mediaFile, userIDUint, reportIDStr)
+			processedFeedURL, processedThumbnailURL, processedFullsizeURL, err = s.MediaService.ProcessImageFile(mediaFile, userID, reportID)
 			if err == nil {
 				feedURLs = append(feedURLs, processedFeedURL)
 				thumbnailURLs = append(thumbnailURLs, processedThumbnailURL)
@@ -578,7 +617,7 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 			if mediaFile.Size > 100*1024*1024 {
 				return nil, nil, nil, nil, nil, fmt.Errorf("video file %s exceeds the 100 MB size limit", mediaFile.Filename)
 			}
-			videoURL, err = s.MediaService.UploadFileToS3(mediaFile, userIDUint, "video")
+			videoURL, err = s.MediaService.UploadFileToS3(mediaFile, userID, "video")
 			if err == nil {
 				feedURLs = append(feedURLs, videoURL)
 				fileTypes = append(fileTypes, "video")
@@ -587,7 +626,7 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 			if mediaFile.Size > 50*1024*1024 {
 				return nil, nil, nil, nil, nil, fmt.Errorf("audio file %s exceeds the 50 MB size limit", mediaFile.Filename)
 			}
-			audioURL, err = s.MediaService.UploadFileToS3(mediaFile, userIDUint, "audio")
+			audioURL, err = s.MediaService.UploadFileToS3(mediaFile, userID, "audio")
 			if err == nil {
 				feedURLs = append(feedURLs, audioURL)
 				fileTypes = append(fileTypes, "audio")
@@ -598,15 +637,15 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 		}
 
 		if err != nil {
-			log.Printf("Error processing media file %s: %v\n", mediaFile.Filename, err)
+			log.Printf("Error processing media file %s: %v", mediaFile.Filename, err)
 			return nil, nil, nil, nil, nil, err
 		}
 	}
 
 	// Update incident report with the processed URLs
-	incidentReport, err := s.IncidentReportRepository.GetIncidentReportByID(reportIDStr)
+	incidentReport, err := s.IncidentReportRepository.GetIncidentReportByID(reportID)
 	if err != nil {
-		log.Printf("Error retrieving report: %v\n", err)
+		log.Printf("Error retrieving report: %v", err)
 		return nil, nil, nil, nil, nil, fmt.Errorf("error retrieving report: %v", err)
 	}
 
@@ -618,16 +657,14 @@ func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []stri
 
 	// Save the updated report
 	if err := s.IncidentReportRepository.UpdateIncidentReport(incidentReport); err != nil {
-		log.Printf("Error updating incident report: %v\n", err)
+		log.Printf("Error updating incident report: %v", err)
 		return nil, nil, nil, nil, nil, fmt.Errorf("error updating incident report: %v", err)
 	}
 
 	// Return the final URLs
 	log.Println("Media processed and saved successfully")
-	return feedURLs, fullsizeURLs, fileTypes, nil, nil, err
+	return feedURLs, thumbnailURLs, fullsizeURLs, fileTypes, nil, nil
 }
-
-
 
 
 // Helper function to detect file type based on extension (expand as needed)

@@ -113,10 +113,11 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 
     // Check if the reportType was found
     if reportType == nil {
-        // If no report type found, we should either create it or return an error
+        // If no report type found, we should create a new one
         newReportType := &models.ReportType{
+            ID:       uuid.New(), // Ensure a new UUID is created for the ReportType
             Category: report.Category,
-            Name:     report.Category + " Report", // or any other default name logic
+            Name:     report.Category + " Report", // Default name based on category
         }
 
         // Create a new report type
@@ -170,7 +171,6 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 
     return reportResponse, nil
 }
-
 
 
 func (s *IncidentService) GetAllReports(page int) ([]map[string]interface{}, error) {
