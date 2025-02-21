@@ -736,17 +736,18 @@ func (i *incidentReportRepo) GetRatingPercentages(reportType, state string) (*mo
 func (i *incidentReportRepo) GetReportCountsByStateAndLGA() ([]models.ReportCount, error) {
 	var results []models.ReportCount
 
-	err := i.DB.Model(&models.ReportType{}).
-		Select("state_name, lga_name, COUNT(*) as count").
-		Group("state_name, lga_name").
-		Scan(&results).Error
+	err := i.DB.Model(&models.IncidentReport{}). // Query the 'incident_reports' table
+		Select("state_name, lga_name, COUNT(*) as count"). // Select state, LGA, and count of reports
+		Group("state_name, lga_name"). // Group results by state and LGA
+		Scan(&results).Error // Store results in 'results' slice
 
 	if err != nil {
-		return nil, err
+		return nil, err // Return error if query fails
 	}
 
-	return results, nil
+	return results, nil // Return results
 }
+
 
 func (repo *incidentReportRepo) ListAllStatesWithReportCounts() ([]models.StateReportCount, error) {
 	var topStates []models.StateReportCount
