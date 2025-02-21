@@ -1642,11 +1642,11 @@ func (repo *incidentReportRepo) GetReportCountByState(state string) (int, error)
 
 func (repo *incidentReportRepo) GetOverallReportCount() (int, error) {
     var count int64
-    err := repo.DB.Model(&models.ReportType{}). 
-        Count(&count).Error
+    err := repo.DB.Model(&models.IncidentReport{}).Count(&count).Error
     if err != nil {
         return 0, err
     }
     return int(count), nil
 }
+
 
