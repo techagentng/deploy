@@ -97,6 +97,7 @@ type IncidentReportRepository interface {
 	GetOverallReportCount() (int, error)
 	CreateReportType(reportType *models.ReportType) error
 	GetLastReportIDByUserID(userID uint) (string, error)
+	GetGovernorDetails(stateName string) (*models.State, error)
 }
 
 type incidentReportRepo struct {
@@ -1648,6 +1649,15 @@ func (repo *incidentReportRepo) GetOverallReportCount() (int, error) {
         return 0, err
     }
     return int(count), nil
+}
+
+func (repo *incidentReportRepo) GetGovernorDetails(stateName string) (*models.State, error) {
+    var state models.State
+    err := repo.DB.Where("state = ?", stateName).Select("governor, governor_image, lgac_image").First(&state).Error
+    if err != nil {
+        return nil, err
+    }
+    return &state, nil
 }
 
 

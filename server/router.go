@@ -140,5 +140,6 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.GET("/incident_reports/lga/:lga/count", s.handleGetReportCountByLGA())
 	apirouter.GET("/incident_reports/state/:state/count", s.handleGetReportCountByState())
 	apirouter.GET("/incident_reports/count", s.handleGetOverallReportCount())
+	apirouter.GET("/state/governor", s.handleGetGovernorDetails())
 
 }

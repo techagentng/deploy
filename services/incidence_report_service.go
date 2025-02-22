@@ -36,6 +36,7 @@ type IncidentReportService interface {
 	GetReportCountByLGA(lga string) (int, error)
 	GetReportCountByState(state string) (int, error)
 	GetOverallReportCount() (int, error)
+	GetGovernorDetails(stateName string) (*models.State, error)
 }
 
 type IncidentService struct {
@@ -333,3 +334,6 @@ func (s *IncidentService) GetOverallReportCount() (int, error) {
     return s.incidentRepo.GetOverallReportCount()
 }
 
+func (s *IncidentService) GetGovernorDetails(stateName string) (*models.State, error) {
+    return s.incidentRepo.GetGovernorDetails(stateName)
+}

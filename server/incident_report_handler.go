@@ -1950,3 +1950,21 @@ func (s *Server) handleGetOverallReportCount() gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{"total_reports": count})
     }
 }
+
+func (s *Server) handleGetGovernorDetails() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        stateName := c.Query("state") // Get state name from query params
+        if stateName == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "State name is required"})
+            return
+        }
+
+        governorDetails, err := s.IncidentReportService.GetGovernorDetails(stateName)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        c.JSON(http.StatusOK, governorDetails)
+    }
+}
