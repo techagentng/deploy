@@ -232,10 +232,13 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 	}
 
 	log.Printf("Fetched LGA: %s, State: %s", locality, state) // Log fetched values
+	if locality == "" { 
+		locality = "Unknown" 
+	}
 
 	lga := &models.LGA{
 		ID:   generateIDx(),
-		Name: locality,
+		Name: &locality,
 	}
 
 	stateStruct := &models.State{

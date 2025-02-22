@@ -5,7 +5,7 @@ import "github.com/google/uuid"
 // LGA struct
 type LGA struct {
 	ID      uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
-	Name    string    `json:"state"`
+	 Name *string `gorm:"default:null"`
 	StateID uuid.UUID `gorm:"type:uuid;not null"`
 	State   State     `gorm:"foreignKey:StateID" json:"state"`
 }
