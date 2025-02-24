@@ -14,9 +14,12 @@ type State struct {
     ID       uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
     State     string    `gorm:"" json:"state"`
     Governor string    `gorm:"" json:"governor"`
+	DeputyName string    `gorm:"" json:"deputy_name"`
+	DeputyImage string `gorm:"" json:"deputy_image"`
     LGAC   string    `gorm:"" json:"lgac"`
-    GovernorImage string `gorm:"" json:"governor_image"`  // Image URL for the Governor
-    LgacImage   string `gorm:"" json:"lgac_image"`    // Image URL for the Deputy
+	LgacImage   string `gorm:"" json:"lgac_image"` 
+    GovernorImage string `gorm:"" json:"governor_image"`
+	       
 }
 
 

@@ -1968,3 +1968,71 @@ func (s *Server) handleGetGovernorDetails() gin.HandlerFunc {
         c.JSON(http.StatusOK, governorDetails)
     }
 }
+
+
+// CreateState handles the request to create a new state
+func (s *Server) CreateState() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var input models.State
+
+		// Bind JSON request
+		if err := ctx.ShouldBindJSON(&input); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+			return
+		}
+
+		// Assuming user ID is provided in the request context or extracted from JWT
+		userID := uint(1) // Replace with actual user ID retrieval logic
+
+		// Handle file uploads
+		govFile, _ := ctx.FormFile("governor_image")
+		depFile, _ := ctx.FormFile("deputy_image")
+		lgacFile, _ := ctx.FormFile("lgac_image")
+
+		// Upload images to S3 using mediaService
+		uploadedImages := make(map[string]string)
+
+		if govFile != nil {
+			url, err := s.MediaService.UploadFileToS3(govFile, userID, "governor")
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload governor image"})
+				return
+			}
+			uploadedImages["governor_image"] = url
+		}
+
+		if depFile != nil {
+			url, err := s.MediaService.UploadFileToS3(depFile, userID, "deputy")
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload deputy image"})
+				return
+			}
+			uploadedImages["deputy_image"] = url
+		}
+
+		if lgacFile != nil {
+			url, err := s.MediaService.UploadFileToS3(lgacFile, userID, "lgac")
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload LGA Chair image"})
+				return
+			}
+			uploadedImages["lgac_image"] = url
+		}
+
+		// Assign uploaded image URLs to the input struct
+		input.GovernorImage = uploadedImages["governor_image"]
+		input.DeputyImage = uploadedImages["deputy_image"]
+		input.LgacImage = uploadedImages["lgac_image"]
+		input.ID = uuid.New()
+
+		// Save state to DB
+		err := s.IncidentReportRepository.CreateState(&input)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save state details"})
+			return
+		}
+
+		ctx.JSON(http.StatusCreated, gin.H{"message": "State created successfully", "data": input})
+	}
+}
+

@@ -337,3 +337,4 @@ func (s *IncidentService) GetOverallReportCount() (int, error) {
 func (s *IncidentService) GetGovernorDetails(stateName string) (*models.State, error) {
     return s.incidentRepo.GetGovernorDetails(stateName)
 }
+
