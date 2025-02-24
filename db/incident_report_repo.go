@@ -1633,7 +1633,7 @@ func (repo *incidentReportRepo) GetReportCountByLGA(lga string) (int, error) {
 
 func (repo *incidentReportRepo) GetReportCountByState(state string) (int, error) {
     var count int64
-    err := repo.DB.Model(&models.ReportType{}). // Query the report_types table
+    err := repo.DB.Model(&models.IncidentReport{}). // Query the incident_reports table
         Where("state_name = ?", state). 
         Count(&count).Error
     if err != nil {
@@ -1641,6 +1641,7 @@ func (repo *incidentReportRepo) GetReportCountByState(state string) (int, error)
     }
     return int(count), nil
 }
+
 
 func (repo *incidentReportRepo) GetOverallReportCount() (int, error) {
     var count int64
