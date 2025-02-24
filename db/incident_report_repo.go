@@ -626,7 +626,7 @@ func (repo *incidentReportRepo) DeleteByID(id string) error {
 func (repo *incidentReportRepo) GetStateReportCounts() ([]models.StateReportCount, error) {
 	var stateReportCounts []models.StateReportCount
 
-	err := repo.DB.Table("report_types").
+	err := repo.DB.Table("incident_reports").
 		Select("state_name, COUNT(id) as report_count").
 		Group("state_name").
 		Scan(&stateReportCounts).Error
