@@ -1988,7 +1988,16 @@ func (s *Server) CreateState() gin.HandlerFunc {
 		govFile, _ := ctx.FormFile("governor_image")
 		depFile, _ := ctx.FormFile("deputy_image")
 		lgacFile, _ := ctx.FormFile("lgac_image")
-
+		// Log files for debugging
+		if govFile != nil {
+			fmt.Println("Governor Image:", govFile.Filename)
+		}
+		if depFile != nil {
+			fmt.Println("Deputy Image:", depFile.Filename)
+		}
+		if lgacFile != nil {
+			fmt.Println("LGAC Image:", lgacFile.Filename)
+		}
 		// Upload images to S3 using mediaService
 		uploadedImages := make(map[string]string)
 
