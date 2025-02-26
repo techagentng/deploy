@@ -1663,5 +1663,19 @@ func (repo *incidentReportRepo) GetGovernorDetails(stateName string) (*models.St
 }
 
 func (repo *incidentReportRepo) CreateState(state *models.State) error {
-	return repo.DB.Create(state).Error
+	// Check if the state already exists based on a unique field (e.g., ID or State name)
+	existingState := &models.State{}
+	err := repo.DB.Where("state = ?", state.State).First(existingState).Error
+
+	if err != nil {
+		// If the state doesn't exist, create a new record
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return repo.DB.Create(state).Error
+		}
+		// Return other errors (e.g., database connection issues)
+		return err
+	}
+
+	// If the state exists, update the existing record
+	return repo.DB.Model(existingState).Updates(state).Error
 }
