@@ -1982,10 +1982,10 @@ func (s *Server) CreateState() gin.HandlerFunc {
         input.LGAC = ctx.PostForm("lgac")
 
         // Validate required fields (optional, depending on your models.State struct)
-        if input.State == "" || input.Governor == "" || input.DeputyName == "" || input.LGAC == "" {
-            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Missing required fields"})
-            return
-        }
+        // if input.State == "" || input.Governor == "" || input.DeputyName == "" || input.LGAC == "" {
+        //     ctx.JSON(http.StatusBadRequest, gin.H{"error": "Missing required fields"})
+        //     return
+        // }
 
         // Assuming user ID is provided in the request context or extracted from JWT
         userID := uint(1) // Replace with actual user ID retrieval logic
