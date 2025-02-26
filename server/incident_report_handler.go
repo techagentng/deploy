@@ -1976,7 +1976,7 @@ func (s *Server) CreateState() gin.HandlerFunc {
 		var input models.State
 
 		// Bind JSON request
-		if err := ctx.ShouldBindJSON(&input); err != nil {
+		if err := ctx.ShouldBind(&input); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 			return
 		}
