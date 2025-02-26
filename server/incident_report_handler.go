@@ -1972,76 +1972,96 @@ func (s *Server) handleGetGovernorDetails() gin.HandlerFunc {
 
 // CreateState handles the request to create a new state
 func (s *Server) CreateState() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		var input models.State
+    return func(ctx *gin.Context) {
+        var input models.State
 
-		// Bind JSON request
-		if err := ctx.ShouldBind(&input); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
-			return
-		}
+        // Extract text fields from multipart form
+        input.State = ctx.PostForm("state")
+        input.Governor = ctx.PostForm("governor")
+        input.DeputyName = ctx.PostForm("deputy_name")
+        input.LGAC = ctx.PostForm("lgac")
 
-		// Assuming user ID is provided in the request context or extracted from JWT
-		userID := uint(1) // Replace with actual user ID retrieval logic
+        // Validate required fields (optional, depending on your models.State struct)
+        if input.State == "" || input.Governor == "" || input.DeputyName == "" || input.LGAC == "" {
+            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Missing required fields"})
+            return
+        }
 
-		// Handle file uploads
-		govFile, _ := ctx.FormFile("governor_image")
-		depFile, _ := ctx.FormFile("deputy_image")
-		lgacFile, _ := ctx.FormFile("lgac_image")
-		// Log files for debugging
-		if govFile != nil {
-			fmt.Println("Governor Image:", govFile.Filename)
-		}
-		if depFile != nil {
-			fmt.Println("Deputy Image:", depFile.Filename)
-		}
-		if lgacFile != nil {
-			fmt.Println("LGAC Image:", lgacFile.Filename)
-		}
-		// Upload images to S3 using mediaService
-		uploadedImages := make(map[string]string)
+        // Assuming user ID is provided in the request context or extracted from JWT
+        userID := uint(1) // Replace with actual user ID retrieval logic
 
-		if govFile != nil {
-			url, err := s.MediaService.UploadFileToS3(govFile, userID, "governor")
-			if err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload governor image"})
-				return
-			}
-			uploadedImages["governor_image"] = url
-		}
+        // Handle file uploads
+        govFile, err := ctx.FormFile("governor_image")
+        if err != nil && err != http.ErrMissingFile { // Ignore if file is missing, handle based on your requirements
+            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving governor image"})
+            return
+        }
+        depFile, err := ctx.FormFile("deputy_image")
+        if err != nil && err != http.ErrMissingFile {
+            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving deputy image"})
+            return
+        }
+        lgacFile, err := ctx.FormFile("lgac_image")
+        if err != nil && err != http.ErrMissingFile {
+            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving LGAC image"})
+            return
+        }
 
-		if depFile != nil {
-			url, err := s.MediaService.UploadFileToS3(depFile, userID, "deputy")
-			if err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload deputy image"})
-				return
-			}
-			uploadedImages["deputy_image"] = url
-		}
+        // Log files for debugging
+        if govFile != nil {
+            fmt.Println("Governor Image:", govFile.Filename)
+        }
+        if depFile != nil {
+            fmt.Println("Deputy Image:", depFile.Filename)
+        }
+        if lgacFile != nil {
+            fmt.Println("LGAC Image:", lgacFile.Filename)
+        }
 
-		if lgacFile != nil {
-			url, err := s.MediaService.UploadFileToS3(lgacFile, userID, "lgac")
-			if err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload LGA Chair image"})
-				return
-			}
-			uploadedImages["lgac_image"] = url
-		}
+        // Upload images to S3 using mediaService
+        uploadedImages := make(map[string]string)
 
-		// Assign uploaded image URLs to the input struct
-		input.GovernorImage = uploadedImages["governor_image"]
-		input.DeputyImage = uploadedImages["deputy_image"]
-		input.LgacImage = uploadedImages["lgac_image"]
-		input.ID = uuid.New()
+        if govFile != nil {
+            url, err := s.MediaService.UploadFileToS3(govFile, userID, "governor")
+            if err != nil {
+                ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload governor image"})
+                return
+            }
+            uploadedImages["governor_image"] = url
+        }
 
-		// Save state to DB
-		err := s.IncidentReportRepository.CreateState(&input)
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save state details"})
-			return
-		}
+        if depFile != nil {
+            url, err := s.MediaService.UploadFileToS3(depFile, userID, "deputy")
+            if err != nil {
+                ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload deputy image"})
+                return
+            }
+            uploadedImages["deputy_image"] = url
+        }
 
-		ctx.JSON(http.StatusCreated, gin.H{"message": "State created successfully", "data": input})
-	}
+        if lgacFile != nil {
+            url, err := s.MediaService.UploadFileToS3(lgacFile, userID, "lgac")
+            if err != nil {
+                ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload LGA Chair image"})
+                return
+            }
+            uploadedImages["lgac_image"] = url
+        }
+
+        // Assign uploaded image URLs to the input struct
+        input.GovernorImage = uploadedImages["governor_image"]
+        input.DeputyImage = uploadedImages["deputy_image"]
+        input.LgacImage = uploadedImages["lgac_image"]
+        input.ID = uuid.New()
+
+        // Save state to DB
+        err = s.IncidentReportRepository.CreateState(&input)
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save state details"})
+            return
+        }
+
+        ctx.JSON(http.StatusCreated, gin.H{"message": "State created successfully", "data": input})
+    }
 }
 
