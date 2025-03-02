@@ -99,7 +99,6 @@ type IncidentReportRepository interface {
 	GetLastReportIDByUserID(userID uint) (string, error)
 	GetGovernorDetails(stateName string) (*models.State, error)
 	CreateState(state *models.State) error
-	GetReportTypeCountsByLGA(lga string) ([]gin.H, error)
 }
 
 type incidentReportRepo struct {
@@ -1063,11 +1062,12 @@ func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) (map[string
 	var counts []int
 	var totalCount int
 
-	// SQL query to get report types and their counts for the specified LGA
+	// Updated SQL query referencing the correct table: incident_reports
 	query := `
-        SELECT rt.category AS report_type, COUNT(*) AS report_count
-        FROM report_types rt
-        WHERE rt.lga_name = ?
+        SELECT rt.category AS report_type, COUNT(ir.id) AS report_count
+        FROM incident_reports ir
+        JOIN report_types rt ON ir.report_type_id = rt.id
+        WHERE ir.lga_name = ?
         GROUP BY rt.category
         ORDER BY report_count DESC;
     `
@@ -1104,6 +1104,7 @@ func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) (map[string
 
 	return response, nil
 }
+
 
 // Repository function
 func (repo *incidentReportRepo) GetReportCountsByState(state string) ([]string, []int, error) {
@@ -1682,20 +1683,3 @@ func (repo *incidentReportRepo) CreateState(state *models.State) error {
 	return repo.DB.Model(existingState).Updates(state).Error
 }
 
-func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) ([]gin.H, error) {
-	var results []gin.H
-
-	err := repo.DB.Table("incident_reports").
-		Select("report_types.name as report_type, COUNT(incident_reports.id) as total_count").
-		Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
-		Where("incident_reports.lga_name = ?", lga).
-		Group("report_types.name").
-		Order("total_count DESC").
-		Find(&results).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return results, nil
-}

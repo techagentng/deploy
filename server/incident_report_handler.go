@@ -2065,21 +2065,3 @@ func (s *Server) CreateState() gin.HandlerFunc {
     }
 }
 
-func (s *Server) GetReportTypeCountsByLGAHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		lga := c.Param("lga") // Or use `c.Query("lga")` if passing as a query param
-
-		if lga == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "LGA parameter is required"})
-			return
-		}
-
-		results, err := s.IncidentReportRepository.GetReportTypeCountsByLGA(lga)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, results)
-	}
-}
