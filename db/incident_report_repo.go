@@ -99,6 +99,7 @@ type IncidentReportRepository interface {
 	GetLastReportIDByUserID(userID uint) (string, error)
 	GetGovernorDetails(stateName string) (*models.State, error)
 	CreateState(state *models.State) error
+	GetReportTypeCountsByLGA(lga string) ([]gin.H, error)
 }
 
 type incidentReportRepo struct {
@@ -1679,4 +1680,22 @@ func (repo *incidentReportRepo) CreateState(state *models.State) error {
 
 	// If the state exists, update the existing record
 	return repo.DB.Model(existingState).Updates(state).Error
+}
+
+func (repo *incidentReportRepo) GetReportTypeCountsByLGA(lga string) ([]gin.H, error) {
+	var results []gin.H
+
+	err := repo.DB.Table("incident_reports").
+		Select("report_types.name as report_type, COUNT(incident_reports.id) as total_count").
+		Joins("JOIN report_types ON report_types.id = incident_reports.report_type_id").
+		Where("incident_reports.lga_name = ?", lga).
+		Group("report_types.name").
+		Order("total_count DESC").
+		Find(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
