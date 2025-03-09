@@ -1263,3 +1263,17 @@ func (s *Server) GenerateGoogleState() gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{"state": state})
     }
 }
+
+func (s *Server) GetTotalUserCount(c *gin.Context) {
+    count, err := s.AuthRepository.GetTotalUserCount()
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": err.Error(),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "total_users": count,
+    })
+}

@@ -707,15 +707,15 @@ func (i *incidentReportRepo) GetRatingPercentages(reportType, state string) (*mo
     var badCount int64
 
     // Count total reports
-    if err := i.DB.Model(&models.IncidentReport{}). // Fixed to use IncidentReport
+    if err := i.DB.Model(&models.IncidentReport{}). 
         Where("category = ? AND state_name = ?", reportType, state).
         Count(&totalCount).Error; err != nil {
         return nil, fmt.Errorf("failed to fetch total count: %v", err)
     }
 
     // Count good ratings
-    if err := i.DB.Model(&models.IncidentReport{}). // Fixed to use IncidentReport
-        Where("category = ? AND state_name = ? AND rating = ?", reportType, state, "good"). // Fixed field name to 'rating'
+    if err := i.DB.Model(&models.IncidentReport{}). 
+        Where("category = ? AND state_name = ? AND rating = ?", reportType, state, "good"). 
         Count(&goodCount).Error; err != nil {
         return nil, fmt.Errorf("failed to fetch good count: %v", err)
     }

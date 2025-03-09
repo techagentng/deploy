@@ -48,6 +48,7 @@ type AuthRepository interface {
 	ClearResetToken(user *models.User) error
 	GetUserByEmail(email string) (*models.User, error)
 	FindOrCreateUser(email, name string) (*models.User, error)
+	GetTotalUserCount() (int64, error)
 }
 
 type authRepo struct {
@@ -561,3 +562,14 @@ func (a *authRepo) FindOrCreateUser(email, name string) (*models.User, error) {
     return &user, nil
 }
 
+// In incident_report_repo.go or similar
+func (a *authRepo) GetTotalUserCount() (int64, error) {
+    var totalCount int64
+
+    if err := a.DB.Model(&models.User{}).
+        Count(&totalCount).Error; err != nil {
+        return 0, fmt.Errorf("failed to fetch total user count: %v", err)
+    }
+
+    return totalCount, nil
+}
