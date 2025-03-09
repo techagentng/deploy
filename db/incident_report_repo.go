@@ -1626,7 +1626,7 @@ func (repo *incidentReportRepo) SaveOAuthState(oauthState *models.OAuthState) er
 
 func (repo *incidentReportRepo) GetReportCountByLGA(lga string) (int, error) {
     var count int64
-    err := repo.DB.Model(&models.ReportType{}). // Query the report_types table
+    err := repo.DB.Model(&models.IncidentReport{}). // Query the report_types table
         Where("lga_name = ?", lga). 
         Count(&count).Error
     if err != nil {
