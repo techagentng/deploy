@@ -1905,7 +1905,7 @@ func (s *Server) HandleGetFollowersByReport() gin.HandlerFunc {
 
 func (s *Server) handleGetReportCountByLGA() gin.HandlerFunc {
     return func(c *gin.Context) {
-        lga := c.Param("lga")
+        lga := c.Query("lga")
         if lga == "" {
             c.JSON(http.StatusBadRequest, gin.H{"error": "LGA parameter is required"})
             return
