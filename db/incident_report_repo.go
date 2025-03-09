@@ -99,6 +99,7 @@ type IncidentReportRepository interface {
 	GetLastReportIDByUserID(userID uint) (string, error)
 	GetGovernorDetails(stateName string) (*models.State, error)
 	CreateState(state *models.State) error
+	GetAllStatesRatingPercentages(reportType string) (map[string]*models.RatingPercentage, error)
 }
 
 type incidentReportRepo struct {
@@ -701,39 +702,42 @@ func (i *incidentReportRepo) GetAllStates() ([]string, error) {
 }
 
 func (i *incidentReportRepo) GetRatingPercentages(reportType, state string) (*models.RatingPercentage, error) {
-	var totalCount int64
-	var goodCount int64
-	var badCount int64
+    var totalCount int64
+    var goodCount int64
+    var badCount int64
 
-	// Count total reports
-	if err := i.DB.Model(&models.ReportType{}).
-		Where("category = ? AND state_name = ?", reportType, state).
-		Count(&totalCount).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch total count: %v", err)
-	}
+    // Count total reports
+    if err := i.DB.Model(&models.IncidentReport{}). // Fixed to use IncidentReport
+        Where("category = ? AND state_name = ?", reportType, state).
+        Count(&totalCount).Error; err != nil {
+        return nil, fmt.Errorf("failed to fetch total count: %v", err)
+    }
 
-	// Count good ratings
-	if err := i.DB.Model(&models.ReportType{}).
-		Where("category = ? AND state_name = ? AND incident_report_rating = ?", reportType, state, "good").
-		Count(&goodCount).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch good count: %v", err)
-	}
+    // Count good ratings
+    if err := i.DB.Model(&models.IncidentReport{}). // Fixed to use IncidentReport
+        Where("category = ? AND state_name = ? AND rating = ?", reportType, state, "good"). // Fixed field name to 'rating'
+        Count(&goodCount).Error; err != nil {
+        return nil, fmt.Errorf("failed to fetch good count: %v", err)
+    }
 
-	// Count bad ratings
-	if err := i.DB.Model(&models.ReportType{}).
-		Where("category = ? AND state_name = ? AND incident_report_rating = ?", reportType, state, "bad").
-		Count(&badCount).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch bad count: %v", err)
-	}
+    // Count bad ratings
+    if err := i.DB.Model(&models.IncidentReport{}). // Fixed to use IncidentReport
+        Where("category = ? AND state_name = ? AND rating = ?", reportType, state, "bad"). // Fixed field name to 'rating'
+        Count(&badCount).Error; err != nil {
+        return nil, fmt.Errorf("failed to fetch bad count: %v", err)
+    }
 
-	// Calculate percentages
-	goodPercentage := float64(goodCount) / float64(totalCount) * 100
-	badPercentage := float64(badCount) / float64(totalCount) * 100
+    // Calculate percentages with zero division protection
+    var goodPercentage, badPercentage float64
+    if totalCount > 0 { // Added to prevent division by zero
+        goodPercentage = float64(goodCount) / float64(totalCount) * 100
+        badPercentage = float64(badCount) / float64(totalCount) * 100
+    }
 
-	return &models.RatingPercentage{
-		GoodPercentage: goodPercentage,
-		BadPercentage:  badPercentage,
-	}, nil
+    return &models.RatingPercentage{
+        GoodPercentage: goodPercentage,
+        BadPercentage:  badPercentage,
+    }, nil
 }
 
 func (i *incidentReportRepo) GetReportCountsByStateAndLGA() ([]models.ReportCount, error) {
@@ -1683,3 +1687,46 @@ func (repo *incidentReportRepo) CreateState(state *models.State) error {
 	return repo.DB.Model(existingState).Updates(state).Error
 }
 
+func (i *incidentReportRepo) GetAllStatesRatingPercentages(reportType string) (map[string]*models.RatingPercentage, error) {
+    type RatingCount struct {
+        StateName    string
+        Rating       string
+        Count        int64
+    }
+
+    var results []RatingCount
+    if err := i.DB.Model(&models.IncidentReport{}).
+        Select("state_name, rating, COUNT(*) as count").
+        Where("category = ?", reportType).
+        Group("state_name, rating").
+        Scan(&results).Error; err != nil {
+        return nil, fmt.Errorf("failed to fetch rating counts: %v", err)
+    }
+
+    // Process results
+    ratingMap := make(map[string]*models.RatingPercentage)
+    totalCounts := make(map[string]int64)
+
+    // First pass: calculate totals
+    for _, result := range results {
+        totalCounts[result.StateName] += result.Count
+    }
+
+    // Second pass: set percentages
+    for _, result := range results {
+        if _, exists := ratingMap[result.StateName]; !exists {
+            ratingMap[result.StateName] = &models.RatingPercentage{}
+        }
+        total := totalCounts[result.StateName]
+        if total > 0 {
+            percentage := float64(result.Count) / float64(total) * 100
+            if result.Rating == "good" {
+                ratingMap[result.StateName].GoodPercentage = percentage
+            } else if result.Rating == "bad" {
+                ratingMap[result.StateName].BadPercentage = percentage
+            }
+        }
+    }
+
+    return ratingMap, nil
+}
