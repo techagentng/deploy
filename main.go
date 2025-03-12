@@ -12,20 +12,8 @@ import (
 	"github.com/techagentng/citizenx/mailingservices"
 	"github.com/techagentng/citizenx/server"
 	"github.com/techagentng/citizenx/services"
+	 "github.com/go-redis/redis/v8"
 )
-
-// var firebaseApp *firebase.App
-
-// func InitFirebase() {
-// 	// Load Firebase credentials JSON file
-// 	opt := option.WithCredentialsFile("path/to/firebase-credentials.json")
-// 	app, err := firebase.NewApp(context.Background(), nil, opt)
-// 	if err != nil {
-// 		log.Fatalf("error initializing Firebase app: %v", err)
-// 	}
-// 	firebaseApp = app
-// 	log.Println("Firebase initialized")
-// }
 
 func main() {
 	// Load configuration
@@ -34,8 +22,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Initialize Firebase
-	// InitFirebase()
+    redisClient := redis.NewClient(&redis.Options{
+        Addr:     "localhost:6379", // Adjust to your Redis server address
+        Password: "",               // No password by default
+        DB:       0,                // Default DB
+    })
 
 	// Initialize Mailgun client
 	mailgunClient := &mailingservices.Mailgun{}
@@ -81,6 +72,7 @@ func main() {
 		PostService:              postService,
 		PostRepository:           postRepo,
 		DB:                       db.GormDB{},
+		RedisClient:              redisClient,
 	}
 
 	// Start server

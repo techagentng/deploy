@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -243,7 +244,7 @@ func fetchGeocodingData(lat, lng float64, c *gin.Context, reportID string) (*mod
 
 	stateStruct := &models.State{
 		ID:   generateIDx(),
-		State: state,
+		State: &state,
 	}
 
 	// Check if user exists in the context
@@ -1969,6 +1970,12 @@ func (s *Server) handleGetGovernorDetails() gin.HandlerFunc {
     }
 }
 
+func toStringPtr(s string) *string {
+    if s == "" {
+        return nil // Return nil for empty strings to keep fields optional
+    }
+    return &s
+}
 
 // CreateState handles the request to create a new state
 func (s *Server) CreateState() gin.HandlerFunc {
@@ -1976,51 +1983,30 @@ func (s *Server) CreateState() gin.HandlerFunc {
         var input models.State
 
         // Extract text fields from multipart form
-        input.State = ctx.PostForm("state")
-        input.Governor = ctx.PostForm("governor")
-        input.DeputyName = ctx.PostForm("deputy_name")
-        input.LGAC = ctx.PostForm("lgac")
+        if state := ctx.PostForm("state"); state != "" {
+            input.State = toStringPtr(state)
+        }
+        if governor := ctx.PostForm("governor"); governor != "" {
+            input.Governor = toStringPtr(governor)
+        }
+        if deputyName := ctx.PostForm("deputy_name"); deputyName != "" {
+            input.DeputyName = toStringPtr(deputyName)
+        }
+        if lgac := ctx.PostForm("lgac"); lgac != "" {
+            input.LGAC = toStringPtr(lgac)
+        }
 
-        // Validate required fields (optional, depending on your models.State struct)
-        // if input.State == "" || input.Governor == "" || input.DeputyName == "" || input.LGAC == "" {
-        //     ctx.JSON(http.StatusBadRequest, gin.H{"error": "Missing required fields"})
-        //     return
-        // }
-
-        // Assuming user ID is provided in the request context or extracted from JWT
-        userID := uint(1) // Replace with actual user ID retrieval logic
+        // Assuming user ID from context (e.g., JWT)
+        userID := uint(1) // Replace with actual logic, e.g., ctx.GetUint("userID")
 
         // Handle file uploads
+        uploadedImages := make(map[string]string)
+
         govFile, err := ctx.FormFile("governor_image")
-        if err != nil && err != http.ErrMissingFile { // Ignore if file is missing, handle based on your requirements
+        if err != nil && err != http.ErrMissingFile {
             ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving governor image"})
             return
         }
-        depFile, err := ctx.FormFile("deputy_image")
-        if err != nil && err != http.ErrMissingFile {
-            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving deputy image"})
-            return
-        }
-        lgacFile, err := ctx.FormFile("lgac_image")
-        if err != nil && err != http.ErrMissingFile {
-            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving LGAC image"})
-            return
-        }
-
-        // Log files for debugging
-        if govFile != nil {
-            fmt.Println("Governor Image:", govFile.Filename)
-        }
-        if depFile != nil {
-            fmt.Println("Deputy Image:", depFile.Filename)
-        }
-        if lgacFile != nil {
-            fmt.Println("LGAC Image:", lgacFile.Filename)
-        }
-
-        // Upload images to S3 using mediaService
-        uploadedImages := make(map[string]string)
-
         if govFile != nil {
             url, err := s.MediaService.UploadFileToS3(govFile, userID, "governor")
             if err != nil {
@@ -2030,6 +2016,11 @@ func (s *Server) CreateState() gin.HandlerFunc {
             uploadedImages["governor_image"] = url
         }
 
+        depFile, err := ctx.FormFile("deputy_image")
+        if err != nil && err != http.ErrMissingFile {
+            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving deputy image"})
+            return
+        }
         if depFile != nil {
             url, err := s.MediaService.UploadFileToS3(depFile, userID, "deputy")
             if err != nil {
@@ -2039,6 +2030,11 @@ func (s *Server) CreateState() gin.HandlerFunc {
             uploadedImages["deputy_image"] = url
         }
 
+        lgacFile, err := ctx.FormFile("lgac_image")
+        if err != nil && err != http.ErrMissingFile {
+            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving LGAC image"})
+            return
+        }
         if lgacFile != nil {
             url, err := s.MediaService.UploadFileToS3(lgacFile, userID, "lgac")
             if err != nil {
@@ -2048,10 +2044,18 @@ func (s *Server) CreateState() gin.HandlerFunc {
             uploadedImages["lgac_image"] = url
         }
 
-        // Assign uploaded image URLs to the input struct
-        input.GovernorImage = uploadedImages["governor_image"]
-        input.DeputyImage = uploadedImages["deputy_image"]
-        input.LgacImage = uploadedImages["lgac_image"]
+        // Assign uploaded image URLs
+        if url, ok := uploadedImages["governor_image"]; ok {
+            input.GovernorImage = toStringPtr(url)
+        }
+        if url, ok := uploadedImages["deputy_image"]; ok {
+            input.DeputyImage = toStringPtr(url)
+        }
+        if url, ok := uploadedImages["lgac_image"]; ok {
+            input.LgacImage = toStringPtr(url)
+        }
+
+        // Assign a new UUID
         input.ID = uuid.New()
 
         // Save state to DB
@@ -2059,6 +2063,13 @@ func (s *Server) CreateState() gin.HandlerFunc {
         if err != nil {
             ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save state details"})
             return
+        }
+
+        // Invalidate Redis cache
+        err = s.RedisClient.Del(context.Background(), "states:all").Err()
+        if err != nil {
+            // Log the error but don’t fail the request—cache invalidation is secondary
+            fmt.Println("Failed to invalidate Redis cache:", err)
         }
 
         ctx.JSON(http.StatusCreated, gin.H{"message": "State created successfully", "data": input})

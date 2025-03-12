@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"github.com/go-redis/redis/v8"
 )
 
 type Server struct {
@@ -31,6 +32,7 @@ type Server struct {
 	PostRepository           db.PostRepository
 	DB                       db.GormDB
 	SessionSecret            string
+	RedisClient              *redis.Client
 }
 
 // Server serves requests to DB with rout
