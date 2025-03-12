@@ -100,6 +100,7 @@ type IncidentReportRepository interface {
 	GetGovernorDetails(stateName string) (*models.State, error)
 	CreateState(state *models.State) error
 	GetAllStatesRatingPercentages(reportType string) (map[string]*models.RatingPercentage, error)
+	FetchStates() ([]models.State, error)
 }
 
 type incidentReportRepo struct {
@@ -1729,4 +1730,14 @@ func (i *incidentReportRepo) GetAllStatesRatingPercentages(reportType string) (m
     }
 
     return ratingMap, nil
+}
+
+// FetchStates retrieves all states from the database
+func (repo *incidentReportRepo) FetchStates() ([]models.State, error) {
+    var states []models.State
+    err := repo.DB.Find(&states).Error
+    if err != nil {
+        return nil, err
+    }
+    return states, nil
 }

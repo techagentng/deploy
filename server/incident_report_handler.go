@@ -18,6 +18,7 @@ import (
 	// "github.com/aws/aws-sdk-go-v2/service/s3"
 	// "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/techagentng/citizenx/errors"
@@ -2073,6 +2074,48 @@ func (s *Server) CreateState() gin.HandlerFunc {
         }
 
         ctx.JSON(http.StatusCreated, gin.H{"message": "State created successfully", "data": input})
+    }
+}
+
+func (s *Server) FetchStates() gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+        cacheKey := "states:all"
+        redisCtx := context.Background()
+
+        // Try to get from Redis
+        cachedStates, err := s.RedisClient.Get(redisCtx, cacheKey).Result()
+        if err == nil {
+            // Cache hit: Return cached data
+            ctx.Data(http.StatusOK, "application/json", []byte(cachedStates))
+            return
+        }
+        if err != redis.Nil {
+            // Redis error (not just a miss)
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Redis error: " + err.Error()})
+            return
+        }
+
+        // Cache miss: Fetch from database
+        states, err := s.IncidentReportRepository.FetchStates()
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
+            return
+        }
+
+        // Marshal to JSON
+        statesJSON, err := json.Marshal(states)
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal states"})
+            return
+        }
+
+        // Cache the result in Redis (24-hour expiration)
+        err = s.RedisClient.Set(redisCtx, cacheKey, statesJSON, 24*time.Hour).Err()
+        if err != nil {
+            fmt.Println("Failed to set Redis cache:", err) // Log but don’t fail
+        }
+
+        ctx.Data(http.StatusOK, "application/json", statesJSON)
     }
 }
 
