@@ -1736,10 +1736,29 @@ func (i *incidentReportRepo) GetAllStatesRatingPercentages(reportType string) (m
 // FetchStates retrieves all states from the database
 func (repo *incidentReportRepo) FetchStates() ([]models.State, error) {
     var states []models.State
-    err := repo.DB.Find(&states).Error
+    err := repo.DB.Preload("Lgas").Find(&states).Error
     if err != nil {
         return nil, err
     }
+
+    // Populate the Lgas field for each state
+    for i := range states {
+        var lgas []models.LGA
+        err := repo.DB.Where("state_id = ?", states[i].ID).Find(&lgas).Error
+        if err != nil {
+            return nil, err
+        }
+
+        // Extract LGA names and assign to the Lgas field
+        lgaNames := make([]string, len(lgas))
+        for j, lga := range lgas {
+            if lga.Name != nil {
+                lgaNames[j] = *lga.Name
+            }
+        }
+        states[i].Lgas = lgaNames
+    }
+
     return states, nil
 }
 
