@@ -1997,6 +1997,21 @@ func (s *Server) CreateState() gin.HandlerFunc {
             input.LGAC = toStringPtr(lgac)
         }
 
+        // Extract LGAs from form data (e.g., as a comma-separated string or JSON)
+        if lgasStr := ctx.PostForm("lgas"); lgasStr != "" {
+            var lgas []string
+            // Try parsing as JSON array first
+            if err := json.Unmarshal([]byte(lgasStr), &lgas); err != nil {
+                // If JSON parsing fails, treat it as a comma-separated string
+                lgas = strings.Split(strings.TrimSpace(lgasStr), ",")
+                // Trim whitespace from each LGA name
+                for i, lga := range lgas {
+                    lgas[i] = strings.TrimSpace(lga)
+                }
+            }
+            input.Lgas = lgas
+        }
+
         // Assuming user ID from context (e.g., JWT)
         userID := uint(1) // Replace with actual logic, e.g., ctx.GetUint("userID")
 
@@ -2080,17 +2095,16 @@ func (s *Server) CreateState() gin.HandlerFunc {
 func (s *Server) FetchStates() gin.HandlerFunc {
     return func(ctx *gin.Context) {
         cacheKey := "states:all"
-        redisCtx := context.Background()
+        redisCtx := ctx.Request.Context() // Propagate request context
 
         // Try to get from Redis
         cachedStates, err := s.RedisClient.Get(redisCtx, cacheKey).Result()
         if err == nil {
-            // Cache hit: Return cached data
+            // Cache hit
             ctx.Data(http.StatusOK, "application/json", []byte(cachedStates))
             return
         }
         if err != redis.Nil {
-            // Redis error (not just a miss)
             ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Redis error: " + err.Error()})
             return
         }
@@ -2109,13 +2123,51 @@ func (s *Server) FetchStates() gin.HandlerFunc {
             return
         }
 
-        // Cache the result in Redis (24-hour expiration)
-        err = s.RedisClient.Set(redisCtx, cacheKey, statesJSON, 24*time.Hour).Err()
-        if err != nil {
-            fmt.Println("Failed to set Redis cache:", err) // Log but don’t fail
+        // Cache in Redis
+        if err := s.RedisClient.Set(redisCtx, cacheKey, statesJSON, 24*time.Hour).Err(); err != nil {
+            log.Printf("Failed to set Redis cache: %v", err) // Use proper logging
         }
 
         ctx.Data(http.StatusOK, "application/json", statesJSON)
     }
 }
 
+func (s *Server) FetchLGAs() gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+        cacheKey := "lgas:all"
+        redisCtx := ctx.Request.Context()
+
+        // Try to get from Redis
+        cachedLGAs, err := s.RedisClient.Get(redisCtx, cacheKey).Result()
+        if err == nil {
+            // Cache hit
+            ctx.Data(http.StatusOK, "application/json", []byte(cachedLGAs))
+            return
+        }
+        if err != redis.Nil {
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Redis error: " + err.Error()})
+            return
+        }
+
+        // Cache miss: Fetch from database
+        lgas, err := s.IncidentReportRepository.FetchLGAs()
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
+            return
+        }
+
+        // Marshal to JSON
+        lgasJSON, err := json.Marshal(lgas)
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal LGAs"})
+            return
+        }
+
+        // Cache in Redis
+        if err := s.RedisClient.Set(redisCtx, cacheKey, lgasJSON, 24*time.Hour).Err(); err != nil {
+            log.Printf("Failed to set Redis cache: %v", err)
+        }
+
+        ctx.Data(http.StatusOK, "application/json", lgasJSON)
+    }
+}

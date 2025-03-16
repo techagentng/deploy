@@ -19,6 +19,7 @@ type State struct {
     LGAC          *string   `gorm:"default:null" json:"lgac"`
     LgacImage     *string   `gorm:"default:null" json:"lgac_image"`
     GovernorImage *string   `gorm:"default:null" json:"governor_image"`
+    Lgas          []string  `gorm:"type:text;serializer:json" json:"lgas"` 
 }
 
 

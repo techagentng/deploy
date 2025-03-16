@@ -101,6 +101,7 @@ type IncidentReportRepository interface {
 	CreateState(state *models.State) error
 	GetAllStatesRatingPercentages(reportType string) (map[string]*models.RatingPercentage, error)
 	FetchStates() ([]models.State, error)
+	FetchLGAs() ([]models.LGA, error)
 }
 
 type incidentReportRepo struct {
@@ -1740,4 +1741,13 @@ func (repo *incidentReportRepo) FetchStates() ([]models.State, error) {
         return nil, err
     }
     return states, nil
+}
+
+func (repo *incidentReportRepo) FetchLGAs() ([]models.LGA, error) {
+    var lgas []models.LGA
+    err := repo.DB.Preload("State").Find(&lgas).Error
+    if err != nil {
+        return nil, err
+    }
+    return lgas, nil
 }
