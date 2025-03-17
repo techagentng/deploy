@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -407,6 +408,13 @@ func SeedStates(db *gorm.DB) error {
 	}
 
 	for _, state := range states {
+        // Serialize Lgas to JSON string
+        lgasJSON, err := json.Marshal(state.Lgas)
+        if err != nil {
+            log.Printf("Failed to marshal LGAs for state %s: %v", *state.State, err)
+            return err
+        }
+
         // Check if state exists
         var existingState models.State
         result := db.Where("state = ?", *state.State).First(&existingState)
@@ -423,13 +431,13 @@ func SeedStates(db *gorm.DB) error {
                 return result.Error
             }
         } else {
-            // Update existing record with LGAs and other fields
+            // Update existing record with serialized LGAs
             if err := db.Model(&existingState).Updates(map[string]interface{}{
                 "governor":       state.Governor,
                 "lgac":           state.LGAC,
                 "governor_image": state.GovernorImage,
                 "lgac_image":     state.LgacImage,
-                "lgas":           state.Lgas,
+                "lgas":           string(lgasJSON), // Pass as JSON string
             }).Error; err != nil {
                 log.Printf("Failed to update state %s: %v", *state.State, err)
                 return err
@@ -440,7 +448,6 @@ func SeedStates(db *gorm.DB) error {
 
     return nil
 }
-
 
 func migrate(db *gorm.DB) error {
 	// AutoMigrate all the models
