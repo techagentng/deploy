@@ -1677,21 +1677,65 @@ func (repo *incidentReportRepo) GetGovernorDetails(stateName string) (*models.St
 }
 
 func (repo *incidentReportRepo) CreateState(state *models.State) error {
-	// Check if the state already exists based on a unique field (e.g., ID or State name)
-	existingState := &models.State{}
-	err := repo.DB.Where("state = ?", state.State).First(existingState).Error
+    existingState := &models.State{}
+    err := repo.DB.Where("state = ?", state.State).First(existingState).Error
 
-	if err != nil {
-		// If the state doesn't exist, create a new record
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return repo.DB.Create(state).Error
-		}
-		// Return other errors (e.g., database connection issues)
-		return err
-	}
+    if err != nil {
+        // If the state doesn't exist, create a new record
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return repo.DB.Create(state).Error
+        }
+        // Return other errors (e.g., database connection issues)
+        return err
+    }
 
-	// If the state exists, update the existing record
-	return repo.DB.Model(existingState).Updates(state).Error
+    // If the state exists, merge LGAs and update other fields
+    // Step 1: Merge LGAs (assuming Lgas is a []string field)
+    if len(state.Lgas) > 0 {
+        // Get existing LGAs
+        existingLgas := existingState.Lgas
+        // Create a map to avoid duplicates
+        lgaMap := make(map[string]struct{})
+        for _, lga := range existingLgas {
+            lgaMap[lga] = struct{}{}
+        }
+        // Add new LGAs
+        for _, lga := range state.Lgas {
+            lgaMap[lga] = struct{}{}
+        }
+        // Convert back to slice
+        mergedLgas := make([]string, 0, len(lgaMap))
+        for lga := range lgaMap {
+            mergedLgas = append(mergedLgas, lga)
+        }
+        existingState.Lgas = mergedLgas
+    }
+
+    // Step 2: Update other fields only if provided (non-nil or non-empty)
+    if state.State != nil && *state.State != "" {
+        existingState.State = state.State
+    }
+    if state.Governor != nil && *state.Governor != "" {
+        existingState.Governor = state.Governor
+    }
+    if state.DeputyName != nil && *state.DeputyName != "" {
+        existingState.DeputyName = state.DeputyName
+    }
+    if state.LGAC != nil && *state.LGAC != "" {
+        existingState.LGAC = state.LGAC
+    }
+    if state.GovernorImage != nil && *state.GovernorImage != "" {
+        existingState.GovernorImage = state.GovernorImage
+    }
+    if state.DeputyImage != nil && *state.DeputyImage != "" {
+        existingState.DeputyImage = state.DeputyImage
+    }
+    if state.LgacImage != nil && *state.LgacImage != "" {
+        existingState.LgacImage = state.LgacImage
+    }
+
+    // Step 3: Save the updated state
+    return repo.DB.Save(existingState).Error
 }
 
 func (i *incidentReportRepo) GetAllStatesRatingPercentages(reportType string) (map[string]*models.RatingPercentage, error) {
