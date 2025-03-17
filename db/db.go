@@ -70,7 +70,7 @@ func toStringPtr(s string) *string {
 }
 
 func SeedStates(db *gorm.DB) error {
-	states := []State{
+	states := []models.State{
 		{
 			ID:            uuid.New(),
 			State:         toStringPtr("Abia"),
