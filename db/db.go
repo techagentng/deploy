@@ -406,9 +406,35 @@ func SeedStates(db *gorm.DB) error {
 		},
 	}
 
-    for _, state := range states {
-        if err := db.FirstOrCreate(&state, models.State{State: state.State}).Error; err != nil {
-            return err
+	for _, state := range states {
+        // Check if state exists
+        var existingState models.State
+        result := db.Where("state = ?", *state.State).First(&existingState)
+        if result.Error != nil {
+            if result.Error == gorm.ErrRecordNotFound {
+                // Create new record if not found
+                if err := db.Create(&state).Error; err != nil {
+                    log.Printf("Failed to create state %s: %v", *state.State, err)
+                    return err
+                }
+                log.Printf("Created state %s with LGAs: %v", *state.State, state.Lgas)
+            } else {
+                log.Printf("Error querying state %s: %v", *state.State, result.Error)
+                return result.Error
+            }
+        } else {
+            // Update existing record with LGAs and other fields
+            if err := db.Model(&existingState).Updates(map[string]interface{}{
+                "governor":       state.Governor,
+                "lgac":           state.LGAC,
+                "governor_image": state.GovernorImage,
+                "lgac_image":     state.LgacImage,
+                "lgas":           state.Lgas,
+            }).Error; err != nil {
+                log.Printf("Failed to update state %s: %v", *state.State, err)
+                return err
+            }
+            log.Printf("Updated state %s with LGAs: %v", *state.State, state.Lgas)
         }
     }
 
