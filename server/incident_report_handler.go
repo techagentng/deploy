@@ -2091,59 +2091,60 @@ func (s *Server) CreateState() gin.HandlerFunc {
         ctx.JSON(http.StatusCreated, gin.H{"message": "State created successfully", "data": input})
     }
 }
+
 func (s *Server) FetchLGAsByState() gin.HandlerFunc {
     return func(ctx *gin.Context) {
-        // Get the state name from the URL parameter (e.g., /lgas/Anambra)
         stateName := ctx.Param("state")
         if stateName == "" {
             ctx.JSON(http.StatusBadRequest, gin.H{"error": "State parameter is required"})
             return
         }
 
-        // Use a state-specific cache key
         cacheKey := fmt.Sprintf("lgas:%s", stateName)
         redisCtx := ctx.Request.Context()
 
-        // Try to get from Redis
-        cachedLGAs, err := s.RedisClient.Get(redisCtx, cacheKey).Result()
-        if err == nil {
-            // Cache hit
-            ctx.Data(http.StatusOK, "application/json", []byte(cachedLGAs))
-            return
-        }
-        if err != redis.Nil {
-            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Redis error: " + err.Error()})
-            return
+        // Attempt to fetch from Redis if available
+        if s.RedisClient != nil {
+            cachedLGAs, err := s.RedisClient.Get(redisCtx, cacheKey).Result()
+            if err == nil {
+                // Cache hit: return cached response
+                ctx.Data(http.StatusOK, "application/json", []byte(cachedLGAs))
+                return
+            }
+            if err != redis.Nil {
+                log.Printf("Redis error (cache lookup failed for %s): %v", cacheKey, err)
+            }
         }
 
-        // Cache miss: Fetch the state from the database
-        state, err := s.IncidentReportRepository.FetchStateByName(stateName)
-		if err != nil {
-			switch err {
-			case gorm.ErrRecordNotFound:
-				ctx.JSON(http.StatusNotFound, gin.H{"error": "State not found"})
-			default:
-				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
-			}
-			return
-		}
+ // Cache miss: Fetch the state from the database
+ state, err := s.IncidentReportRepository.FetchStateByName(stateName)
+ if err != nil {
+	 switch err {
+	 case gorm.ErrRecordNotFound:
+		 ctx.JSON(http.StatusNotFound, gin.H{"error": "State not found"})
+	 default:
+		 ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
+	 }
+	 return
+ }
 
-        // Extract LGAs from the state
+        // Ensure LGA list is never null
         lgas := state.Lgas
         if len(lgas) == 0 {
-            lgas = []string{} // Ensure an empty array is returned, not null
+            lgas = []string{}
         }
 
-        // Marshal LGAs to JSON
         lgasJSON, err := json.Marshal(lgas)
         if err != nil {
             ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal LGAs"})
             return
         }
 
-        // Cache in Redis
-        if err := s.RedisClient.Set(redisCtx, cacheKey, lgasJSON, 24*time.Hour).Err(); err != nil {
-            log.Printf("Failed to set Redis cache for %s: %v", cacheKey, err)
+        // Cache response in Redis if available
+        if s.RedisClient != nil {
+            if err := s.RedisClient.Set(redisCtx, cacheKey, lgasJSON, 24*time.Hour).Err(); err != nil {
+                log.Printf("Failed to set Redis cache for %s: %v", cacheKey, err)
+            }
         }
 
         ctx.Data(http.StatusOK, "application/json", lgasJSON)
