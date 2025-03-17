@@ -102,6 +102,7 @@ type IncidentReportRepository interface {
 	GetAllStatesRatingPercentages(reportType string) (map[string]*models.RatingPercentage, error)
 	FetchStates() ([]models.State, error)
 	FetchLGAs() ([]models.LGA, error)
+	FetchStateByName(stateName string) (*models.State, error)
 }
 
 type incidentReportRepo struct {
@@ -111,6 +112,10 @@ type incidentReportRepo struct {
 func NewIncidentReportRepo(db *GormDB) IncidentReportRepository {
 	return &incidentReportRepo{db.DB}
 }
+var (
+    ErrStateNotFound = errors.New("state not found")
+    ErrDatabase      = errors.New("database error")
+)
 
 // GetLastReportIDByUserID fetches the last report ID created by a given user.
 func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error) {
@@ -1769,4 +1774,17 @@ func (repo *incidentReportRepo) FetchLGAs() ([]models.LGA, error) {
         return nil, err
     }
     return lgas, nil
+}
+
+// Repository method to fetch a state by name
+func (repo *incidentReportRepo) FetchStateByName(stateName string) (*models.State, error) {
+    var state models.State
+    err := repo.DB.Where("state = ?", stateName).First(&state).Error
+    if err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return nil, ErrStateNotFound
+        }
+        return nil, ErrDatabase
+    }
+    return &state, nil
 }

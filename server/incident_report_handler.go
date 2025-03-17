@@ -2091,17 +2091,24 @@ func (s *Server) CreateState() gin.HandlerFunc {
         ctx.JSON(http.StatusCreated, gin.H{"message": "State created successfully", "data": input})
     }
 }
-
-func (s *Server) FetchStates() gin.HandlerFunc {
+func (s *Server) FetchLGAsByState() gin.HandlerFunc {
     return func(ctx *gin.Context) {
-        cacheKey := "states:all"
-        redisCtx := ctx.Request.Context() // Propagate request context
+        // Get the state name from the URL parameter (e.g., /lgas/Anambra)
+        stateName := ctx.Param("state")
+        if stateName == "" {
+            ctx.JSON(http.StatusBadRequest, gin.H{"error": "State parameter is required"})
+            return
+        }
+
+        // Use a state-specific cache key
+        cacheKey := fmt.Sprintf("lgas:%s", stateName)
+        redisCtx := ctx.Request.Context()
 
         // Try to get from Redis
-        cachedStates, err := s.RedisClient.Get(redisCtx, cacheKey).Result()
+        cachedLGAs, err := s.RedisClient.Get(redisCtx, cacheKey).Result()
         if err == nil {
             // Cache hit
-            ctx.Data(http.StatusOK, "application/json", []byte(cachedStates))
+            ctx.Data(http.StatusOK, "application/json", []byte(cachedLGAs))
             return
         }
         if err != redis.Nil {
@@ -2109,28 +2116,40 @@ func (s *Server) FetchStates() gin.HandlerFunc {
             return
         }
 
-        // Cache miss: Fetch from database
-        states, err := s.IncidentReportRepository.FetchStates()
-        if err != nil {
-            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
-            return
+        // Cache miss: Fetch the state from the database
+        state, err := s.IncidentReportRepository.FetchStateByName(stateName)
+		if err != nil {
+			switch err {
+			case gorm.ErrRecordNotFound:
+				ctx.JSON(http.StatusNotFound, gin.H{"error": "State not found"})
+			default:
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
+			}
+			return
+		}
+
+        // Extract LGAs from the state
+        lgas := state.Lgas
+        if len(lgas) == 0 {
+            lgas = []string{} // Ensure an empty array is returned, not null
         }
 
-        // Marshal to JSON
-        statesJSON, err := json.Marshal(states)
+        // Marshal LGAs to JSON
+        lgasJSON, err := json.Marshal(lgas)
         if err != nil {
-            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal states"})
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal LGAs"})
             return
         }
 
         // Cache in Redis
-        if err := s.RedisClient.Set(redisCtx, cacheKey, statesJSON, 24*time.Hour).Err(); err != nil {
-            log.Printf("Failed to set Redis cache: %v", err) // Use proper logging
+        if err := s.RedisClient.Set(redisCtx, cacheKey, lgasJSON, 24*time.Hour).Err(); err != nil {
+            log.Printf("Failed to set Redis cache for %s: %v", cacheKey, err)
         }
 
-        ctx.Data(http.StatusOK, "application/json", statesJSON)
+        ctx.Data(http.StatusOK, "application/json", lgasJSON)
     }
 }
+
 
 func (s *Server) FetchLGAs() gin.HandlerFunc {
     return func(ctx *gin.Context) {
