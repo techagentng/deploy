@@ -1084,37 +1084,66 @@ func (s *Server) handleGetReportsByTypeAndLGA() gin.HandlerFunc {
 }
 
 func (s *Server) handleGetReportTypeCounts() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		state := strings.TrimSpace(c.Query("state"))
-		lga := strings.TrimSpace(c.Query("lga"))
-		startDate := strings.TrimSpace(c.Query("start_date"))
-		endDate := strings.TrimSpace(c.Query("end_date"))
+    return func(c *gin.Context) {
+        // Extract query parameters
+        state := strings.TrimSpace(c.Query("state"))
+        lga := strings.TrimSpace(c.Query("lga"))
+        startDate := strings.TrimSpace(c.Query("start_date"))
+        endDate := strings.TrimSpace(c.Query("end_date"))
 
-		if state == "" || lga == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "State and LGA are required"})
-			return
-		}
+        // Validate required fields
+        if state == "" || lga == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "State and LGA are required"})
+            return
+        }
 
-		reportTypes, reportCounts, totalUsers, totalReports, topStates, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+        // Optional: Pre-validate date format if provided
+        if startDate != "" {
+            if _, err := time.Parse("2006-01-02", startDate); err != nil {
+                c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format, use YYYY-MM-DD"})
+                return
+            }
+        }
+        if endDate != "" {
+            if _, err := time.Parse("2006-01-02", endDate); err != nil {
+                c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format, use YYYY-MM-DD"})
+                return
+            }
+        }
 
-		// Convert the slice of StateReportCount to a map
-		topStatesMap := make(map[string]int)
-		for _, stateReport := range topStates {
-			topStatesMap[stateReport.StateName] = stateReport.ReportCount
-		}
+        // Call service with potentially empty dates (repo will use DB range if nil/empty)
+        reportTypes, reportCounts, totalUsers, totalReports, topStates, err := s.IncidentReportService.GetReportTypeCounts(state, lga, &startDate, &endDate)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
 
-		c.JSON(http.StatusOK, gin.H{
-			"report_types":  reportTypes,
-			"report_counts": reportCounts,
-			"total_users":   totalUsers,
-			"total_reports": totalReports,
-			"top_states":    topStatesMap,
-		})
-	}
+        // Convert topStates to map
+        topStatesMap := make(map[string]int)
+        for _, stateReport := range topStates {
+            topStatesMap[stateReport.StateName] = stateReport.ReportCount
+        }
+
+        // Build response, optionally including effective time range
+        response := gin.H{
+            "report_types":  reportTypes,
+            "report_counts": reportCounts,
+            "total_users":   totalUsers,
+            "total_reports": totalReports,
+            "top_states":    topStatesMap,
+        }
+
+        // Optional: Add effective time range to response (requires service to return it)
+        // For now, assume repo handles it internally; adjust if you modify service to return times
+        if startDate != "" {
+            response["start_date"] = startDate
+        }
+        if endDate != "" {
+            response["end_date"] = endDate
+        }
+
+        c.JSON(http.StatusOK, response)
+    }
 }
 
 // Handler function to get LGAs in a state
