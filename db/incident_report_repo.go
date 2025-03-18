@@ -468,42 +468,6 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
     var totalReports int
     var topStates []models.StateReportCount
 
-    // Determine the time range from the database if not provided
-    var minTime, maxTime time.Time
-    if (startDate == nil || *startDate == "") || (endDate == nil || *endDate == "") {
-        // Fetch min and max time_of_incidence for the given state and lga
-        err := repo.DB.Raw(`
-            SELECT MIN(time_of_incidence), MAX(time_of_incidence)
-            FROM incident_reports
-            WHERE state_name = ? AND lga_name = ?
-        `, state, lga).Row().Scan(&minTime, &maxTime)
-        if err != nil {
-            return nil, nil, 0, 0, nil, fmt.Errorf("failed to fetch time range from DB: %v", err)
-        }
-    }
-
-    // Use query params if provided, otherwise fall back to DB-derived range
-    var effectiveStartDate, effectiveEndDate time.Time
-    if startDate != nil && *startDate != "" {
-        var err error
-        effectiveStartDate, err = time.Parse("2006-01-02", *startDate)
-        if err != nil {
-            return nil, nil, 0, 0, nil, errors.New("failed to parse start date: " + err.Error())
-        }
-    } else {
-        effectiveStartDate = minTime
-    }
-
-    if endDate != nil && *endDate != "" {
-        var err error
-        effectiveEndDate, err = time.Parse("2006-01-02", *endDate)
-        if err != nil {
-            return nil, nil, 0, 0, nil, errors.New("failed to parse end date: " + err.Error())
-        }
-    } else {
-        effectiveEndDate = maxTime
-    }
-
     // Base query for report types and counts from IncidentReport table
     query := `
         SELECT ir.category, COUNT(*) AS count,
@@ -511,17 +475,31 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
                (SELECT COUNT(*) FROM incident_reports ir WHERE ir.state_name = ? AND ir.lga_name = ?) AS total_reports
         FROM incident_reports ir
         WHERE ir.state_name = ? AND ir.lga_name = ?
-        AND ir.time_of_incidence BETWEEN ? AND ?
-        GROUP BY ir.category
     `
 
-    // Prepare query arguments with effective time range
-    args := []interface{}{
-        state, lga, // For total_users subquery
-        state, lga, // For total_reports subquery
-        state, lga, // For main WHERE clause
-        effectiveStartDate, effectiveEndDate, // Time range
+    // Prepare query arguments
+    var args []interface{}
+    args = append(args, state, lga, state, lga, state, lga)
+
+    // Optional date filter
+    if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
+        var err error
+        defaultStartDate, err := time.Parse("2006-01-02", *startDate)
+        if err != nil {
+            return nil, nil, 0, 0, nil, errors.New("failed to parse start date: " + err.Error())
+        }
+
+        defaultEndDate, err := time.Parse("2006-01-02", *endDate)
+        if err != nil {
+            return nil, nil, 0, 0, nil, errors.New("failed to parse end date: " + err.Error())
+        }
+
+        // Use time_of_incidence instead of date_of_incidence
+        query += ` AND ir.time_of_incidence BETWEEN ? AND ?`
+        args = append(args, defaultStartDate, defaultEndDate)
     }
+
+    query += ` GROUP BY ir.category`
 
     // Execute the query with parameters
     rows, err := repo.DB.Raw(query, args...).Rows()
@@ -550,15 +528,31 @@ func (repo *incidentReportRepo) GetReportTypeCounts(state string, lga string, st
         SELECT state_name, COUNT(*) AS report_count
         FROM incident_reports
         WHERE lga_name = ?
-        AND time_of_incidence BETWEEN ? AND ?
+    `
+
+    // Append date filters if provided
+    if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
+        topStatesQuery += ` AND time_of_incidence BETWEEN ? AND ?`
+    }
+
+    topStatesQuery += `
         GROUP BY state_name
         ORDER BY report_count DESC
     `
 
-    topStatesArgs := []interface{}{
-        lga,
-        effectiveStartDate,
-        effectiveEndDate,
+    topStatesArgs := []interface{}{lga}
+    if startDate != nil && endDate != nil && *startDate != "" && *endDate != "" {
+        defaultStartDate, err := time.Parse("2006-01-02", *startDate)
+        if err != nil {
+            return nil, nil, 0, 0, nil, errors.New("failed to parse start date: " + err.Error())
+        }
+
+        defaultEndDate, err := time.Parse("2006-01-02", *endDate)
+        if err != nil {
+            return nil, nil, 0, 0, nil, errors.New("failed to parse end date: " + err.Error())
+        }
+
+        topStatesArgs = append(topStatesArgs, defaultStartDate, defaultEndDate)
     }
 
     err = repo.DB.Raw(topStatesQuery, topStatesArgs...).Scan(&topStates).Error
