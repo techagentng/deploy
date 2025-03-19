@@ -1853,16 +1853,17 @@ func (repo *incidentReportRepo) StateReportCounts() ([]models.StateReportCount, 
 
 func (repo *incidentReportRepo) GetReportTypeCountsState(state string) ([]string, []int, int, int, []models.StateReportCount, error) {
     var reportCounts []struct {
-        ReportType string // This struct field name can stay as-is
+        ReportType string
         Count      int
     }
 
-    // Updated query with the correct column name
+    // Query to count report types per state
     err := repo.DB.Raw(`
-        SELECT incident_type AS report_type, COUNT(*) AS count 
-        FROM incident_reports 
-        WHERE state_name = ? 
-        GROUP BY incident_type 
+        SELECT rt.category AS report_type, COUNT(*) AS count
+        FROM incident_reports ir
+        JOIN report_types rt ON ir.report_type_id = rt.id
+        WHERE ir.state_name = ?
+        GROUP BY rt.category
         ORDER BY count DESC
     `, state).Scan(&reportCounts).Error
 
@@ -1878,7 +1879,7 @@ func (repo *incidentReportRepo) GetReportTypeCountsState(state string) ([]string
         counts = append(counts, rc.Count)
     }
 
-    // Rest of the queries remain unchanged unless they also reference report_type
+    // Query to get total users and total reports in the state
     var totalUsers, totalReports int
     err = repo.DB.Raw(`
         SELECT COUNT(DISTINCT user_id) AS total_users, COUNT(*) AS total_reports 
@@ -1893,6 +1894,7 @@ func (repo *incidentReportRepo) GetReportTypeCountsState(state string) ([]string
         return nil, nil, 0, 0, nil, err
     }
 
+    // Query to get top states based on report count
     var topStates []models.StateReportCount
     err = repo.DB.Raw(`
         SELECT state_name, COUNT(*) AS report_count 
