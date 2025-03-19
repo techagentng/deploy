@@ -2191,3 +2191,52 @@ func (s *Server) FetchLGAs() gin.HandlerFunc {
         ctx.Data(http.StatusOK, "application/json", lgasJSON)
     }
 }
+
+func (s *Server) handleGetReportTypeCountsState() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		state := c.Query("state")
+
+		if state == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "State parameter is required"})
+			return
+		}
+
+		// Call repository function
+		reportTypes, counts, totalUsers, totalReports, topStates, err := s.IncidentReportRepository.GetReportTypeCountsState(state)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Convert reportTypes and counts into structured response
+		var reportCounts []struct {
+			ReportType string `json:"report_type"`
+			Count      int    `json:"count"`
+		}
+
+		for i := range reportTypes {
+			reportCounts = append(reportCounts, struct {
+				ReportType string `json:"report_type"`
+				Count      int    `json:"count"`
+			}{
+				ReportType: reportTypes[i],
+				Count:      counts[i],
+			})
+		}
+
+		// Convert topStates slice to a map
+		topStatesMap := make(map[string]int)
+		for _, stateReport := range topStates {
+			topStatesMap[stateReport.StateName] = stateReport.ReportCount
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"report_types":  reportTypes,
+			"report_counts": reportCounts,
+			"total_users":   totalUsers,
+			"total_reports": totalReports,
+			"top_states":    topStatesMap,
+		})
+	}
+}
+

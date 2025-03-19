@@ -69,6 +69,7 @@ type IncidentReport struct {
 	Followers []*User `gorm:"many2many:follows;joinForeignKey:ReportID;joinReferences:UserID" json:"followers"`
 
 }
+
 type ReportCount struct {
 	StateName string
 	LGAName   string
