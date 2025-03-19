@@ -1852,60 +1852,58 @@ func (repo *incidentReportRepo) StateReportCounts() ([]models.StateReportCount, 
 
 
 func (repo *incidentReportRepo) GetReportTypeCountsState(state string) ([]string, []int, int, int, []models.StateReportCount, error) {
-	var reportCounts []struct {
-		ReportType string
-		Count      int
-	}
+    var reportCounts []struct {
+        ReportType string // This struct field name can stay as-is
+        Count      int
+    }
 
-	// Query to get report types and their counts for the given state
-	err := repo.DB.Raw(`
-		SELECT report_type, COUNT(*) AS count 
-		FROM incident_reports 
-		WHERE state_name = ? 
-		GROUP BY report_type 
-		ORDER BY count DESC
-	`, state).Scan(&reportCounts).Error
+    // Updated query with the correct column name
+    err := repo.DB.Raw(`
+        SELECT incident_type AS report_type, COUNT(*) AS count 
+        FROM incident_reports 
+        WHERE state_name = ? 
+        GROUP BY incident_type 
+        ORDER BY count DESC
+    `, state).Scan(&reportCounts).Error
 
-	if err != nil {
-		return nil, nil, 0, 0, nil, err
-	}
+    if err != nil {
+        return nil, nil, 0, 0, nil, err
+    }
 
-	// Extract report types and counts into separate slices
-	var reportTypes []string
-	var counts []int
+    var reportTypes []string
+    var counts []int
 
-	for _, rc := range reportCounts {
-		reportTypes = append(reportTypes, rc.ReportType)
-		counts = append(counts, rc.Count)
-	}
+    for _, rc := range reportCounts {
+        reportTypes = append(reportTypes, rc.ReportType)
+        counts = append(counts, rc.Count)
+    }
 
-	// Query to get total users who reported and total reports
-	var totalUsers, totalReports int
-	err = repo.DB.Raw(`
-		SELECT COUNT(DISTINCT user_id) AS total_users, COUNT(*) AS total_reports 
-		FROM incident_reports 
-		WHERE state_name = ?
-	`, state).Scan(&struct {
-		TotalUsers  *int
-		TotalReports *int
-	}{&totalUsers, &totalReports}).Error
+    // Rest of the queries remain unchanged unless they also reference report_type
+    var totalUsers, totalReports int
+    err = repo.DB.Raw(`
+        SELECT COUNT(DISTINCT user_id) AS total_users, COUNT(*) AS total_reports 
+        FROM incident_reports 
+        WHERE state_name = ?
+    `, state).Scan(&struct {
+        TotalUsers  *int
+        TotalReports *int
+    }{&totalUsers, &totalReports}).Error
 
-	if err != nil {
-		return nil, nil, 0, 0, nil, err
-	}
+    if err != nil {
+        return nil, nil, 0, 0, nil, err
+    }
 
-	// Query to get top states and their report counts
-	var topStates []models.StateReportCount
-	err = repo.DB.Raw(`
-		SELECT state_name, COUNT(*) AS report_count 
-		FROM incident_reports 
-		GROUP BY state_name 
-		ORDER BY report_count DESC
-	`).Scan(&topStates).Error
+    var topStates []models.StateReportCount
+    err = repo.DB.Raw(`
+        SELECT state_name, COUNT(*) AS report_count 
+        FROM incident_reports 
+        GROUP BY state_name 
+        ORDER BY report_count DESC
+    `).Scan(&topStates).Error
 
-	if err != nil {
-		return nil, nil, 0, 0, nil, err
-	}
+    if err != nil {
+        return nil, nil, 0, 0, nil, err
+    }
 
-	return reportTypes, counts, totalUsers, totalReports, topStates, nil
+    return reportTypes, counts, totalUsers, totalReports, topStates, nil
 }
