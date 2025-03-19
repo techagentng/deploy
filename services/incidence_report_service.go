@@ -37,7 +37,6 @@ type IncidentReportService interface {
 	GetReportCountByState(state string) (int, error)
 	GetOverallReportCount() (int, error)
 	GetGovernorDetails(stateName string) (*models.State, error)
-	GetReportTypeCountsState(state string) ([]string, int, int, []models.StateReportCount, error)
 }
 
 type IncidentService struct {
