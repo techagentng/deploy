@@ -49,6 +49,7 @@ type AuthRepository interface {
 	GetUserByEmail(email string) (*models.User, error)
 	FindOrCreateUser(email, name string) (*models.User, error)
 	GetTotalUserCount() (int64, error)
+	GoogleUserCreate(user *models.User) error
 }
 
 type authRepo struct {
@@ -102,6 +103,15 @@ func (a *authRepo) CreateUser(user *models.User) (*models.User, error) {
 
 	// Return the created user
 	return user, nil
+}
+
+// CreateUser saves a new user to the database
+func (a *authRepo) GoogleUserCreate(user *models.User) error {
+    result := a.DB.Create(user)
+    if result.Error != nil {
+        return result.Error
+    }
+    return nil
 }
 
 // CreateUserWithMacAddress updates the MAC address field for an existing user or creates a new user with the provided MAC address
@@ -573,3 +583,4 @@ func (a *authRepo) GetTotalUserCount() (int64, error) {
 
     return totalCount, nil
 }
+

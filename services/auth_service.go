@@ -2,11 +2,15 @@ package services
 
 import (
 	"crypto/rand"
+	"strings"
 	// "encoding/json"
 	"errors"
 	"fmt"
 
 	// "io/ioutil"
+	"log"
+	"net/http"
+
 	_ "github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/techagentng/citizenx/config"
@@ -16,8 +20,6 @@ import (
 	"github.com/techagentng/citizenx/services/jwt"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	"log"
-	"net/http"
 )
 
 //go:generate mockgen -destination=../mocks/auth_mock.go -package=mocks github.com/decagonhq/meddle-api/services AuthService
@@ -38,6 +40,7 @@ type AuthService interface {
 	// DeleteUserByEmail(userEmail string) *apiError.Error
 	GetRoleByName(name string) (*models.Role, error)
 	DeleteUser(userID uint) error
+	GoogleLoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error)
 }
 
 // authService struct
@@ -181,6 +184,92 @@ func (a *authService) LoginUser(loginRequest *models.LoginRequest) (*models.Logi
 	}, nil
 }
 
+func (a *authService) GoogleLoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error) {
+    // Find the user by email
+    foundUser, err := a.authRepo.FindUserByEmail(loginRequest.Email)
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            // Optionally create a new user if they don’t exist
+            foundUser, err = a.createGoogleUser(loginRequest.Email)
+            if err != nil {
+                log.Printf("Error creating user for email %s: %v", loginRequest.Email, err)
+                return nil, apiError.New("unable to create user", http.StatusInternalServerError)
+            }
+        } else {
+            log.Printf("Error finding user by email: %v", err)
+            return nil, apiError.New("unable to find user", http.StatusInternalServerError)
+        }
+    }
+
+    // Ensure RoleID is not empty
+    if foundUser.RoleID == uuid.Nil {
+        log.Printf("User %s does not have a role assigned", foundUser.Email)
+        return nil, apiError.New("user role not assigned", http.StatusInternalServerError)
+    }
+
+    // Fetch the user's role
+    log.Printf("Fetching role with ID: %s for user %s", foundUser.RoleID.String(), foundUser.Email)
+    role, err := a.authRepo.FindRoleByID(foundUser.RoleID)
+    if err != nil {
+        log.Printf("Error fetching role for user %s: %v", foundUser.Email, err)
+        return nil, apiError.New("unable to fetch role", http.StatusInternalServerError)
+    }
+
+    roleName := role.Name
+
+    // Generate tokens with role information
+    log.Printf("Generating token pair for user %s with role %s", foundUser.Email, roleName)
+    accessToken, refreshToken, err := jwt.GenerateTokenPair(foundUser.Email, a.Config.JWTSecret, foundUser.AdminStatus, foundUser.ID, roleName)
+    if err != nil {
+        log.Printf("Error generating token pair for user %s: %v", foundUser.Email, err)
+        return nil, apiError.ErrInternalServerError
+    }
+
+    return &models.LoginResponse{
+        UserResponse: models.UserResponse{
+            ID:        foundUser.ID,
+            Fullname:  foundUser.Fullname, 
+            Username:  foundUser.Username, 
+            Telephone: foundUser.Telephone, 
+            Email:     foundUser.Email,
+            RoleName:  roleName,
+        },
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+    }, nil
+}
+
+func (a *authService) createGoogleUser(email string) (*models.User, error) {
+    // Define a default role for new Google users (e.g., "user")
+    defaultRoleID, err := a.getDefaultRoleID()
+    if err != nil {
+        return nil, err
+    }
+
+    newUser := &models.User{
+        Email:     email,
+        RoleID:    defaultRoleID,
+        Fullname:  "",
+        Username:  strings.Split(email, "@")[0],
+        Telephone: "", // Optional field
+    }
+
+    // Save the user to the database
+    if err := a.authRepo.GoogleUserCreate(newUser); err != nil {
+        return nil, err
+    }
+
+    return newUser, nil
+}
+
+// Example helper to get a default role ID
+func (a *authService) getDefaultRoleID() (uuid.UUID, error) {
+    role, err := a.authRepo.FindRoleByName("user") // Assuming a "user" role exists
+    if err != nil {
+        return uuid.Nil, err
+    }
+    return role.ID, nil
+}
 // func (a *authService) GetUserByID(id string) (*models.User, error) {
 //     user, err := a.authRepo.FindByID(id)
 //     if err != nil {

@@ -320,6 +320,30 @@ func (s *Server) handleSignup() gin.HandlerFunc {
     }
 }
 
+type GoogleLoginRequest struct {
+    Email string `json:"email" binding:"required,email"`
+}
+
+func (s *Server) handleGoogleUserLogin() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        var loginRequest GoogleLoginRequest
+        if err := decode(c, &loginRequest); err != nil {
+            response.JSON(c, "", errors.ErrBadRequest.Status, nil, err)
+            return
+        }
+
+		userResponse, err := s.AuthService.GoogleLoginUser(&models.LoginRequest{
+			Email: loginRequest.Email,
+		})
+        if err != nil {
+            response.JSON(c, "", err.Status, nil, err)
+            return
+        }
+
+        response.JSON(c, "login successful", http.StatusOK, userResponse, nil)
+    }
+}
+
 // Middleware to redirect non-credential users to sign-in page for certain actions
 func (s *Server) handleNonCredentialLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {
