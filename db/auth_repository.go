@@ -51,6 +51,8 @@ type AuthRepository interface {
 	GetTotalUserCount() (int64, error)
 	GoogleUserCreate(user *models.User) error
 	FindGoogleUserByEmail(email string) (*models.User, error)
+	FindFacebookUserByEmail(email string) (*models.User, error)
+	FacebookUserCreate(user *models.User) error
 }
 
 type authRepo struct {
@@ -108,6 +110,14 @@ func (a *authRepo) CreateUser(user *models.User) (*models.User, error) {
 
 // CreateUser saves a new user to the database
 func (a *authRepo) GoogleUserCreate(user *models.User) error {
+    result := a.DB.Create(user)
+    if result.Error != nil {
+        return result.Error
+    }
+    return nil
+}
+
+func (a *authRepo) FacebookUserCreate(user *models.User) error {
     result := a.DB.Create(user)
     if result.Error != nil {
         return result.Error
@@ -198,6 +208,14 @@ func (a *authRepo) FindUserByEmail(email string) (*models.User, error) {
 }
 
 func (a *authRepo) FindGoogleUserByEmail(email string) (*models.User, error) {
+    var user models.User
+    err := a.DB.Where("email = ?", email).First(&user).Error
+    if err != nil {
+        return nil, err // Return the raw GORM error, including gorm.ErrRecordNotFound
+    }
+    return &user, nil
+}
+func (a *authRepo) FindFacebookUserByEmail(email string) (*models.User, error) {
     var user models.User
     err := a.DB.Where("email = ?", email).First(&user).Error
     if err != nil {

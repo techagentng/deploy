@@ -342,6 +342,29 @@ func (s *Server) handleGoogleUserLogin() gin.HandlerFunc {
     }
 }
 
+func (s *Server) handleFacebookUserLogin() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        var loginRequest models.FacebookLoginRequest
+        if err := decode(c, &loginRequest); err != nil {
+            response.JSON(c, "", errors.ErrBadRequest.Status, nil, err)
+            return
+        }
+
+        userResponse, err := s.AuthService.FacebookLoginUser(&models.FacebookLoginRequest{
+            Email:     loginRequest.Email,
+            Fullname:  loginRequest.Fullname,
+            Telephone: loginRequest.Telephone,
+        })
+        if err != nil {
+            response.JSON(c, "", err.Status, nil, err)
+            return
+        }
+
+        response.JSON(c, "login successful", http.StatusOK, userResponse, nil)
+    }
+}
+
+
 // Middleware to redirect non-credential users to sign-in page for certain actions
 func (s *Server) handleNonCredentialLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {

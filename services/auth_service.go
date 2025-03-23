@@ -41,6 +41,7 @@ type AuthService interface {
 	GetRoleByName(name string) (*models.Role, error)
 	DeleteUser(userID uint) error
 	GoogleLoginUser(loginRequest *models.GoogleLoginRequest) (*models.LoginResponse, *apiError.Error)
+	FacebookLoginUser(loginRequest *models.FacebookLoginRequest) (*models.LoginResponse, *apiError.Error)
 }
 
 // authService struct
@@ -269,6 +270,103 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
             Username:  newUser.Username,
             Telephone: newUser.Telephone,
             Email:     newUser.Email,
+            RoleName:  roleName,
+        },
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+    }, nil
+}
+
+func (a *authService) FacebookLoginUser(loginRequest *models.FacebookLoginRequest) (*models.LoginResponse, *apiError.Error) {
+    // Find the user by email
+    foundUser, err := a.authRepo.FindFacebookUserByEmail(loginRequest.Email)
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            // Create a new user if they don’t exist
+            return a.createFacebookUser(loginRequest.Email, loginRequest.Fullname, loginRequest.Telephone)
+        }
+        log.Printf("Error finding user by email: %v", err)
+        return nil, apiError.New("unable to find user", http.StatusInternalServerError)
+    }
+
+    // Optional: Skip RoleID check if role is not required
+    // if foundUser.RoleID == uuid.Nil {
+    //     log.Printf("User %s does not have a role assigned", foundUser.Email)
+    //     return nil, apiError.New("user role not assigned", http.StatusInternalServerError)
+    // }
+
+    // Fetch role only if RoleID is set; otherwise use a default
+    roleName := "user" // Default roleName
+    if foundUser.RoleID != uuid.Nil {
+        role, err := a.authRepo.FindRoleByID(foundUser.RoleID)
+        if err != nil {
+            log.Printf("Error fetching role for user %s: %v", foundUser.Email, err)
+            return nil, apiError.New("unable to fetch role", http.StatusInternalServerError)
+        }
+        roleName = role.Name
+    }
+
+    // Generate tokens with role information
+    log.Printf("Generating token pair for user %s with role %s", foundUser.Email, roleName)
+    accessToken, refreshToken, err := jwt.GenerateTokenPair(foundUser.Email, a.Config.JWTSecret, foundUser.AdminStatus, foundUser.ID, roleName)
+    if err != nil {
+        log.Printf("Error generating token pair for user %s: %v", foundUser.Email, err)
+        return nil, apiError.ErrInternalServerError
+    }
+
+    return &models.LoginResponse{
+        UserResponse: models.UserResponse{
+            ID:        foundUser.ID,
+            Fullname:  foundUser.Fullname,
+            Username:  foundUser.Username,
+            Telephone: foundUser.Telephone,
+            Email:     foundUser.Email,
+            RoleName:  roleName,
+        },
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+    }, nil
+}
+
+// Helper function to create a new Facebook user
+func (a *authService) createFacebookUser(email, fullname, telephone string) (*models.LoginResponse, *apiError.Error) {
+    user := &models.User{
+        Email:     email,
+        Fullname:  fullname,
+        Telephone: telephone,
+        RoleID:    uuid.Nil, // Default to no role; adjust if you assign a default role
+    }
+
+    if err := a.authRepo.FacebookUserCreate(user); err != nil {
+        log.Printf("Error creating Facebook user %s: %v", email, err)
+        return nil, apiError.New("unable to create user", http.StatusInternalServerError)
+    }
+
+    // Default role
+    roleName := "user"
+    if user.RoleID != uuid.Nil {
+        role, err := a.authRepo.FindRoleByID(user.RoleID)
+        if err != nil {
+            log.Printf("Error fetching role for new user %s: %v", email, err)
+            return nil, apiError.New("unable to fetch role", http.StatusInternalServerError)
+        }
+        roleName = role.Name
+    }
+
+    // Generate tokens
+    accessToken, refreshToken, err := jwt.GenerateTokenPair(user.Email, a.Config.JWTSecret, user.AdminStatus, user.ID, roleName)
+    if err != nil {
+        log.Printf("Error generating token pair for new user %s: %v", email, err)
+        return nil, apiError.ErrInternalServerError
+    }
+
+    return &models.LoginResponse{
+        UserResponse: models.UserResponse{
+            ID:        user.ID,
+            Fullname:  user.Fullname,
+            Username:  user.Username,
+            Telephone: user.Telephone,
+            Email:     user.Email,
             RoleName:  roleName,
         },
         AccessToken:  accessToken,

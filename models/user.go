@@ -142,6 +142,12 @@ type GoogleLoginRequest struct {
     Telephone string `json:"telephone" binding:"omitempty"`
 }
 
+type FacebookLoginRequest struct {
+    Email     string `json:"email"`
+    Fullname  string `json:"fullname"`
+    Telephone string `json:"telephone"`
+}
+
 type LoginRequestMacAddress struct {
 	Model
 	MacAddress string `json:"mac_address"`
