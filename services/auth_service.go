@@ -131,7 +131,7 @@ func (a *authService) LoginMacAddressUser(loginRequest *models.LoginRequestMacAd
 // LoginUser logs in a user and returns the login response
 func (a *authService) LoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error) {
 	// Find the user by email
-	foundUser, err := a.authRepo.FindUserByEmail(loginRequest.Email)
+	foundUser, err := a.authRepo.FindGoogleUserByEmail(loginRequest.Email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apiError.New("invalid email or password", http.StatusUnprocessableEntity)
