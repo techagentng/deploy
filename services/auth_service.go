@@ -186,7 +186,7 @@ func (a *authService) LoginUser(loginRequest *models.LoginRequest) (*models.Logi
 
 func (a *authService) GoogleLoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error) {
     // Find the user by email
-    foundUser, err := a.authRepo.FindUserByEmail(loginRequest.Email)
+    foundUser, err := a.authRepo.FindGoogleUserByEmail(loginRequest.Email)
     if err != nil {
         if errors.Is(err, gorm.ErrRecordNotFound) {
             // Create a new user if they don’t exist and return the LoginResponse directly
