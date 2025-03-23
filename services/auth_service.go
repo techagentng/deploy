@@ -236,22 +236,26 @@ func (a *authService) GoogleLoginUser(loginRequest *models.LoginRequest) (*model
 }
 
 func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *apiError.Error) {
-    newUser := &models.User{
-        Email:     email,
-        // RoleID is omitted, defaults to uuid.Nil
-        Fullname:  "",
-        Username:  strings.Split(email, "@")[0],
-        Telephone: "",
+    username := strings.Split(email, "@")[0]
+    if len(username) < 2 {
+        username = username + "user"
     }
 
-    // Save the user to the database
+    newUser := &models.User{
+        Email:     email,
+        Fullname:  "Google User",
+        Username:  username,
+        Telephone: "", // Assuming gorm:"default:null" handles this
+        IsSocial:  true,
+        // RoleID defaults to uuid.Nil, which GORM should map to NULL if nullable
+    }
+
     if err := a.authRepo.GoogleUserCreate(newUser); err != nil {
         log.Printf("Error creating user for email %s: %v", email, err)
         return nil, apiError.New("unable to create user", http.StatusInternalServerError)
     }
 
-    // Use a default roleName since RoleID is optional
-    roleName := "user" // Or "" if empty is acceptable
+    roleName := "user"
     accessToken, refreshToken, err := jwt.GenerateTokenPair(newUser.Email, a.Config.JWTSecret, newUser.AdminStatus, newUser.ID, roleName)
     if err != nil {
         log.Printf("Error generating token pair for user %s: %v", email, err)
@@ -265,7 +269,7 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
             Username:  newUser.Username,
             Telephone: newUser.Telephone,
             Email:     newUser.Email,
-            RoleName:  roleName, // Default or empty string
+            RoleName:  roleName,
         },
         AccessToken:  accessToken,
         RefreshToken: refreshToken,
