@@ -40,7 +40,7 @@ type AuthService interface {
 	// DeleteUserByEmail(userEmail string) *apiError.Error
 	GetRoleByName(name string) (*models.Role, error)
 	DeleteUser(userID uint) error
-	GoogleLoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error)
+	GoogleLoginUser(loginRequest *models.GoogleLoginRequest) (*models.LoginResponse, *apiError.Error)
 }
 
 // authService struct
@@ -184,7 +184,7 @@ func (a *authService) LoginUser(loginRequest *models.LoginRequest) (*models.Logi
 	}, nil
 }
 
-func (a *authService) GoogleLoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error) {
+func (a *authService) GoogleLoginUser(loginRequest *models.GoogleLoginRequest) (*models.LoginResponse, *apiError.Error) {
     // Find the user by email
     foundUser, err := a.authRepo.FindGoogleUserByEmail(loginRequest.Email)
     if err != nil {

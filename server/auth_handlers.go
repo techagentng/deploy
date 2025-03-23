@@ -320,21 +320,19 @@ func (s *Server) handleSignup() gin.HandlerFunc {
     }
 }
 
-type GoogleLoginRequest struct {
-    Email string `json:"email" binding:"required,email"`
-}
-
 func (s *Server) handleGoogleUserLogin() gin.HandlerFunc {
     return func(c *gin.Context) {
-        var loginRequest GoogleLoginRequest
+        var loginRequest models.GoogleLoginRequest
         if err := decode(c, &loginRequest); err != nil {
             response.JSON(c, "", errors.ErrBadRequest.Status, nil, err)
             return
         }
 
-		userResponse, err := s.AuthService.GoogleLoginUser(&models.LoginRequest{
-			Email: loginRequest.Email,
-		})
+        userResponse, err := s.AuthService.GoogleLoginUser(&models.GoogleLoginRequest{
+            Email:     loginRequest.Email,
+            Fullname:  loginRequest.Fullname,
+            Telephone: loginRequest.Telephone,
+        })
         if err != nil {
             response.JSON(c, "", err.Status, nil, err)
             return

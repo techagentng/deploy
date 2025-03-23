@@ -135,6 +135,13 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type GoogleLoginRequest struct {
+    Email     string `json:"email" binding:"required,email"`
+    Password  string `json:"password" binding:"omitempty"` // Changed from required to optional
+    Fullname  string `json:"fullname" binding:"omitempty"`
+    Telephone string `json:"telephone" binding:"omitempty"`
+}
+
 type LoginRequestMacAddress struct {
 	Model
 	MacAddress string `json:"mac_address"`
