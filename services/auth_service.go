@@ -189,16 +189,11 @@ func (a *authService) GoogleLoginUser(loginRequest *models.LoginRequest) (*model
     foundUser, err := a.authRepo.FindUserByEmail(loginRequest.Email)
     if err != nil {
         if errors.Is(err, gorm.ErrRecordNotFound) {
-            // Optionally create a new user if they don’t exist
-            foundUser, err = a.createGoogleUser(loginRequest.Email)
-            if err != nil {
-                log.Printf("Error creating user for email %s: %v", loginRequest.Email, err)
-                return nil, apiError.New("unable to create user", http.StatusInternalServerError)
-            }
-        } else {
-            log.Printf("Error finding user by email: %v", err)
-            return nil, apiError.New("unable to find user", http.StatusInternalServerError)
+            // Create a new user if they don’t exist and return the LoginResponse directly
+            return a.createGoogleUser(loginRequest.Email)
         }
+        log.Printf("Error finding user by email: %v", err)
+        return nil, apiError.New("unable to find user", http.StatusInternalServerError)
     }
 
     // Ensure RoleID is not empty
@@ -228,9 +223,9 @@ func (a *authService) GoogleLoginUser(loginRequest *models.LoginRequest) (*model
     return &models.LoginResponse{
         UserResponse: models.UserResponse{
             ID:        foundUser.ID,
-            Fullname:  foundUser.Fullname, 
-            Username:  foundUser.Username, 
-            Telephone: foundUser.Telephone, 
+            Fullname:  foundUser.Fullname,
+            Username:  foundUser.Username,
+            Telephone: foundUser.Telephone,
             Email:     foundUser.Email,
             RoleName:  roleName,
         },
@@ -239,13 +234,15 @@ func (a *authService) GoogleLoginUser(loginRequest *models.LoginRequest) (*model
     }, nil
 }
 
-func (a *authService) createGoogleUser(email string) (*models.User, error) {
+func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *apiError.Error) {
     // Define a default role for new Google users (e.g., "user")
     defaultRoleID, err := a.getDefaultRoleID()
     if err != nil {
-        return nil, err
+        log.Printf("Error fetching default role ID: %v", err)
+        return nil, apiError.New("unable to fetch default role", http.StatusInternalServerError)
     }
 
+    // Create the new user
     newUser := &models.User{
         Email:     email,
         RoleID:    defaultRoleID,
@@ -256,10 +253,40 @@ func (a *authService) createGoogleUser(email string) (*models.User, error) {
 
     // Save the user to the database
     if err := a.authRepo.GoogleUserCreate(newUser); err != nil {
-        return nil, err
+        log.Printf("Error creating user for email %s: %v", email, err)
+        return nil, apiError.New("unable to create user", http.StatusInternalServerError)
     }
 
-    return newUser, nil
+    // Fetch the user's role
+    role, err := a.authRepo.FindRoleByID(defaultRoleID)
+    if err != nil {
+        log.Printf("Error fetching role for user %s: %v", email, err)
+        return nil, apiError.New("unable to fetch role", http.StatusInternalServerError)
+    }
+
+    roleName := role.Name
+
+    // Generate tokens with role information
+    log.Printf("Generating token pair for new user %s with role %s", email, roleName)
+    accessToken, refreshToken, err := jwt.GenerateTokenPair(newUser.Email, a.Config.JWTSecret, newUser.AdminStatus, newUser.ID, roleName)
+    if err != nil {
+        log.Printf("Error generating token pair for user %s: %v", email, err)
+        return nil, apiError.ErrInternalServerError
+    }
+
+    // Return the LoginResponse with user data and tokens
+    return &models.LoginResponse{
+        UserResponse: models.UserResponse{
+            ID:        newUser.ID,
+            Fullname:  newUser.Fullname,
+            Username:  newUser.Username,
+            Telephone: newUser.Telephone,
+            Email:     newUser.Email,
+            RoleName:  roleName,
+        },
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+    }, nil
 }
 
 // Example helper to get a default role ID
