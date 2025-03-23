@@ -241,15 +241,13 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
         username = username + "user"
     }
 
-    defaultRoleID := uuid.MustParse("5498c8da-2dec-4b0e-80a5-e9b3298a3fab") 
-
     newUser := &models.User{
         Email:     email,
         Fullname:  "Google User",
         Username:  username,
         Telephone: "",
         IsSocial:  true,
-        RoleID:    defaultRoleID,
+        // RoleID defaults to uuid.Nil, which GORM maps to NULL if nullable
     }
 
     if err := a.authRepo.GoogleUserCreate(newUser); err != nil {
@@ -257,7 +255,7 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
         return nil, apiError.New("unable to create user", http.StatusInternalServerError)
     }
 
-    roleName := "user" // Adjust if necessary
+    roleName := "user"
     accessToken, refreshToken, err := jwt.GenerateTokenPair(newUser.Email, a.Config.JWTSecret, newUser.AdminStatus, newUser.ID, roleName)
     if err != nil {
         log.Printf("Error generating token pair for user %s: %v", email, err)
