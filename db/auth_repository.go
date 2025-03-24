@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 	"github.com/techagentng/citizenx/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	apiError "github.com/techagentng/citizenx/errors"
 )
 
 type AuthRepository interface {
@@ -54,6 +56,8 @@ type AuthRepository interface {
 	FindFacebookUserByEmail(email string) (*models.User, error)
 	FacebookUserCreate(user *models.User) error
 	FindGoogleUserByUsername(username string) (*models.User, error)
+	CreateRole(role *models.Role) (*models.Role, *apiError.Error)
+	FindFacebookUserByUsername(username string) (*models.User, error)
 }
 
 type authRepo struct {
@@ -622,3 +626,22 @@ func (a *authRepo) FindGoogleUserByUsername(username string) (*models.User, erro
     }
     return &user, nil
 }
+
+// CreateRole creates a new role in the database
+func (a *authRepo) CreateRole(role *models.Role) (*models.Role, *apiError.Error) {
+    if err := a.DB.Create(role).Error; err != nil {
+        log.Printf("Error creating role '%s': %v", role.Name, err)
+        return nil, apiError.New("unable to create default role", http.StatusInternalServerError)
+    }
+    return role, nil
+}
+
+func (a *authRepo) FindFacebookUserByUsername(username string) (*models.User, error) {
+    var user models.User
+    result := a.DB.Where("username = ?", username).First(&user)
+    if result.Error != nil {
+        return nil, result.Error
+    }
+    return &user, nil
+}
+
