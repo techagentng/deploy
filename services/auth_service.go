@@ -253,7 +253,6 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
     // Use the predefined "user" role ID directly
     newUser := &models.User{
         Email:     email,
-        Fullname:  "Google User",
         Username:  username,
         Telephone: "", // Matches your struct's gorm:"default:null"
         IsSocial:  true,
