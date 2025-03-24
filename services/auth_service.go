@@ -248,7 +248,7 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
         Username:  username,
         Telephone: "",
         IsSocial:  true,
-        // RoleID defaults to uuid.Nil, which GORM maps to NULL if nullable
+        RoleID:    role.ID,
     }
 
     if err := a.authRepo.GoogleUserCreate(newUser); err != nil {
@@ -263,6 +263,13 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
         return nil, apiError.ErrInternalServerError
     }
 
+	    // Fetch the default "user" role
+		role, err := a.authRepo.FindRoleByName("user")
+		if err != nil {
+			log.Printf("Error fetching 'user' role: %v", err)
+			return nil, apiError.New("unable to assign role", http.StatusInternalServerError)
+		}
+		
     return &models.LoginResponse{
         UserResponse: models.UserResponse{
             ID:        newUser.ID,
