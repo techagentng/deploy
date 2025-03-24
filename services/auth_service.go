@@ -242,18 +242,39 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
         username = username + "user"
     }
 
+    // Ensure username uniqueness
+    baseUsername := username
+    for i := 1; ; i++ {
+        existingUser, err := a.authRepo.FindGoogleUserByUsername(username)
+        if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+            log.Printf("Error checking username %s: %v", username, err)
+            return nil, apiError.New("unable to verify username", http.StatusInternalServerError)
+        }
+        if existingUser == nil {
+            break
+        }
+        username = fmt.Sprintf("%s%d", baseUsername, i)
+    }
+
+    // Fetch the default "user" role
+    role, err := a.authRepo.FindRoleByName("user")
+    if err != nil {
+        log.Printf("Error fetching 'user' role: %v", err)
+        return nil, apiError.New("unable to assign role", http.StatusInternalServerError)
+    }
+
     newUser := &models.User{
         Email:     email,
         Fullname:  "Google User",
         Username:  username,
-        Telephone: "",
+        Telephone: "", // Assuming schema allows empty or NULL
         IsSocial:  true,
-        RoleID:    role.ID,
+        RoleID:    role.ID, // Set the valid RoleID
     }
 
     if err := a.authRepo.GoogleUserCreate(newUser); err != nil {
         log.Printf("Error creating user for email %s: %v", email, err)
-        return nil, apiError.New("unable to create user", http.StatusInternalServerError)
+        return nil, apiError.New(fmt.Sprintf("unable to create user: %v", err), http.StatusInternalServerError)
     }
 
     roleName := "user"
@@ -263,13 +284,6 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
         return nil, apiError.ErrInternalServerError
     }
 
-	    // Fetch the default "user" role
-		role, err := a.authRepo.FindRoleByName("user")
-		if err != nil {
-			log.Printf("Error fetching 'user' role: %v", err)
-			return nil, apiError.New("unable to assign role", http.StatusInternalServerError)
-		}
-		
     return &models.LoginResponse{
         UserResponse: models.UserResponse{
             ID:        newUser.ID,
