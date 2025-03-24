@@ -53,6 +53,7 @@ type AuthRepository interface {
 	FindGoogleUserByEmail(email string) (*models.User, error)
 	FindFacebookUserByEmail(email string) (*models.User, error)
 	FacebookUserCreate(user *models.User) error
+	FindGoogleUserByUsername(username string) (*models.User, error)
 }
 
 type authRepo struct {
@@ -612,3 +613,12 @@ func (a *authRepo) GetTotalUserCount() (int64, error) {
     return totalCount, nil
 }
 
+// FindGoogleUserByUsername retrieves a user by their username
+func (a *authRepo) FindGoogleUserByUsername(username string) (*models.User, error) {
+    var user models.User
+    result := a.DB.Where("username = ?", username).First(&user)
+    if result.Error != nil {
+        return nil, result.Error // Returns gorm.ErrRecordNotFound if not found
+    }
+    return &user, nil
+}

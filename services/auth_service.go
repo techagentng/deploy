@@ -245,7 +245,7 @@ func (a *authService) createGoogleUser(email string) (*models.LoginResponse, *ap
     // Ensure username uniqueness
     baseUsername := username
     for i := 1; ; i++ {
-        existingUser, err := a.authRepo.FindGoogleUserByUsername(username)
+        existingUser, err := a.authRepo.FindFacebookUserByEmail(username)
         if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
             log.Printf("Error checking username %s: %v", username, err)
             return nil, apiError.New("unable to verify username", http.StatusInternalServerError)
