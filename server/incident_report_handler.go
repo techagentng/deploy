@@ -540,7 +540,7 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
             UserID:           user.ID,
             RewardType:       "media_upload",
             Point:            points,
-            Balance:          points, // Start with the same value for new rewards
+            Balance:          points, 
         }
 
         if err := s.RewardRepository.SaveReward(reward); err != nil {
@@ -559,8 +559,6 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
         }, nil)
     }
 }
-
-
 
 func (s *Server) processAndSaveMedia(c *gin.Context) ([]string, []string, []string, []string, []string, error) {
 	// Parse multipart form with a size limit

@@ -53,7 +53,7 @@ func (repo *rewardRepo) SaveReward(reward *models.Reward) error {
 
 	// Update existing reward
 	existingReward.Point += reward.Point
-	existingReward.Balance = reward.Balance
+	existingReward.Balance += reward.Point
 	return repo.DB.Save(&existingReward).Error
 }
 
