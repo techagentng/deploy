@@ -549,14 +549,22 @@ func (s *Server) handleUploadMedia() gin.HandlerFunc {
             return
         }
 
-        // Respond with successful media upload and reward details
-        response.JSON(c, "Media added to report successfully", http.StatusOK, gin.H{
-            "reportID":     reportID,
-            "feedURLs":     feedURLs,
-            "fullsizeURLs": fullsizeURLs,
-            "fileTypes":    fileTypes,
-            "reward":       gin.H{"points": points, "balance": reward.Balance},
-        }, nil)
+		updatedBalance, err := s.RewardRepository.GetUserRewardBalance(user.ID)
+if err != nil {
+    response.JSON(c, "Could not retrieve updated reward balance", http.StatusInternalServerError, nil, err)
+    return
+}
+
+response.JSON(c, "Media added to report successfully", http.StatusOK, gin.H{
+    "reportID":     reportID,
+    "feedURLs":     feedURLs,
+    "fullsizeURLs": fullsizeURLs,
+    "fileTypes":    fileTypes,
+    "reward": gin.H{
+        "points":  points,
+        "balance": updatedBalance,
+    },
+}, nil)
     }
 }
 
