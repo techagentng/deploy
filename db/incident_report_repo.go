@@ -1041,11 +1041,10 @@ func (repo *incidentReportRepo) GetBookmarkedReports(userID uint) ([]models.Inci
 
 	log.Printf("Retrieving bookmarked reports for userID: %d", userID)
 
-	// Perform the query with a join on bookmarks and preload the associated ReportType
+	// Join bookmarks table, filter by userID, and fetch incident reports only
 	err := repo.DB.
 		Joins("JOIN bookmarks ON bookmarks.report_id = incident_reports.id").
 		Where("bookmarks.user_id = ?", userID).
-		Preload("ReportType"). // This preloads the related ReportType data
 		Find(&reports).Error
 
 	if err != nil {
@@ -1057,6 +1056,7 @@ func (repo *incidentReportRepo) GetBookmarkedReports(userID uint) ([]models.Inci
 
 	return reports, nil
 }
+
 
 func (repo *incidentReportRepo) GetReportsByUserID(userID uint) ([]models.ReportType, error) {
 	var reports []models.ReportType
