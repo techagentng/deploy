@@ -1041,9 +1041,9 @@ func (repo *incidentReportRepo) GetBookmarkedReports(userID uint) ([]models.Inci
 
 	log.Printf("Retrieving bookmarked reports for userID: %d", userID)
 
-	// Join bookmarks table, filter by userID, and fetch incident reports only
+	// Cast incident_reports.id (uuid) to text to match bookmarks.report_id
 	err := repo.DB.
-		Joins("JOIN bookmarks ON bookmarks.report_id = incident_reports.id").
+		Joins("JOIN bookmarks ON bookmarks.report_id = incident_reports.id::text").
 		Where("bookmarks.user_id = ?", userID).
 		Find(&reports).Error
 
