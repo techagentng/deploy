@@ -176,3 +176,22 @@ func (s *Server) GetPostByID() gin.HandlerFunc {
 	}
 }
 
+func (s *Server) GetAppPostByID() gin.HandlerFunc{
+	return func(c *gin.Context) {
+    postID := c.Param("id")
+
+    report, err := s.PostRepository.GetPublicReportByID(postID)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "id":          report.ID,
+        "title":       "CitizenX Nigeria",
+        "description": report.Description,
+        "report_type": report.ReportType.Category,
+        "created_at":  report.CreatedAt,
+    })
+}
+}

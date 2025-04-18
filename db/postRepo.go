@@ -21,7 +21,7 @@ type PostRepository interface {
 	GetReceiverDeviceToken(receiverID uint) (string, error)
 	UpdateConversationLastMessage(conversationID uuid.UUID, lastMessage string, updatedAt time.Time) error
 	FindReceiverIDBySomeLogic(senderID uuid.UUID) (uuid.UUID, error)
-	// CreateNewConversation(senderID uuid.UUID, receiverID uuid.UUID) (uuid.UUID, error)
+	GetPublicReportByID(postID string) (*models.IncidentReport, error)
 }
 
 // likeRepo struct
@@ -32,6 +32,19 @@ type postRepo struct {
 // NewLikeRepo creates a new instance of LikeRepository
 func NewPostRepo(db *GormDB) PostRepository {
 	return &postRepo{db.DB}
+}
+
+func (r *postRepo) GetPublicReportByID(postID string) (*models.IncidentReport, error) {
+    var report models.IncidentReport
+
+    err := r.DB.Preload("ReportType").Preload("SubReport").
+        First(&report, "id = ?", postID).Error
+
+    if err != nil {
+        return nil, err
+    }
+
+    return &report, nil
 }
 
 func (r *postRepo) CreatePost(post *models.Post) error {
