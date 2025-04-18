@@ -150,4 +150,5 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.GET("/lgas/:state", s.FetchLGAsByState())
 	apirouter.GET("/map/state/count", s.handleGetReportTypeCountsState())
 	apirouter.GET("/post/:id", s.GetAppPostByID())
+	apirouter.GET("/preview/post/:id", s.GetPostPreviewByID())
 }

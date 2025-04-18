@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <meta property="og:title" content="{{.Title}}" />
+    <meta property="og:description" content="{{.Description}}" />
+    <meta property="og:image" content="{{.ImageURL}}" />
+    <meta property="og:url" content="https://citizenx.ng/post/{{.ID}}" />
+    <meta property="og:type" content="article" />
+    
+    <title>{{.Title}}</title>
+</head>
+<body>
+    <p>Redirecting to post...</p>
+    <script>
+        window.location.href = "https://citizenx.ng/post/{{.ID}}";
+    </script>
+</body>
+</html>

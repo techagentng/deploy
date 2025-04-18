@@ -22,6 +22,7 @@ type PostRepository interface {
 	UpdateConversationLastMessage(conversationID uuid.UUID, lastMessage string, updatedAt time.Time) error
 	FindReceiverIDBySomeLogic(senderID uuid.UUID) (uuid.UUID, error)
 	GetPublicReportByID(postID string) (*models.IncidentReport, error)
+	GetIncidentReportByID(id string) (*models.IncidentReport, error)
 }
 
 // likeRepo struct
@@ -33,6 +34,18 @@ type postRepo struct {
 func NewPostRepo(db *GormDB) PostRepository {
 	return &postRepo{db.DB}
 }
+
+func (r *postRepo) GetIncidentReportByID(id string) (*models.IncidentReport, error) {
+	var report models.IncidentReport
+	if err := r.DB.
+		Preload("ReportType").
+		Preload("SubReport").
+		First(&report, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &report, nil
+}
+
 
 func (r *postRepo) GetPublicReportByID(postID string) (*models.IncidentReport, error) {
     var report models.IncidentReport

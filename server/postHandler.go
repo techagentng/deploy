@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/techagentng/citizenx/models"
+	"html/template"
 	jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
 
@@ -194,4 +195,37 @@ func (s *Server) GetAppPostByID() gin.HandlerFunc{
         "created_at":  report.CreatedAt,
     })
 }
+}
+
+func (s *Server) GetPostPreviewByID() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		// Get post from DB using repository
+		post, err := s.PostRepository.GetPublicReportByID(id)
+		if err != nil {
+			c.String(http.StatusNotFound, "Post not found")
+			return
+		}
+
+		// Load template
+		tmpl, err := template.ParseFiles("templates/preview_post.html")
+		if err != nil {
+			c.String(http.StatusInternalServerError, "Template error")
+			return
+		}
+
+		// Fill template data
+		data := map[string]interface{}{
+			"ID":          post.ID,
+			"Title":       "CitizenX Nigeria",
+			"ReportType":  post.ReportType.Category,
+			"Description": post.Description,
+			"ImageURL":    post.FeedURLs,
+		}
+
+		// Render template
+		c.Writer.Header().Set("Content-Type", "text/html")
+		tmpl.Execute(c.Writer, data)
+	}
 }
