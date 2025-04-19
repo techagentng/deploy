@@ -104,6 +104,9 @@ type IncidentReportRepository interface {
 	FetchLGAs() ([]models.LGA, error)
 	FetchStateByName(stateName string) (*models.State, error)
 	GetReportTypeCountsState(state string) ([]string, []int, int, int, []models.StateReportCount, error)
+	GetReportCreatorID(reportID uuid.UUID) (uint, error)
+	GetExpoPushToken(userID uint) (string, error)
+	UpdateExpoPushToken(userID uint, token string) error
 }
 
 type incidentReportRepo struct {
@@ -117,6 +120,56 @@ var (
     ErrStateNotFound = errors.New("state not found")
     ErrDatabase      = errors.New("database error")
 )
+
+// user_repository_impl.go
+func (r *incidentReportRepo) GetExpoPushToken(userID uint) (string, error) {
+    var expoPushToken string
+    
+    // Using GORM
+    err := r.DB.Model(&models.User{}).
+        Select("expo_push_token").
+        Where("id = ?", userID).
+        Scan(&expoPushToken).
+        Error
+
+    // Alternative raw SQL version:
+    /*
+    err := r.db.Raw(`
+        SELECT expo_push_token 
+        FROM users 
+        WHERE id = ?
+    `, userID).Scan(&expoPushToken).Error
+    */
+
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return "", fmt.Errorf("user not found")
+        }
+        return "", fmt.Errorf("database error: %w", err)
+    }
+
+    if expoPushToken == "" {
+        return "", fmt.Errorf("user has no push token")
+    }
+
+    return expoPushToken, nil
+}
+
+func (r *incidentReportRepo) UpdateExpoPushToken(userID uint, token string) error {
+    result := r.DB.Model(&models.User{}).
+        Where("id = ?", userID).
+        Update("expo_push_token", token)
+
+    if result.Error != nil {
+        return fmt.Errorf("database error: %w", result.Error)
+    }
+
+    if result.RowsAffected == 0 {
+        return fmt.Errorf("no user found with ID %d", userID)
+    }
+
+    return nil
+}
 
 // GetLastReportIDByUserID fetches the last report ID created by a given user.
 func (i *incidentReportRepo) GetLastReportIDByUserID(userID uint) (string, error) {
@@ -1613,6 +1666,29 @@ func (repo *incidentReportRepo) BlockUser(ctx context.Context, userID uint) erro
 
 func (repo *incidentReportRepo) CreateFollow(follow models.Follow) error {
 	return repo.DB.Create(&follow).Error
+}
+
+func (r *incidentReportRepo) GetReportCreatorID(reportID uuid.UUID) (uint, error) {
+    var creatorID uint
+    
+    err := r.DB.Table("incident_reports").
+        Select("user_id").
+        Where("id = ?", reportID).
+        Scan(&creatorID).
+        Error
+
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return 0, fmt.Errorf("report not found")
+        }
+        return 0, fmt.Errorf("database error: %w", err)
+    }
+
+    if creatorID == 0 {
+        return 0, fmt.Errorf("report has no creator")
+    }
+
+    return creatorID, nil
 }
 
 func (repo *incidentReportRepo) GetFollowersByReport(reportID uuid.UUID) ([]models.User, error) {

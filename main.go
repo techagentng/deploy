@@ -1,18 +1,14 @@
 package main
 
 import (
-	// "context"
 	"log"
-
-	// "firebase.google.com/go"
-	// "google.golang.org/api/option"
 
 	"github.com/techagentng/citizenx/config"
 	"github.com/techagentng/citizenx/db"
 	"github.com/techagentng/citizenx/mailingservices"
 	"github.com/techagentng/citizenx/server"
 	"github.com/techagentng/citizenx/services"
-	 "github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v8"
 )
 
 func main() {
@@ -22,11 +18,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-    redisClient := redis.NewClient(&redis.Options{
-        Addr:     "localhost:6379", // Adjust to your Redis server address
-        Password: "",               // No password by default
-        DB:       0,                // Default DB
-    })
+	// Initialize Redis
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379", // Adjust to your Redis server address
+		Password: "",               // No password by default
+		DB:       0,                // Default DB
+	})
 
 	// Initialize Mailgun client
 	mailgunClient := &mailingservices.Mailgun{}
@@ -55,6 +52,7 @@ func main() {
 	rewardService := services.NewRewardService(rewardRepo, incidentReportRepo, conf)
 	likeService := services.NewLikeService(likeRepo, conf)
 	postService := services.NewPostService(postRepo, conf)
+	notificationService := services.NewNotificationService()
 
 	// Server setup
 	s := &server.Server{
@@ -71,7 +69,8 @@ func main() {
 		LikeService:              likeService,
 		PostService:              postService,
 		PostRepository:           postRepo,
-		DB:                       db.GormDB{},
+		NotificationService:      notificationService,
+		DB: gormDB.DB,
 		RedisClient:              redisClient,
 	}
 

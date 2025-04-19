@@ -58,6 +58,7 @@ type AuthRepository interface {
 	FindGoogleUserByUsername(username string) (*models.User, error)
 	CreateRole(role *models.Role) (*models.Role, *apiError.Error)
 	FindFacebookUserByUsername(username string) (*models.User, error)
+	UpdateUserExpoPushToken(userID uint, token string) error
 }
 
 type authRepo struct {
@@ -71,6 +72,23 @@ func NewAuthRepo(db *GormDB) AuthRepository {
 func generateIDx2() uuid.UUID {
 	id := uuid.New() // Generates a UUIDv4
 	return id
+}
+
+// In your auth repository interface
+func (a *authRepo) UpdateUserExpoPushToken(userID uint, token string) error {
+    result := a.DB.Model(&models.User{}).
+        Where("id = ?", userID).
+        Update("expo_push_token", token)
+        
+    if result.Error != nil {
+        return result.Error
+    }
+    
+    if result.RowsAffected == 0 {
+        return fmt.Errorf("no user found with ID %d", userID)
+    }
+    
+    return nil
 }
 
 func (a *authRepo) CreateUser(user *models.User) (*models.User, error) {

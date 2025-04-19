@@ -130,9 +130,11 @@ type EditProfileResponse struct {
 	State    string `json:"state"`
 	Lga      string `json:"lga"`
 }
+// In your models.LoginRequest struct
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+    Email         string `json:"email" binding:"required,email"`
+    Password      string `json:"password" binding:"required"`
+    ExpoPushToken string `json:"expo_push_token"` // Add this field
 }
 
 type GoogleLoginRequest struct {

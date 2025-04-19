@@ -3,17 +3,19 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/techagentng/citizenx/config"
-	"github.com/techagentng/citizenx/db"
-	"github.com/techagentng/citizenx/mailingservices"
-	"github.com/techagentng/citizenx/services"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
 	"github.com/go-redis/redis/v8"
+	"github.com/techagentng/citizenx/config"
+	"github.com/techagentng/citizenx/db"
+	"github.com/techagentng/citizenx/mailingservices"
+	"github.com/techagentng/citizenx/services"
+	"gorm.io/gorm"
 )
 
 type Server struct {
@@ -30,7 +32,8 @@ type Server struct {
 	LikeService              services.LikeService
 	PostService              services.PostService
 	PostRepository           db.PostRepository
-	DB                       db.GormDB
+	NotificationService *services.NotificationService
+	DB *gorm.DB 
 	SessionSecret            string
 	RedisClient              *redis.Client
 }

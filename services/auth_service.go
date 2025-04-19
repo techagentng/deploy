@@ -132,58 +132,69 @@ func (a *authService) LoginMacAddressUser(loginRequest *models.LoginRequestMacAd
 
 // LoginUser logs in a user and returns the login response
 func (a *authService) LoginUser(loginRequest *models.LoginRequest) (*models.LoginResponse, *apiError.Error) {
-	// Find the user by email
-	foundUser, err := a.authRepo.FindGoogleUserByEmail(loginRequest.Email)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apiError.New("invalid email or password", http.StatusUnprocessableEntity)
-		}
-		log.Printf("Error finding user by email: %v", err)
-		return nil, apiError.New("unable to find user", http.StatusInternalServerError)
-	}
+    // Find the user by email
+    foundUser, err := a.authRepo.FindGoogleUserByEmail(loginRequest.Email)
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, apiError.New("invalid email or password", http.StatusUnprocessableEntity)
+        }
+        log.Printf("Error finding user by email: %v", err)
+        return nil, apiError.New("unable to find user", http.StatusInternalServerError)
+    }
 
-	// Verify user password
-	if err := foundUser.VerifyPassword(loginRequest.Password); err != nil {
-		log.Printf("Invalid password for user %s", foundUser.Email)
-		return nil, apiError.ErrInvalidPassword
-	}
+    // Verify user password
+    if err := foundUser.VerifyPassword(loginRequest.Password); err != nil {
+        log.Printf("Invalid password for user %s", foundUser.Email)
+        return nil, apiError.ErrInvalidPassword
+    }
 
-	// Ensure RoleID is not empty
-	if foundUser.RoleID == uuid.Nil {
-		log.Printf("User %s does not have a role assigned", foundUser.Email)
-		return nil, apiError.New("user role not assigned", http.StatusInternalServerError)
-	}
+    // Ensure RoleID is not empty
+    if foundUser.RoleID == uuid.Nil {
+        log.Printf("User %s does not have a role assigned", foundUser.Email)
+        return nil, apiError.New("user role not assigned", http.StatusInternalServerError)
+    }
 
-	// Fetch the user's role
-	log.Printf("Fetching role with ID: %s for user %s", foundUser.RoleID.String(), foundUser.Email)
-	role, err := a.authRepo.FindRoleByID(foundUser.RoleID)
-	if err != nil {
-		log.Printf("Error fetching role for user %s: %v", foundUser.Email, err)
-		return nil, apiError.New("unable to fetch role", http.StatusInternalServerError)
-	}
+    // Fetch the user's role
+    log.Printf("Fetching role with ID: %s for user %s", foundUser.RoleID.String(), foundUser.Email)
+    role, err := a.authRepo.FindRoleByID(foundUser.RoleID)
+    if err != nil {
+        log.Printf("Error fetching role for user %s: %v", foundUser.Email, err)
+        return nil, apiError.New("unable to fetch role", http.StatusInternalServerError)
+    }
 
-	roleName := role.Name
+    roleName := role.Name
 
-	// Generate tokens with role information
-	log.Printf("Generating token pair for user %s with role %s", foundUser.Email, roleName)
-	accessToken, refreshToken, err := jwt.GenerateTokenPair(foundUser.Email, a.Config.JWTSecret, foundUser.AdminStatus, foundUser.ID, roleName)
-	if err != nil {
-		log.Printf("Error generating token pair for user %s: %v", foundUser.Email, err)
-		return nil, apiError.ErrInternalServerError
-	}
+    // ========== PUSH TOKEN STORAGE ========== //
+    if loginRequest.ExpoPushToken != "" {
+        // Update user's push token in database
+        if err := a.authRepo.UpdateUserExpoPushToken(foundUser.ID, loginRequest.ExpoPushToken); err != nil {
+            log.Printf("Failed to update push token for user %s: %v", foundUser.Email, err)
+            // Don't fail login - just log the error
+        } else {
+            log.Printf("Updated Expo push token for user %s", foundUser.Email)
+        }
+    }
 
-	return &models.LoginResponse{
-		UserResponse: models.UserResponse{
-			ID:        foundUser.ID,
-			Fullname:  foundUser.Fullname,
-			Username:  foundUser.Username,
-			Telephone: foundUser.Telephone,
-			Email:     foundUser.Email,
-			RoleName:  roleName,
-		},
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}, nil
+    // Generate tokens with role information
+    log.Printf("Generating token pair for user %s with role %s", foundUser.Email, roleName)
+    accessToken, refreshToken, err := jwt.GenerateTokenPair(foundUser.Email, a.Config.JWTSecret, foundUser.AdminStatus, foundUser.ID, roleName)
+    if err != nil {
+        log.Printf("Error generating token pair for user %s: %v", foundUser.Email, err)
+        return nil, apiError.ErrInternalServerError
+    }
+
+    return &models.LoginResponse{
+        UserResponse: models.UserResponse{
+            ID:        foundUser.ID,
+            Fullname:  foundUser.Fullname,
+            Username:  foundUser.Username,
+            Telephone: foundUser.Telephone,
+            Email:     foundUser.Email,
+            RoleName:  roleName,
+        },
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+    }, nil
 }
 
 // DefaultUserRoleID is the predefined UUID for the "user" role

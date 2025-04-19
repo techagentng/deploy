@@ -1810,71 +1810,137 @@ func (s *Server) handleChangeUserRole() gin.HandlerFunc {
 }
 
 func (s *Server) HandleFollowReport() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Parse multipart form data with a max size of 20 MB
-		if err := c.Request.ParseMultipartForm(20 << 20); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "File size exceeds 20 MB"})
-			return
-		}
+    return func(c *gin.Context) {
+        // Parse multipart form data with a max size of 20 MB
+        if err := c.Request.ParseMultipartForm(20 << 20); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "File size exceeds 20 MB"})
+            return
+        }
 
-// Extract and parse the report_id from the URL
-reportIDParam := c.Param("report_id")
-reportID, err := uuid.Parse(reportIDParam)
-if err != nil {
-    c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid report ID format"})
-    return
-}
+        // Extract and parse the report_id from the URL
+        reportIDParam := c.Param("report_id")
+        reportID, err := uuid.Parse(reportIDParam)
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid report ID format"})
+            return
+        }
 
-		// Extract followText from the form data
-		followText := c.PostForm("followText")
+        // Extract followText from the form data
+        followText := c.PostForm("followText")
 
-		// Extract followMedia (image/video) from the form data
-		var mediaURL string
-		file, handler, err := c.Request.FormFile("followMedia")
-		if err == nil {
-			defer file.Close()
+        // Extract followMedia (image/video) from the form data
+        var mediaURL string
+        file, handler, err := c.Request.FormFile("followMedia")
+        if err == nil {
+            defer file.Close()
 
-			// Validate the file type (only image or video)
-			if !isValidMediaType(handler.Header.Get("Content-Type")) {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media type. Only image or video files are allowed"})
-				return
-			}
+            // Validate the file type (only image or video)
+            if !isValidMediaType(handler.Header.Get("Content-Type")) {
+                c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media type. Only image or video files are allowed"})
+                return
+            }
 
-			// Create S3 client
-			s3Client, err := createS3Client()
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create S3 client"})
-				return
-			}
+            // Create S3 client
+            s3Client, err := createS3Client()
+            if err != nil {
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create S3 client"})
+                return
+            }
 
-			// Generate a unique filename for the media
-			mediaFilename := fmt.Sprintf("%s_%s", reportID.String(), handler.Filename)
+            // Generate a unique filename for the media
+            mediaFilename := fmt.Sprintf("%s_%s", reportID.String(), handler.Filename)
 
-			// Upload the file to S3
-			mediaURL, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), mediaFilename)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload media"})
-				return
-			}
-		}
+            // Upload the file to S3
+            mediaURL, err = uploadFileToS3(s3Client, file, os.Getenv("AWS_BUCKET"), mediaFilename)
+            if err != nil {
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload media"})
+                return
+            }
+        }
 
-		// Create a Follow instance with userID from context and reportID from URL
-		userID := c.MustGet("userID").(uint) // UserID is set in the context by the authorization middleware
-		follow := models.Follow{
-			UserID:   userID,
-			ReportID: reportID,
-			FollowText: followText,
-			FollowMedia: mediaURL,
-		}
+        // Create a Follow instance with userID from context and reportID from URL
+        userID := c.MustGet("userID").(uint)
+        follow := models.Follow{
+            UserID:      userID,
+            ReportID:    reportID,
+            FollowText:  followText,
+            FollowMedia: mediaURL,
+        }
 
-		// Call the repository to create a follow record
-		if err := s.IncidentReportRepository.CreateFollow(follow); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow report"})
-			return
-		}
+        // Call the repository to create a follow record
+        if err := s.IncidentReportRepository.CreateFollow(follow); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow report"})
+            return
+        }
 
-		c.JSON(http.StatusOK, gin.H{"message": "Successfully followed the report"})
-	}
+        // ========== NOTIFICATION INTEGRATION ========== //
+        response := gin.H{
+            "message": "Successfully followed the report",
+            "data": gin.H{
+                "followText":  followText,
+                "followMedia": mediaURL,
+            },
+            "notification": gin.H{
+                "status": "sent",
+            },
+        }
+
+        // Only attempt notification if we have a NotificationService
+        if s.NotificationService != nil {
+            // 1. Get the report creator's user ID
+            reportCreatorID, err := s.IncidentReportRepository.GetReportCreatorID(reportID)
+            if err != nil {
+                log.Printf("Failed to get report creator ID: %v", err)
+                response["notification"] = gin.H{
+                    "status":  "failed",
+                    "reason":  "could not get report creator",
+                    "details": err.Error(),
+                }
+                c.JSON(http.StatusOK, response)
+                return
+            }
+
+            // 2. Get the creator's Expo push token using UserRepository
+			expoPushToken, err := s.IncidentReportRepository.GetExpoPushToken(reportCreatorID)
+            if err != nil {
+                log.Printf("Failed to get creator's push token: %v", err)
+                response["notification"] = gin.H{
+                    "status":  "failed",
+                    "reason":  "could not get push token",
+                    "details": err.Error(),
+                }
+                c.JSON(http.StatusOK, response)
+                return
+            }
+
+            // 3. Send notification
+            err = s.NotificationService.SendPushNotification(
+                expoPushToken,
+                "New Follow-up",
+                fmt.Sprintf("Your report has been followed up: %s", followText),
+                map[string]interface{}{
+                    "reportId": reportID.String(),
+                    "type":     "follow-up",
+                    "deepLink": fmt.Sprintf("/reports/%s", reportID.String()),
+                },
+            )
+
+            if err != nil {
+                log.Printf("Failed to send notification: %v", err)
+                response["notification"] = gin.H{
+                    "status":  "failed",
+                    "reason":  "could not send notification",
+                    "details": err.Error(),
+                }
+            }
+        } else {
+            response["notification"] = gin.H{
+                "status": "disabled",
+            }
+        }
+
+        c.JSON(http.StatusOK, response)
+    }
 }
 
 // Helper function to validate media type (image or video)
