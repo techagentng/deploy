@@ -64,25 +64,33 @@ func (mail *Mailgun) SendVerifyAccount(userEmail, link string) (string, error) {
 }
 
 func (mail *Mailgun) SendResetPassword(userEmail, live string) (string, error) {
-	EmailFrom := os.Getenv("MG_EMAIL_FROM")
+    EmailFrom := os.Getenv("MG_EMAIL_FROM")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+    defer cancel()
 
-	m := mail.Client.NewMessage(EmailFrom, "Reset Password", "")
-	m.SetTemplate("live")
-	if err := m.AddRecipient(userEmail); err != nil {
-		return "", err
-	}
+    // Create a new message
+    m := mail.Client.NewMessage(EmailFrom, "Reset Password", "")
+    
+    // Use the "live" template
+    m.SetTemplate("live")
 
-	err := m.AddVariable("live", live)
-	if err != nil {
-		return "", err
-	}
+    // Add the recipient email
+    if err := m.AddRecipient(userEmail); err != nil {
+        return "", err
+    }
 
-	res, _, errr := mail.Client.Send(ctx, m)
-	if errr != nil {
-		return "", errr
-	}
-	return res, nil
+    // Inject the reset link into the template variable
+    err := m.AddVariable("live", live)
+    if err != nil {
+        return "", err
+    }
+
+    // Send the email
+    res, _, errr := mail.Client.Send(ctx, m)
+    if errr != nil {
+        return "", errr
+    }
+
+    return res, nil
 }
