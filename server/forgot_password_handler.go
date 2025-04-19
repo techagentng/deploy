@@ -21,18 +21,25 @@ import (
 
 func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Parse the email from the request
-		email := struct {
-			Email string `json:"email" binding:"required,email"`
+		// Parse the email and platform from the request
+		req := struct {
+			Email    string `json:"email" binding:"required,email"`
+			Platform string `json:"platform" binding:"required"` // "web" or "mobile"
 		}{}
-		errs := decode(c, &email)
+		errs := decode(c, &req)
 		if errs != nil {
 			response.JSON(c, "", http.StatusBadRequest, nil, errs)
 			return
 		}
 
+		// Validate platform
+		if req.Platform != "web" && req.Platform != "mobile" {
+			response.JSON(c, "", http.StatusBadRequest, nil, fmt.Errorf("invalid platform value"))
+			return
+		}
+
 		// Find user by email
-		user, err := s.AuthRepository.FindUserByEmail(email.Email)
+		user, err := s.AuthRepository.FindUserByEmail(req.Email)
 		if err != nil || user == nil {
 			response.JSON(c, "", http.StatusNotFound, nil, fmt.Errorf("user not found"))
 			return
@@ -52,12 +59,17 @@ func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 			return
 		}
 
-		// Create the reset link
-		baseURL := os.Getenv("BASE_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:3002"
+		// Create the reset link based on platform
+		var resetLink string
+		if req.Platform == "mobile" {
+			resetLink = fmt.Sprintf("citizenx://reset-password/%s", resetToken)
+		} else {
+			baseURL := os.Getenv("BASE_URL")
+			if baseURL == "" {
+				baseURL = "http://localhost:3002"
+			}
+			resetLink = fmt.Sprintf("%s/reset-password/%s", baseURL, resetToken)
 		}
-		resetLink := fmt.Sprintf("%s/reset-password/%s", baseURL, resetToken)
 
 		// Send password reset email
 		_, err = s.Mail.SendResetPassword(user.Email, resetLink)
@@ -70,6 +82,7 @@ func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 		response.JSON(c, "Reset Password Link Sent Successfully", http.StatusOK, nil, nil)
 	}
 }
+
 
 type ResetPasswordRequest struct {
 	Token       string `json:"token" binding:"required"`
