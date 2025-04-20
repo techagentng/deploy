@@ -303,52 +303,55 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 }
 
 func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{}, error) {
-	var reports []map[string]interface{}
+    var reports []map[string]interface{}
 
-	if page < 1 {
-		page = 1
-	}
+    if page < 1 {
+        page = 1
+    }
 
-	offset := (page - 1) * 20
+    offset := (page - 1) * 20
 
-	err := repo.DB.
-		Table("incident_reports").
-		Select(`
-			incident_reports.*, 
-			users.thumb_nail_url AS thumbnail_urls,  -- Changed thumbnail_url to thumbnail_urls
-			users.profile_image AS profile_image, 
-			incident_reports.feed_urls
-		`).
-		Joins("JOIN users ON users.id = incident_reports.user_id").
-		Order("incident_reports.created_at DESC").
-		Limit(20).
-		Offset(offset).
-		Scan(&reports).Error
+    err := repo.DB.
+        Table("incident_reports").
+        Select(`
+            incident_reports.*, 
+            users.thumb_nail_url AS thumbnail_urls,
+            users.profile_image AS profile_image, 
+            incident_reports.feed_urls,
+            incident_reports.is_anonymous
+        `).
+        Joins("JOIN users ON users.id = incident_reports.user_id").
+        Order("incident_reports.created_at DESC").
+        Limit(20).
+        Offset(offset).
+        Scan(&reports).Error
 
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("no incident reports found")
-		}
-		return nil, err
-	}
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, errors.New("no incident reports found")
+        }
+        return nil, err
+    }
 
-	for _, report := range reports {
-		// Profile image logic remains unchanged
-		if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
-			report["profile_image"] = profileImage
-		} else if thumbnailUrl, exists := report["thumbnail_urls"]; exists && thumbnailUrl != "" {  // Updated to thumbnail_urls
-			report["profile_image"] = thumbnailUrl
-		} else {
-			report["profile_image"] = nil
-		}
+    for _, report := range reports {
+        // Handle anonymous reports
+        if isAnonymous, ok := report["is_anonymous"].(bool); ok && isAnonymous {
+            report["user_fullname"] = "Anonymous"
+            report["user_username"] = "anonymous"
+            report["profile_image"] = nil
+        }
 
-		// Ensure feed_urls is properly handled
-		if feedUrls, exists := report["feed_urls"]; exists {
-			report["feed_urls"] = feedUrls
-		}
-	}
+        // Profile image fallback logic
+        if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
+            report["profile_image"] = profileImage
+        } else if thumbnailUrl, exists := report["thumbnail_urls"]; exists && thumbnailUrl != "" {
+            report["profile_image"] = thumbnailUrl
+        } else {
+            report["profile_image"] = nil
+        }
+    }
 
-	return reports, nil
+    return reports, nil
 }
 
 
