@@ -168,6 +168,7 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
         ThumbnailURLs:        savedReport.ThumbnailURLs,
         StateName:            savedReport.StateName,
         LGAName:              savedReport.LGAName,
+		IsAnonymous:    savedReport.IsAnonymous,
     }
 
     return reportResponse, nil

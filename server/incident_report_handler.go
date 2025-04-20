@@ -410,7 +410,8 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 		fullName := c.GetString("fullName")
 		username := c.GetString("username")
 		profileImage := c.GetString("profile_image")
-
+		isAnonymousStr := c.PostForm("is_anonymous")
+		isAnonymous := isAnonymousStr == "true"
 		reportType, err := s.IncidentReportRepository.GetReportTypeByCategory(category)
 		if err != nil && err != gorm.ErrRecordNotFound {
 			log.Printf("Error fetching report type: %v\n", err)
@@ -460,6 +461,7 @@ func (s *Server) handleIncidentReport() gin.HandlerFunc {
 			ThumbnailURLs:   profileImage,
 			TimeofIncidence: time.Now(),
 			ReportTypeID:    reportType.ID, 
+			IsAnonymous:    isAnonymous,
 		}
 
 		savedIncidentReport, err := s.IncidentReportService.SaveReport(user.ID, lat, lng, incidentReport, reportID.String(), 0)

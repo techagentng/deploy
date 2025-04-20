@@ -67,7 +67,7 @@ type IncidentReport struct {
 	ReportTypeID         uuid.UUID  `json:"report_type_id"`
 	ReportType           ReportType `gorm:"foreignKey:ReportTypeID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 	Followers []*User `gorm:"many2many:follows;joinForeignKey:ReportID;joinReferences:UserID" json:"followers"`
-
+	IsAnonymous bool `json:"is_anonymous" gorm:"column:is_anonymous"`
 }
 
 type ReportCount struct {
