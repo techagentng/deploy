@@ -1,13 +1,15 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 
+	"html/template"
+
 	"github.com/gin-gonic/gin"
 	"github.com/techagentng/citizenx/models"
-	"html/template"
 	jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
 
@@ -200,31 +202,34 @@ func (s *Server) GetAppPostByID() gin.HandlerFunc{
 func (s *Server) GetPostPreviewByID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-
-		// Get post from DB using repository
+		
+		// Add CORS headers for web access
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET")
+		
 		post, err := s.PostRepository.GetPublicReportByID(id)
 		if err != nil {
 			c.String(http.StatusNotFound, "Post not found")
 			return
 		}
 
-		// Load template
+		// Add proper meta tags for social sharing
+		data := map[string]interface{}{
+			"ID":          post.ID,
+			"Title":       "CitizenX Nigeria",
+			"Description": post.Description,
+			"ImageURL":    post.FeedURLs,
+			"URL":         fmt.Sprintf("https://www.citizenx.ng/preview/post/%s", post.ID),
+			"Type":        "article",
+			"SiteName":    "CitizenX",
+		}
+
 		tmpl, err := template.ParseFiles("templates/preview_post.html")
 		if err != nil {
 			c.String(http.StatusInternalServerError, "Template error")
 			return
 		}
 
-		// Fill template data
-		data := map[string]interface{}{
-			"ID":          post.ID,
-			"Title":       "CitizenX Nigeria",
-			"ReportType":  post.ReportType.Category,
-			"Description": post.Description,
-			"ImageURL":    post.FeedURLs,
-		}
-
-		// Render template
 		c.Writer.Header().Set("Content-Type", "text/html")
 		tmpl.Execute(c.Writer, data)
 	}

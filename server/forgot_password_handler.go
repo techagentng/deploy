@@ -62,11 +62,11 @@ func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 		// Create the reset link based on platform
 		var resetLink string
 		if req.Platform == "mobile" {
-			resetLink = fmt.Sprintf("%s/reset-password/%s", resetToken)
+			resetLink = os.Getenv("MOBILE_BASE_URL")
 		} else {
 			baseURL := os.Getenv("BASE_URL")
 			if baseURL == "" {
-				baseURL = "http://localhost:3002"
+				baseURL = "https://citizenx.ng"
 			}
 			resetLink = fmt.Sprintf("%s/reset-password/%s", baseURL, resetToken)
 		}
