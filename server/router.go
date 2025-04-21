@@ -81,8 +81,9 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.GET("/all/publications", s.HandleGetAllPosts())
 	apirouter.GET("/publication/:id", s.GetPostByID())
 	apirouter.PUT("/incident-report/block-request/:post_id", s.UpdateBlockRequestHandler())
-	
-
+	apirouter.POST("/password/forgot/mobile", s.HandleForgotPasswordMobile())
+	apirouter.POST("/password/token/validate", s.ValidateResetTokenHandler())
+		
 	authorized := apirouter.Group("/")
 	authorized.Use(s.Authorize())
 	// Upload endpoint

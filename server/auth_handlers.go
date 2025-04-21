@@ -1322,3 +1322,4 @@ func (s *Server) GetTotalUserCount(c *gin.Context) {
         "total_users": count,
     })
 }
+

@@ -19,6 +19,71 @@ import (
 	// jwtPackage "github.com/techagentng/citizenx/services/jwt"
 )
 
+func (s *Server) HandleForgotPasswordMobile() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email string `json:"email" binding:"required,email"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.JSON(c, "", http.StatusBadRequest, nil, err)
+			return
+		}
+
+		user, err := s.AuthRepository.FindUserByEmail(req.Email)
+		if err != nil || user == nil {
+			response.JSON(c, "", http.StatusNotFound, nil, fmt.Errorf("user not found"))
+			return
+		}
+
+		resetToken, err := utils.GeneratePasswordResetToken(user.Email, s.Config.JWTSecret)
+		if err != nil {
+			response.JSON(c, "failed to generate reset token", http.StatusInternalServerError, nil, err)
+			return
+		}
+
+		user.ResetToken = resetToken
+		if err := s.AuthRepository.UpdateUser(user); err != nil {
+			response.JSON(c, "failed to save reset token", http.StatusInternalServerError, nil, err)
+			return
+		}
+
+		_, err = s.Mail.SendResetPassword(user.Email, resetToken) // token passed directly
+		if err != nil {
+			response.JSON(c, "failed to send reset email", http.StatusInternalServerError, nil, err)
+			return
+		}
+
+		// Return token in response
+		response.JSON(c, "Token sent and returned successfully", http.StatusOK, gin.H{
+			"reset_token": resetToken,
+		}, nil)
+	}
+}
+
+
+func (s *Server) ValidateResetTokenHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email string `json:"email" binding:"required,email"`
+			Token string `json:"token" binding:"required"`
+		}
+		
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
+			return
+		}
+
+		user, err := s.AuthRepository.FindUserByEmail(req.Email)
+		if err != nil || user.ResetToken != req.Token {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Token is valid"})
+	}
+}
+
+
 func (s *Server) HandleForgotPassword() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse the email and platform from the request

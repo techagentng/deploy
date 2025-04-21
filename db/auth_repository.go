@@ -5,13 +5,14 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	apiError "github.com/techagentng/citizenx/errors"
 	"github.com/techagentng/citizenx/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	apiError "github.com/techagentng/citizenx/errors"
 )
 
 type AuthRepository interface {
@@ -59,6 +60,7 @@ type AuthRepository interface {
 	CreateRole(role *models.Role) (*models.Role, *apiError.Error)
 	FindFacebookUserByUsername(username string) (*models.User, error)
 	UpdateUserExpoPushToken(userID uint, token string) error
+	StoreMobileResetToken(email, token string) error
 }
 
 type authRepo struct {
@@ -72,6 +74,14 @@ func NewAuthRepo(db *GormDB) AuthRepository {
 func generateIDx2() uuid.UUID {
 	id := uuid.New() // Generates a UUIDv4
 	return id
+}
+
+func (a *authRepo) StoreMobileResetToken(email, token string) error {
+	return a.DB.Table("mobile_reset_tokens").Create(map[string]interface{}{
+		"email": email,
+		"token": token,
+		"created_at": time.Now(),
+	}).Error
 }
 
 // In your auth repository interface
