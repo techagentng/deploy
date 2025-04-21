@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -62,7 +63,7 @@ func (s *Server) HandleForgotPasswordMobile() gin.HandlerFunc {
 
 // This should be used for the route: POST /password/reset/mobile
 func (s *Server) ResetPasswordMobileHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
+    return func(c *gin.Context) {
         var req struct {
             Email           string `json:"email" binding:"required,email"`
             Token           string `json:"token" binding:"required"`
@@ -70,37 +71,56 @@ func (s *Server) ResetPasswordMobileHandler() gin.HandlerFunc {
             ConfirmPassword string `json:"confirm_password" binding:"required"`
         }
 
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
-			return
-		}
+        if err := c.ShouldBindJSON(&req); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
+            return
+        }
 
-		user, err := s.AuthRepository.FindUserByResetToken(req.Token)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Invalid or expired token"})
-			return
-		}
+        if req.NewPassword != req.ConfirmPassword {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Passwords do not match"})
+            return
+        }
 
-		hashedPassword, err := hashPassword(req.Password)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
-			return
-		}
+        user, err := s.AuthRepository.FindUserByEmail(req.Email)
+        if err != nil {
+            c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+            return
+        }
 
-		if err := s.AuthRepository.UpdateUserPassword(user, hashedPassword); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
-			return
-		}
+        if user.ResetToken != req.Token {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+            return
+        }
 
-		if err := s.AuthRepository.ClearResetToken(user); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear reset token"})
-			return
-		}
+        // Log the password before hashing
+        log.Printf("New password for user %s: %s", req.Email, req.NewPassword)
 
-		c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
-	}
+        // Hash the new password
+        hashedPassword, err := utils.HashPassword(req.NewPassword)
+        if err != nil {
+            log.Printf("Error hashing password for user %s: %v", req.Email, err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
+            return
+        }
+
+        // Log the hashed password to ensure it was hashed correctly
+        log.Printf("Hashed password for user %s: %s", req.Email, hashedPassword)
+
+        // Update the password and optionally clear the reset token
+        user.HashedPassword = hashedPassword
+        user.ResetToken = "" // optional: clears the token after use
+
+        // Log the user object before saving
+        log.Printf("Updating user %s with new password", req.Email)
+        if err := s.AuthRepository.UpdateUser(user); err != nil {
+            log.Printf("Failed to update password for user %s: %v", req.Email, err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
+    }
 }
-
 
 
 
@@ -131,7 +151,7 @@ func (s *Server) HandleMobilePasswordReset() gin.HandlerFunc {
 		var req struct {
 			Email       string `json:"email" binding:"required,email"`
 			Token       string `json:"token" binding:"required"`
-			NewPassword string `json:"new_password" binding:"required,min=6"`
+			NewPassword string `json:"newPassword" binding:"required,min=6"` // match web field name
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -142,38 +162,43 @@ func (s *Server) HandleMobilePasswordReset() gin.HandlerFunc {
 			return
 		}
 
-		// Find user by email
+		// Step 1: Find user by email
 		user, err := s.AuthRepository.FindUserByEmail(req.Email)
 		if err != nil || user == nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
 		}
 
-		// Validate reset token
+		// Step 2: Validate reset token
 		if user.ResetToken != req.Token {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			return
 		}
 
-		// Hash new password
+		// Step 3: Hash new password
 		hashedPassword, err := utils.HashPassword(req.NewPassword)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
 			return
 		}
 
-		// Update user's password and clear the reset token
-		user.Password = hashedPassword
-		user.ResetToken = ""
-
-		if err := s.AuthRepository.UpdateUser(user); err != nil {
+		// Step 4: Update user password using the same method as web
+		if err := s.AuthRepository.UpdateUserPassword(user, hashedPassword); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 			return
 		}
 
+		// Step 5: Clear reset token
+		if err := s.AuthRepository.ClearResetToken(user); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear reset token"})
+			return
+		}
+
+		// Step 6: Success response
 		c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
 	}
 }
+
 
 
 func (s *Server) HandleForgotPassword() gin.HandlerFunc {
