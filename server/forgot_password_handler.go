@@ -92,31 +92,19 @@ func (s *Server) ResetPasswordMobileHandler() gin.HandlerFunc {
             return
         }
 
-        // Log the password before hashing
-        log.Printf("New password for user %s: %s", req.Email, req.NewPassword)
-
         // Hash the new password
-        hashedPassword, err := utils.HashPassword(req.NewPassword)
+        hashedPassword, err := hashPassword(req.NewPassword)
         if err != nil {
             log.Printf("Error hashing password for user %s: %v", req.Email, err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
             return
         }
 
-        // Log the hashed password to ensure it was hashed correctly
-        log.Printf("Hashed password for user %s: %s", req.Email, hashedPassword)
-
-        // Update the password and optionally clear the reset token
-        user.HashedPassword = hashedPassword
-        user.ResetToken = "" // optional: clears the token after use
-
-        // Log the user object before saving
-        log.Printf("Updating user %s with new password", req.Email)
-        if err := s.AuthRepository.UpdateUser(user); err != nil {
-            log.Printf("Failed to update password for user %s: %v", req.Email, err)
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
-            return
-        }
+		// Step 5: Update the user's password
+		if err := s.AuthRepository.UpdateUserPassword(user, hashedPassword); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password", "details": err.Error()})
+			return
+		}
 
         c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
     }
