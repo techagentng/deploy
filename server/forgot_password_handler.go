@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -62,54 +63,65 @@ func (s *Server) HandleForgotPasswordMobile() gin.HandlerFunc {
 
 // This should be used for the route: POST /password/reset/mobile
 func (s *Server) ResetPasswordMobileHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req struct {
-			Email           string `json:"email" binding:"required,email"`
-			Token           string `json:"token" binding:"required"`
-			NewPassword     string `json:"new_password" binding:"required,min=6"`
-			ConfirmPassword string `json:"confirm_password" binding:"required"`
-		}
+    return func(c *gin.Context) {
+        var req struct {
+            Email           string `json:"email" binding:"required,email"`
+            Token           string `json:"token" binding:"required"`
+            NewPassword     string `json:"new_password" binding:"required,min=6"`
+            ConfirmPassword string `json:"confirm_password" binding:"required"`
+        }
 
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
-			return
-		}
+        if err := c.ShouldBindJSON(&req); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
+            return
+        }
 
-		if req.NewPassword != req.ConfirmPassword {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Passwords do not match"})
-			return
-		}
+        if req.NewPassword != req.ConfirmPassword {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Passwords do not match"})
+            return
+        }
 
-		user, err := s.AuthRepository.FindUserByEmail(req.Email)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-			return
-		}
+        user, err := s.AuthRepository.FindUserByEmail(req.Email)
+        if err != nil {
+            c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+            return
+        }
 
-		if user.ResetToken != req.Token {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-			return
-		}
+        if user.ResetToken != req.Token {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+            return
+        }
 
-		// Hash the new password
-		hashedPassword, err := utils.HashPassword(req.NewPassword)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
-			return
-		}
+        // Log the password before hashing
+        log.Printf("New password for user %s: %s", req.Email, req.NewPassword)
 
-		// Update the password and optionally clear the reset token
-		user.HashedPassword = hashedPassword
-		user.ResetToken = "" // optional: clears the token after use
+        // Hash the new password
+        hashedPassword, err := utils.HashPassword(req.NewPassword)
+        if err != nil {
+            log.Printf("Error hashing password for user %s: %v", req.Email, err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
+            return
+        }
 
-		if err := s.AuthRepository.UpdateUser(user); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
-			return
-		}
+        // Log the hashed password to ensure it was hashed correctly
+        log.Printf("Hashed password for user %s: %s", req.Email, hashedPassword)
 
-		c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
-	}
+        // Update the password and optionally clear the reset token
+        user.HashedPassword = hashedPassword
+        user.ResetToken = "" // optional: clears the token after use
+
+        // Log the user object before saving
+        log.Printf("Updating user %s with new password", req.Email)
+        if err := s.AuthRepository.UpdateUser(user); err != nil {
+            log.Printf("Failed to update password for user %s: %v", req.Email, err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
+    }
 }
+
 
 
 func (s *Server) ValidateResetTokenHandler() gin.HandlerFunc {

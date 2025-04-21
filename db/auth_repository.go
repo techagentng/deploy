@@ -553,9 +553,16 @@ func (a *authRepo) SoftDeleteUser(userID uint) error {
 
 // UpdateUserPassword updates the password for a given user
 func (a *authRepo) UpdateUserPassword(user *models.User, hashedPassword string) error {
-	user.HashedPassword = hashedPassword
-	return a.DB.Save(user).Error
+    // Log before saving to check if the password field is updated correctly
+    log.Printf("Updating user %s password in database", user.Email)
+    user.HashedPassword = hashedPassword
+    err := a.DB.Save(user).Error
+    if err != nil {
+        log.Printf("Error updating user %s password: %v", user.Email, err)
+    }
+    return err
 }
+
 
 func (a *authRepo) GetUserByID(userID uint) (*models.User, error) {
 	var user models.User
