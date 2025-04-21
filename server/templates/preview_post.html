@@ -45,22 +45,47 @@
             border-radius: 5px;
             margin-top: 20px;
         }
+        .content {
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
-    <h1>{{.Title}}</h1>
-    <p>{{.Description}}</p>
-    {{if .ImageURL}}
-    <img src="{{.ImageURL}}" alt="Post image" class="post-image" />
-    {{end}}
-    <a href="citizenx://post/{{.ID}}" class="open-in-app">Open in App</a>
-    
+    <div class="content">
+        <h1>{{.Title}}</h1>
+        <p>{{.Description}}</p>
+        {{if .ImageURL}}
+        <img src="{{.ImageURL}}" alt="Post image" class="post-image" />
+        {{end}}
+        <a href="citizenx://post/{{.ID}}" class="open-in-app">Open in App</a>
+    </div>
+
     <script>
-        // Only redirect if not coming from a social media platform
-        if (!navigator.userAgent.match(/facebookexternalhit|Twitterbot|Pinterest|LinkedInBot/i)) {
+        // Check if the user agent is a social media crawler
+        function isSocialMediaCrawler() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            return userAgent.includes('facebookexternalhit') ||
+                   userAgent.includes('twitterbot') ||
+                   userAgent.includes('pinterest') ||
+                   userAgent.includes('linkedinbot') ||
+                   userAgent.includes('whatsapp') ||
+                   userAgent.includes('telegrambot');
+        }
+
+        // Only redirect if not a social media crawler and not already on the app
+        if (!isSocialMediaCrawler() && !window.location.href.includes('citizenx://')) {
+            // Add a delay to ensure meta tags are read
             setTimeout(function() {
+                // Try to open in app first
                 window.location.href = "citizenx://post/{{.ID}}";
-            }, 3000);
+                
+                // Fallback to web after a delay if app doesn't open
+                setTimeout(function() {
+                    if (document.hasFocus()) {
+                        window.location.href = "https://citizenx.ng/post/{{.ID}}";
+                    }
+                }, 2000);
+            }, 1000);
         }
     </script>
 </body>
