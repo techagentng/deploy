@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Secret key to sign tokens (Should be stored securely in env vars)
@@ -66,4 +67,17 @@ func GeneratePasswordResetToken(email string, secret string) (string, error) {
 	}
 
 	return resetTokenString, nil
+}
+
+// HashPassword hashes the provided password using bcrypt
+func HashPassword(password string) (string, error) {
+	// bcrypt.DefaultCost is good for most cases (cost = 10)
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
+}
+
+// CheckPasswordHash compares a plain password with its hashed version
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

@@ -67,7 +67,7 @@ func (s *Server) ValidateResetTokenHandler() gin.HandlerFunc {
 			Email string `json:"email" binding:"required,email"`
 			Token string `json:"token" binding:"required"`
 		}
-		
+
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
 			return
@@ -80,6 +80,55 @@ func (s *Server) ValidateResetTokenHandler() gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "Token is valid"})
+	}
+}
+
+func (s *Server) HandleMobilePasswordReset() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email       string `json:"email" binding:"required,email"`
+			Token       string `json:"token" binding:"required"`
+			NewPassword string `json:"new_password" binding:"required,min=6"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Invalid input",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		// Find user by email
+		user, err := s.AuthRepository.FindUserByEmail(req.Email)
+		if err != nil || user == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+
+		// Validate reset token
+		if user.ResetToken != req.Token {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			return
+		}
+
+		// Hash new password
+		hashedPassword, err := utils.HashPassword(req.NewPassword)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			return
+		}
+
+		// Update user's password and clear the reset token
+		user.Password = hashedPassword
+		user.ResetToken = ""
+
+		if err := s.AuthRepository.UpdateUser(user); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
 	}
 }
 
