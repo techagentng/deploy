@@ -16,7 +16,7 @@ import (
 
 type IncidentReportService interface {
 	SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error)
-	GetAllReports(page int) ([]map[string]interface{}, error)
+	GetAllReports(currentUserState string) ([]map[string]interface{}, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByLGA(lga string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByReportType(reportType string, page int) ([]models.IncidentReport, error)
