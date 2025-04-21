@@ -1,10 +1,12 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"html/template"
 
@@ -200,37 +202,55 @@ func (s *Server) GetAppPostByID() gin.HandlerFunc{
 }
 
 func (s *Server) GetPostPreviewByID() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		id := c.Param("id")
-		
-		// Add CORS headers for web access
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET")
-		
-		post, err := s.PostRepository.GetPublicReportByID(id)
-		if err != nil {
-			c.String(http.StatusNotFound, "Post not found")
-			return
-		}
+    return func(c *gin.Context) {
+        id := c.Param("id")
+        
+        // Add CORS headers for web access
+        c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+        c.Writer.Header().Set("Access-Control-Allow-Methods", "GET")
+        
+        post, err := s.PostRepository.GetPublicReportByID(id)
+        if err != nil {
+            c.String(http.StatusNotFound, "Post not found")
+            return
+        }
 
-		// Add proper meta tags for social sharing
-		data := map[string]interface{}{
-			"ID":          post.ID,
-			"Title":       "CitizenX Nigeria",
-			"Description": post.Description,
-			"ImageURL":    post.FeedURLs,
-			"URL":         fmt.Sprintf("https://www.citizenx.ng/preview/post/%s", post.ID),
-			"Type":        "article",
-			"SiteName":    "CitizenX",
-		}
+        // Format image URL properly
+        var imageURL string
+        if post.FeedURLs != "" {
+            // If FeedURLs is a JSON array, parse it
+            var urls []string
+            if err := json.Unmarshal([]byte(post.FeedURLs), &urls); err == nil && len(urls) > 0 {
+                imageURL = urls[0]
+            } else {
+                // If it's a single URL
+                imageURL = post.FeedURLs
+            }
+            
+            // Ensure URL is absolute
+            if !strings.HasPrefix(imageURL, "http") {
+                imageURL = "https://citizenx.ng" + imageURL
+            }
+        }
 
-		tmpl, err := template.ParseFiles("templates/preview_post.html")
-		if err != nil {
-			c.String(http.StatusInternalServerError, "Template error")
-			return
-		}
+        // Add proper meta tags for social sharing
+        data := map[string]interface{}{
+            "ID":          post.ID,
+            "Title":       "CitizenX Nigeria",
+            "Description": post.Description,
+            "ImageURL":    imageURL,
+            "URL":         fmt.Sprintf("https://www.citizenx.ng/preview/post/%s", post.ID),
+            "Type":        "article",
+            "SiteName":    "CitizenX",
+        }
 
-		c.Writer.Header().Set("Content-Type", "text/html")
-		tmpl.Execute(c.Writer, data)
-	}
+        tmpl, err := template.ParseFiles("templates/preview_post.html")
+        if err != nil {
+            c.String(http.StatusInternalServerError, "Template error")
+            return
+        }
+
+        c.Writer.Header().Set("Content-Type", "text/html")
+        tmpl.Execute(c.Writer, data)
+    }
 }

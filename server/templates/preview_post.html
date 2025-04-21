@@ -4,18 +4,64 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
+    <!-- Primary Meta Tags -->
+    <title>{{.Title}}</title>
+    <meta name="title" content="{{.Title}}" />
+    <meta name="description" content="{{.Description}}" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="{{.URL}}" />
     <meta property="og:title" content="{{.Title}}" />
     <meta property="og:description" content="{{.Description}}" />
     <meta property="og:image" content="{{.ImageURL}}" />
-    <meta property="og:url" content="https://citizenx.ng/post/{{.ID}}" />
-    <meta property="og:type" content="article" />
     
-    <title>{{.Title}}</title>
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="{{.URL}}" />
+    <meta property="twitter:title" content="{{.Title}}" />
+    <meta property="twitter:description" content="{{.Description}}" />
+    <meta property="twitter:image" content="{{.ImageURL}}" />
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .post-image {
+            max-width: 100%;
+            height: auto;
+            margin: 20px 0;
+        }
+        .open-in-app {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #0E9C67;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-    <p>Redirecting to post...</p>
+    <h1>{{.Title}}</h1>
+    <p>{{.Description}}</p>
+    {{if .ImageURL}}
+    <img src="{{.ImageURL}}" alt="Post image" class="post-image" />
+    {{end}}
+    <a href="citizenx://post/{{.ID}}" class="open-in-app">Open in App</a>
+    
     <script>
-        window.location.href = "https://citizenx.ng/post/{{.ID}}";
+        // Only redirect if not coming from a social media platform
+        if (!navigator.userAgent.match(/facebookexternalhit|Twitterbot|Pinterest|LinkedInBot/i)) {
+            setTimeout(function() {
+                window.location.href = "citizenx://post/{{.ID}}";
+            }, 3000);
+        }
     </script>
 </body>
 </html>
