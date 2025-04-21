@@ -83,6 +83,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.PUT("/incident-report/block-request/:post_id", s.UpdateBlockRequestHandler())
 	apirouter.POST("/password/forgot/mobile", s.HandleForgotPasswordMobile())
 	apirouter.POST("/password/token/validate", s.ValidateResetTokenHandler())
+	apirouter.POST("/password/reset/mobile", s.ResetPasswordMobileHandler())
 
 	authorized := apirouter.Group("/")
 	authorized.Use(s.Authorize())

@@ -60,6 +60,57 @@ func (s *Server) HandleForgotPasswordMobile() gin.HandlerFunc {
 	}
 }
 
+// This should be used for the route: POST /password/reset/mobile
+func (s *Server) ResetPasswordMobileHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email           string `json:"email" binding:"required,email"`
+			Token           string `json:"token" binding:"required"`
+			NewPassword     string `json:"new_password" binding:"required,min=6"`
+			ConfirmPassword string `json:"confirm_password" binding:"required"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
+			return
+		}
+
+		if req.NewPassword != req.ConfirmPassword {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Passwords do not match"})
+			return
+		}
+
+		user, err := s.AuthRepository.FindUserByEmail(req.Email)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+
+		if user.ResetToken != req.Token {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			return
+		}
+
+		// Hash the new password
+		hashedPassword, err := utils.HashPassword(req.NewPassword)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
+			return
+		}
+
+		// Update the password and optionally clear the reset token
+		user.HashedPassword = hashedPassword
+		user.ResetToken = "" // optional: clears the token after use
+
+		if err := s.AuthRepository.UpdateUser(user); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Password reset successful"})
+	}
+}
+
 
 func (s *Server) ValidateResetTokenHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
