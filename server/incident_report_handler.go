@@ -697,25 +697,42 @@ func detectFileType(filename string) string {
 
 func (s *Server) handleGetAllReport() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		pageStr := c.Query("page")
-		if pageStr == "" {
-			pageStr = "1"
+		// Get current user state from JWT or DB (example assumes it's in context)
+		currentUser, exists := c.Get("currentUser")
+		var currentState string
+		if exists {
+			if user, ok := currentUser.(models.User); ok {
+				currentState = user.StateName
+			}
 		}
-		page, err := strconv.Atoi(pageStr)
-		if err != nil || page < 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page number"})
+
+		// If currentState is empty, it means we can't filter by state
+		if currentState == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "User state is required to filter reports"})
 			return
 		}
 
-		reports, err := s.IncidentReportService.GetAllReports(page)
+		// Fetch reports without pagination and with the state filter if available
+		// Convert currentState to an integer if applicable
+		currentStateInt, err := strconv.Atoi(currentState)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state value"})
+			return
+		}
+
+		reports, err := s.IncidentReportService.GetAllReports(currentStateInt)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"incident_reports": reports})
+		c.JSON(http.StatusOK, gin.H{
+			"incident_reports": reports,
+		})
 	}
 }
+
+
 
 func (s *Server) handleGetAllReportsByState() gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -17,6 +17,7 @@ import (
 // User represents a user of the application
 type User struct {
 	Model
+	StateName string `json:"state_name"` 
 	Fullname          string            `json:"fullname" binding:"required,min=2"`
 	Username          string            `json:"username" binding:"required,min=2"`
 	Telephone         string            `json:"telephone" gorm:"default:null"`

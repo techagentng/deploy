@@ -175,10 +175,13 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 }
 
 
-func (s *IncidentService) GetAllReports(page int) ([]map[string]interface{}, error) {
-	// Delegate the call to the repository
-	return s.incidentRepo.GetAllReports(page)
+// Service function signature
+func (s *IncidentService) GetAllReports(currentUserState string) ([]map[string]interface{}, error) {
+	// Call the repository method to fetch reports, passing the current user state for filtering
+	return s.incidentRepo.GetAllReports(currentUserState)
 }
+
+
 
 
 func (s *IncidentService) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {

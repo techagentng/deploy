@@ -9,6 +9,7 @@ import (
 	"log"
 	"mime/multipart"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -33,7 +34,7 @@ type IncidentReportRepository interface {
 	UpdateReward(userID uint, reward *models.Reward) error
 	FindUserByID(id uint) (*models.UserResponse, error)
 	GetReportByID(report_id string) (*models.IncidentReport, error)
-	GetAllReports(page int) ([]map[string]interface{}, error)
+	GetAllReports(currentUserState string) ([]map[string]interface{}, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByLGA(lga string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByReportType(lga string, page int) ([]models.IncidentReport, error)
@@ -302,57 +303,71 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 	return &report, nil
 }
 
-func (repo *incidentReportRepo) GetAllReports(page int) ([]map[string]interface{}, error) {
-    var reports []map[string]interface{}
+func (repo *incidentReportRepo) GetAllReports(currentUserState string) ([]map[string]interface{}, error) {
+	var reports []map[string]interface{}
 
-    if page < 1 {
-        page = 1
-    }
+	// Fetch reports without pagination, filter by state if provided
+	err := repo.DB.
+		Table("incident_reports").
+		Select(`
+			incident_reports.*, 
+			users.thumb_nail_url AS thumbnail_urls,
+			users.profile_image AS profile_image, 
+			users.state_name AS user_state_name,
+			incident_reports.feed_urls,
+			incident_reports.is_anonymous
+		`).
+		Joins("JOIN users ON users.id = incident_reports.user_id").
+		Order("incident_reports.created_at DESC").
+		Where("users.state_name = ?", currentUserState). // Filter by the current user's state
+		Scan(&reports).Error
 
-    offset := (page - 1) * 20
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("no incident reports found")
+		}
+		return nil, err
+	}
 
-    err := repo.DB.
-        Table("incident_reports").
-        Select(`
-            incident_reports.*, 
-            users.thumb_nail_url AS thumbnail_urls,
-            users.profile_image AS profile_image, 
-            incident_reports.feed_urls,
-            incident_reports.is_anonymous
-        `).
-        Joins("JOIN users ON users.id = incident_reports.user_id").
-        Order("incident_reports.created_at DESC").
-        Limit(20).
-        Offset(offset).
-        Scan(&reports).Error
+	var userStateReports, otherReports []map[string]interface{}
 
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            return nil, errors.New("no incident reports found")
-        }
-        return nil, err
-    }
+	for _, report := range reports {
+		// Handle anonymous logic
+		if isAnonymous, ok := report["is_anonymous"].(bool); ok && isAnonymous {
+			report["user_fullname"] = "Anonymous"
+			report["user_username"] = "anonymous"
+			report["profile_image"] = nil
+		}
 
-    for _, report := range reports {
-        // Handle anonymous reports
-        if isAnonymous, ok := report["is_anonymous"].(bool); ok && isAnonymous {
-            report["user_fullname"] = "Anonymous"
-            report["user_username"] = "anonymous"
-            report["profile_image"] = nil
-        }
+		// Profile image fallback
+		if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
+			report["profile_image"] = profileImage
+		} else if thumbnailUrl, exists := report["thumbnail_urls"]; exists && thumbnailUrl != "" {
+			report["profile_image"] = thumbnailUrl
+		} else {
+			report["profile_image"] = nil
+		}
 
-        // Profile image fallback logic
-        if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
-            report["profile_image"] = profileImage
-        } else if thumbnailUrl, exists := report["thumbnail_urls"]; exists && thumbnailUrl != "" {
-            report["profile_image"] = thumbnailUrl
-        } else {
-            report["profile_image"] = nil
-        }
-    }
+		// Dynamic ordering
+		if state, ok := report["user_state_name"].(string); ok && currentUserState != "" {
+			if strings.EqualFold(state, currentUserState) {
+				userStateReports = append(userStateReports, report)
+			} else {
+				otherReports = append(otherReports, report)
+			}
+		} else {
+			// If state is missing, add to otherReports directly
+			otherReports = append(otherReports, report)
+		}
+	}
 
-    return reports, nil
+	// Combine: current user state first, then others
+	finalFeed := append(userStateReports, otherReports...)
+
+	return finalFeed, nil
 }
+
+
 
 
 func (repo *incidentReportRepo) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
