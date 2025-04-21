@@ -720,7 +720,7 @@ func (s *Server) handleGetAllReport() gin.HandlerFunc {
 			return
 		}
 
-		reports, err := s.IncidentReportService.GetAllReports(currentStateInt)
+		reports, err := s.IncidentReportService.GetAllReports(strconv.Itoa(currentStateInt))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
