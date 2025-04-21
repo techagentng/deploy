@@ -205,9 +205,12 @@ func (s *Server) GetPostPreviewByID() gin.HandlerFunc {
     return func(c *gin.Context) {
         id := c.Param("id")
         
-        // Add CORS headers for web access
+        // Add proper headers
         c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
         c.Writer.Header().Set("Access-Control-Allow-Methods", "GET")
+        c.Writer.Header().Set("Cache-Control", "public, max-age=3600")
+        c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+        
         
         post, err := s.PostRepository.GetPublicReportByID(id)
         if err != nil {
