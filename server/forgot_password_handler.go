@@ -63,10 +63,12 @@ func (s *Server) HandleForgotPasswordMobile() gin.HandlerFunc {
 // This should be used for the route: POST /password/reset/mobile
 func (s *Server) ResetPasswordMobileHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req struct {
-			Token    string `json:"token" binding:"required"`
-			Password string `json:"newPassword" binding:"required,min=4"`
-		}
+        var req struct {
+            Email           string `json:"email" binding:"required,email"`
+            Token           string `json:"token" binding:"required"`
+            NewPassword     string `json:"new_password" binding:"required,min=6"`
+            ConfirmPassword string `json:"confirm_password" binding:"required"`
+        }
 
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input", "details": err.Error()})
