@@ -67,7 +67,6 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.POST("/no-cred/login", restrictAccessToProtectedRoutes(), s.handleNonCredentialLogin())
 	apirouter.GET("/fb/auth", s.handleFBLogin())
 	apirouter.GET("fb/callback", s.handleFBCallback())
-	apirouter.GET("/incident_reports", s.handleGetAllReport()) 
 	apirouter.POST("/google/user/login", s.handleGoogleUserLogin())
 	apirouter.POST("/facebook/user/login", s.handleFacebookUserLogin())
 	apirouter.GET("/google/login", s.HandleGoogleLogin())
@@ -88,7 +87,8 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized := apirouter.Group("/")
 	authorized.Use(s.Authorize())
 	// Upload endpoint
-	authorized.GET("/logout", s.handleLogout())
+	authorized.GET("/logout", s.handleLogout()) //
+	authorized.GET("/incident_reports", s.handleGetAllReport()) 
 	authorized.GET("/users/online", s.handleGetOnlineUsers())
 	authorized.POST("/user/report/", s.handleIncidentReport())  //
 	authorized.POST("/user/report/media", s.handleUploadMedia())
