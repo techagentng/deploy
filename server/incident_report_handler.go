@@ -704,9 +704,10 @@ func (s *Server) handleGetAllReport() gin.HandlerFunc {
 			return
 		}
 
-		// Assert the type as *models.User (pointer)
+		log.Printf("currentUser: %v", currentUser)
 		user, ok := currentUser.(*models.User)
 		if !ok {
+			log.Printf("Failed to assert currentUser type: %T", currentUser) // This will log the type of currentUser
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type"})
 			return
 		}
