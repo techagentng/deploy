@@ -706,13 +706,19 @@ func (s *Server) handleGetAllReport() gin.HandlerFunc {
 
 		// Assert the type as *models.User (pointer)
 		user, ok := currentUser.(*models.User)
-		if !ok || user.StateName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "User state is required to filter reports"})
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type"})
 			return
 		}
 
-		// Call the service with the state name
-		reports, err := s.IncidentReportService.GetAllReports(user.StateName)
+		// If user state is empty, default to "Lagos"
+		stateName := user.StateName
+		if stateName == "" {
+			stateName = "Lagos"
+		}
+
+		// Call the service with the state name (either user's state or default "Lagos")
+		reports, err := s.IncidentReportService.GetAllReports(stateName)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -723,6 +729,7 @@ func (s *Server) handleGetAllReport() gin.HandlerFunc {
 		})
 	}
 }
+
 
 
 func (s *Server) handleGetAllReportsByState() gin.HandlerFunc {

@@ -367,9 +367,6 @@ func (repo *incidentReportRepo) GetAllReports(currentUserState string) ([]map[st
 	return finalFeed, nil
 }
 
-
-
-
 func (repo *incidentReportRepo) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
 	var reports []models.IncidentReport
 	offset := (page - 1) * DefaultPageSize
