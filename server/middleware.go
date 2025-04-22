@@ -99,11 +99,15 @@ func (s *Server) Authorize() gin.HandlerFunc {
 		c.Set("profile_image", user.ThumbNailURL)
 		c.Set("user_role", accessClaims["role"].(string))
 		fmt.Println("Username set in context:", user.Username)
+
+		// Ensure that the user is correctly set as a pointer to User
 		c.Set("currentUser", &user)
+
 		// Continue to the next middleware or handler
 		c.Next()
 	}
 }
+
 
 // Function to check if the user has exceeded the rate limit
 func isRateLimitExceeded(userID uint, lat float64, lng float64) bool {
