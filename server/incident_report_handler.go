@@ -704,7 +704,7 @@ func (s *Server) handleGetAllReport() gin.HandlerFunc {
 			return
 		}
 
-		// Assert the type and get state name (assuming it's a *models.User)
+		// Assert the type as *models.User (pointer)
 		user, ok := currentUser.(*models.User)
 		if !ok || user.StateName == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "User state is required to filter reports"})
@@ -723,6 +723,7 @@ func (s *Server) handleGetAllReport() gin.HandlerFunc {
 		})
 	}
 }
+
 
 func (s *Server) handleGetAllReportsByState() gin.HandlerFunc {
 	return func(c *gin.Context) {
