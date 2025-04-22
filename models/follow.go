@@ -14,3 +14,4 @@ type Follow struct {
     FollowMedia string    `json:"follow_media" gorm:"type:text"`         // Optional field
     CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
 }
+
