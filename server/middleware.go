@@ -99,6 +99,7 @@ func (s *Server) Authorize() gin.HandlerFunc {
 		c.Set("profile_image", user.ThumbNailURL)
 		c.Set("user_role", accessClaims["role"].(string))
 		fmt.Println("Username set in context:", user.Username)
+		c.Set("currentUser", &user)
 		// Continue to the next middleware or handler
 		c.Next()
 	}
