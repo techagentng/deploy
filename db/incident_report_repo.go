@@ -306,7 +306,9 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 func (repo *incidentReportRepo) GetAllReports(currentUserState string) ([]map[string]interface{}, error) {
 	var reports []map[string]interface{}
 
-	// Fetch reports without pagination, filter by state if provided
+	log.Printf("Getting all reports for state: %s", currentUserState)
+
+	// First try: filter by user's state
 	err := repo.DB.
 		Table("incident_reports").
 		Select(`
@@ -318,54 +320,78 @@ func (repo *incidentReportRepo) GetAllReports(currentUserState string) ([]map[st
 			incident_reports.is_anonymous
 		`).
 		Joins("JOIN users ON users.id = incident_reports.user_id").
+		Where("users.state_name = ?", currentUserState).
 		Order("incident_reports.created_at DESC").
-		Where("users.state_name = ?", currentUserState). // Filter by the current user's state
 		Scan(&reports).Error
 
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("no incident reports found")
-		}
+		log.Printf("Error querying reports: %v", err)
 		return nil, err
+	}
+
+	// Fallback: no matching state reports, get all reports instead
+	if len(reports) == 0 {
+		log.Printf("No reports found for state '%s', falling back to all reports.", currentUserState)
+
+		err = repo.DB.
+			Table("incident_reports").
+			Select(`
+				incident_reports.*, 
+				users.thumb_nail_url AS thumbnail_urls,
+				users.profile_image AS profile_image, 
+				users.state_name AS user_state_name,
+				incident_reports.feed_urls,
+				incident_reports.is_anonymous
+			`).
+			Joins("JOIN users ON users.id = incident_reports.user_id").
+			Order("incident_reports.created_at DESC").
+			Scan(&reports).Error
+
+		if err != nil {
+			log.Printf("Error fetching fallback reports: %v", err)
+			return nil, err
+		}
 	}
 
 	var userStateReports, otherReports []map[string]interface{}
 
 	for _, report := range reports {
-		// Handle anonymous logic
-		if isAnonymous, ok := report["is_anonymous"].(bool); ok && isAnonymous {
+		// Anonymous check
+		isAnonymous := false
+		if v, ok := report["is_anonymous"].(bool); ok {
+			isAnonymous = v
+		}
+		if isAnonymous {
 			report["user_fullname"] = "Anonymous"
 			report["user_username"] = "anonymous"
 			report["profile_image"] = nil
 		}
 
 		// Profile image fallback
-		if profileImage, exists := report["profile_image"]; exists && profileImage != "" {
-			report["profile_image"] = profileImage
-		} else if thumbnailUrl, exists := report["thumbnail_urls"]; exists && thumbnailUrl != "" {
-			report["profile_image"] = thumbnailUrl
-		} else {
+		switch {
+		case report["profile_image"] != nil && report["profile_image"] != "":
+			// keep it
+		case report["thumbnail_urls"] != nil && report["thumbnail_urls"] != "":
+			report["profile_image"] = report["thumbnail_urls"]
+		default:
 			report["profile_image"] = nil
 		}
 
-		// Dynamic ordering
-		if state, ok := report["user_state_name"].(string); ok && currentUserState != "" {
-			if strings.EqualFold(state, currentUserState) {
-				userStateReports = append(userStateReports, report)
-			} else {
-				otherReports = append(otherReports, report)
-			}
+		// Grouping by state match
+		state, _ := report["user_state_name"].(string)
+		if strings.EqualFold(state, currentUserState) {
+			userStateReports = append(userStateReports, report)
 		} else {
-			// If state is missing, add to otherReports directly
 			otherReports = append(otherReports, report)
 		}
 	}
 
-	// Combine: current user state first, then others
 	finalFeed := append(userStateReports, otherReports...)
 
+	log.Printf("Returning %d incident reports", len(finalFeed))
 	return finalFeed, nil
 }
+
 
 func (repo *incidentReportRepo) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
 	var reports []models.IncidentReport
