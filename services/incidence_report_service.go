@@ -37,6 +37,7 @@ type IncidentReportService interface {
 	GetReportCountByState(state string) (int, error)
 	GetOverallReportCount() (int, error)
 	GetGovernorDetails(stateName string) (*models.State, error)
+	GetTopStatesWithReportCount() ([]map[string]interface{}, error)
 }
 
 type IncidentService struct {
@@ -55,6 +56,11 @@ func NewIncidentReportService(incidentReportRepo db.IncidentReportRepository, re
 		mediaRepo:    mediaRepo,
 	}
 }
+
+func (s *IncidentService) GetTopStatesWithReportCount() ([]map[string]interface{}, error) {
+	return s.incidentRepo.GetTopStatesWithReportCount()
+}
+
 
 func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error) {
     fmt.Println("Report ID:", reportID)

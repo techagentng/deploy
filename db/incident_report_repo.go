@@ -108,6 +108,7 @@ type IncidentReportRepository interface {
 	GetReportCreatorID(reportID uuid.UUID) (uint, error)
 	GetExpoPushToken(userID uint) (string, error)
 	UpdateExpoPushToken(userID uint, token string) error
+	GetTopStatesWithReportCount() ([]map[string]interface{}, error)
 }
 
 type incidentReportRepo struct {
@@ -121,6 +122,42 @@ var (
     ErrStateNotFound = errors.New("state not found")
     ErrDatabase      = errors.New("database error")
 )
+
+func (r *incidentReportRepo) GetTopStatesWithReportCount() ([]map[string]interface{}, error) {
+	var stateCounts []map[string]interface{}
+	var totalCount int64
+
+	// Step 1: Get report count per state
+	err := r.DB.
+		Table("incident_reports").
+		Select("state_name, COUNT(*) AS report_count").
+		Where("state_name IS NOT NULL AND state_name != ''").
+		Group("state_name").
+		Order("report_count DESC").
+		Scan(&stateCounts).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state report counts: %w", err)
+	}
+
+	// Step 2: Get total number of reports
+	err = r.DB.
+		Table("incident_reports").
+		Where("state_name IS NOT NULL AND state_name != ''").
+		Count(&totalCount).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get total report count: %w", err)
+	}
+
+	// Step 3: Append total count as a map entry
+	stateCounts = append(stateCounts, map[string]interface{}{
+		"total_states": totalCount,
+	})
+
+	return stateCounts, nil
+}
+
 
 // user_repository_impl.go
 func (r *incidentReportRepo) GetExpoPushToken(userID uint) (string, error) {

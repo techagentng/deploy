@@ -153,4 +153,5 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	apirouter.GET("/map/state/count", s.handleGetReportTypeCountsState())
 	apirouter.GET("/post/:id", s.GetAppPostByID())
 	apirouter.GET("/preview/post/:id", s.GetPostPreviewByID())
+	authorized.GET("/reports/states/top", s.handleAllStateReport())
 }
