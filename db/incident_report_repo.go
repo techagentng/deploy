@@ -1865,12 +1865,13 @@ func (repo *incidentReportRepo) GetOverallReportCount() (int, error) {
 
 func (repo *incidentReportRepo) GetGovernorDetails(stateName string) (*models.State, error) {
     var state models.State
-    err := repo.DB.Where("state = ?", stateName).First(&state).Error
+    err := repo.DB.Where("LOWER(state) = LOWER(?)", stateName).First(&state).Error
     if err != nil {
         return nil, err
     }
     return &state, nil
 }
+
 
 func (repo *incidentReportRepo) CreateState(state *models.State) error {
     existingState := &models.State{}
