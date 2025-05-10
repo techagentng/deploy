@@ -26,12 +26,14 @@ type State struct {
 
 
 type CreateStateInput struct {
-    StateName   *string   `form:"state_name" binding:"required"`
-    Governor    string    `form:"governor"`
-    DeputyName  string    `form:"deputy_name"`
-    LGAC        string    `form:"lgac"`
-    LGAList     []*string `form:"lga_list[]" binding:"required"` // Slice of pointers
+    StateName  *string   `form:"state"`        
+    Governor   string    `form:"governor"`
+    DeputyName string    `form:"deputy_name"`
+    LGAC       string    `form:"lgac"`
+    LGAList    []*string `form:"lgas"`
 }
+
+
 
 
 type LGAReportCount struct {
