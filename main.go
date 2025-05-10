@@ -48,7 +48,7 @@ func main() {
 	// Services
 	authService := services.NewAuthService(authRepo, conf)
 	mediaService := services.NewMediaService(mediaRepo, rewardRepo, incidentReportRepo, conf)
-	incidentReportService := services.NewIncidentReportService(incidentReportRepo, rewardRepo, mediaRepo, conf)
+	incidentReportService := services.NewIncidentReportService(incidentReportRepo, rewardRepo, mediaRepo, conf, gormDB.DB)
 	rewardService := services.NewRewardService(rewardRepo, incidentReportRepo, conf)
 	likeService := services.NewLikeService(likeRepo, conf)
 	postService := services.NewPostService(postRepo, conf)

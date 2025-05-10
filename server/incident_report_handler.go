@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -2068,119 +2067,62 @@ func toStringPtr(s string) *string {
     return &s
 }
 
-// CreateState handles the request to create a new state
 func (s *Server) CreateState() gin.HandlerFunc {
     return func(ctx *gin.Context) {
-        var input models.State
-
-        // Extract text fields from multipart form
-        if state := ctx.PostForm("state"); state != "" {
-            input.State = toStringPtr(state)
-        }
-        if governor := ctx.PostForm("governor"); governor != "" {
-            input.Governor = toStringPtr(governor)
-        }
-        if deputyName := ctx.PostForm("deputy_name"); deputyName != "" {
-            input.DeputyName = toStringPtr(deputyName)
-        }
-        if lgac := ctx.PostForm("lgac"); lgac != "" {
-            input.LGAC = toStringPtr(lgac)
-        }
-
-        // Extract LGAs from form data (e.g., as a comma-separated string or JSON)
-        if lgasStr := ctx.PostForm("lgas"); lgasStr != "" {
-            var lgas []string
-            // Try parsing as JSON array first
-            if err := json.Unmarshal([]byte(lgasStr), &lgas); err != nil {
-                // If JSON parsing fails, treat it as a comma-separated string
-                lgas = strings.Split(strings.TrimSpace(lgasStr), ",")
-                // Trim whitespace from each LGA name
-                for i, lga := range lgas {
-                    lgas[i] = strings.TrimSpace(lga)
-                }
-            }
-            input.Lgas = lgas
-        }
-
-        // Assuming user ID from context (e.g., JWT)
-        userID := uint(1) // Replace with actual logic, e.g., ctx.GetUint("userID")
-
-        // Handle file uploads
-        uploadedImages := make(map[string]string)
-
-        govFile, err := ctx.FormFile("governor_image")
-        if err != nil && err != http.ErrMissingFile {
-            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving governor image"})
-            return
-        }
-        if govFile != nil {
-            url, err := s.MediaService.UploadFileToS3(govFile, userID, "governor")
-            if err != nil {
-                ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload governor image"})
-                return
-            }
-            uploadedImages["governor_image"] = url
-        }
-
-        depFile, err := ctx.FormFile("deputy_image")
-        if err != nil && err != http.ErrMissingFile {
-            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving deputy image"})
-            return
-        }
-        if depFile != nil {
-            url, err := s.MediaService.UploadFileToS3(depFile, userID, "deputy")
-            if err != nil {
-                ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload deputy image"})
-                return
-            }
-            uploadedImages["deputy_image"] = url
-        }
-
-        lgacFile, err := ctx.FormFile("lgac_image")
-        if err != nil && err != http.ErrMissingFile {
-            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving LGAC image"})
-            return
-        }
-        if lgacFile != nil {
-            url, err := s.MediaService.UploadFileToS3(lgacFile, userID, "lgac")
-            if err != nil {
-                ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload LGA Chair image"})
-                return
-            }
-            uploadedImages["lgac_image"] = url
-        }
-
-        // Assign uploaded image URLs
-        if url, ok := uploadedImages["governor_image"]; ok {
-            input.GovernorImage = toStringPtr(url)
-        }
-        if url, ok := uploadedImages["deputy_image"]; ok {
-            input.DeputyImage = toStringPtr(url)
-        }
-        if url, ok := uploadedImages["lgac_image"]; ok {
-            input.LgacImage = toStringPtr(url)
-        }
-
-        // Assign a new UUID
-        input.ID = uuid.New()
-
-        // Save state to DB
-        err = s.IncidentReportRepository.CreateState(&input)
-        if err != nil {
-            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save state details"})
+        var input models.CreateStateInput
+        if err := ctx.ShouldBind(&input); err != nil {
+            ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
             return
         }
 
-        // Invalidate Redis cache
-        err = s.RedisClient.Del(context.Background(), "states:all").Err()
-        if err != nil {
-            // Log the error but don’t fail the request—cache invalidation is secondary
-            fmt.Println("Failed to invalidate Redis cache:", err)
+        userID := uint(1) // Replace with actual user ID from context/session
+
+        // Upload images
+        governorImg := uploadImage(ctx, s, "governor_image", userID, "governor")
+        deputyImg := uploadImage(ctx, s, "deputy_image", userID, "deputy")
+        lgacImg := uploadImage(ctx, s, "lgac_image", userID, "lgac")
+
+        // Build state model
+        state := &models.State{
+            ID:            uuid.New(),
+            State:         input.StateName,
+            Governor:      stringPtr(input.Governor),
+            DeputyName:    stringPtr(input.DeputyName),
+            LGAC:          stringPtr(input.LGAC),
+            GovernorImage: stringPtr(governorImg),
+            DeputyImage:   stringPtr(deputyImg),
+            LgacImage:     stringPtr(lgacImg),
         }
 
-        ctx.JSON(http.StatusCreated, gin.H{"message": "State created successfully", "data": input})
+        // Call repo to create or update state and LGAs
+        if err := s.IncidentReportRepository.CreateOrUpdateStateWithLGAs(ctx, state, input.LGAList); err != nil {
+            ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create state"})
+            return
+        }
+
+        ctx.JSON(http.StatusCreated, gin.H{"message": "State created", "data": state})
     }
 }
+
+func stringPtr(s string) *string {
+    if s == "" {
+        return nil
+    }
+    return &s
+}
+
+func uploadImage(ctx *gin.Context, s *Server, formField string, userID uint, category string) string {
+    file, err := ctx.FormFile(formField)
+    if err != nil || file == nil {
+        return ""
+    }
+    url, err := s.MediaService.UploadFileToS3(file, userID, category)
+    if err != nil {
+        return ""
+    }
+    return url
+}
+
 
 func (s *Server) FetchLGAsByState() gin.HandlerFunc {
     return func(ctx *gin.Context) {
@@ -2221,7 +2163,7 @@ func (s *Server) FetchLGAsByState() gin.HandlerFunc {
         // Ensure LGA list is never null
         lgas := state.Lgas
         if len(lgas) == 0 {
-            lgas = []string{}
+			lgas = []models.LGA{}
         }
 
         lgasJSON, err := json.Marshal(lgas)

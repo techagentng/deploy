@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"strings"
+    "strings"
 
 	"github.com/google/uuid"
 	"github.com/techagentng/citizenx/config"
@@ -41,20 +41,21 @@ type IncidentReportService interface {
 }
 
 type IncidentService struct {
-	Config       *config.Config
-	incidentRepo db.IncidentReportRepository
-	rewardRepo   db.RewardRepository
-	mediaRepo    db.MediaRepository
+    Config       *config.Config
+    incidentRepo db.IncidentReportRepository
+    rewardRepo   db.RewardRepository
+    mediaRepo    db.MediaRepository
+    DB           *gorm.DB
 }
 
-// NewIncidentReportService instantiates an IncidentReportService
-func NewIncidentReportService(incidentReportRepo db.IncidentReportRepository, rewardRepo db.RewardRepository, mediaRepo db.MediaRepository, conf *config.Config) *IncidentService {
-	return &IncidentService{
-		Config:       conf,
-		incidentRepo: incidentReportRepo,
-		rewardRepo:   rewardRepo,
-		mediaRepo:    mediaRepo,
-	}
+func NewIncidentReportService(incidentReportRepo db.IncidentReportRepository, rewardRepo db.RewardRepository, mediaRepo db.MediaRepository, conf *config.Config, db *gorm.DB) *IncidentService {
+    return &IncidentService{
+        Config:       conf,
+        incidentRepo: incidentReportRepo,
+        rewardRepo:   rewardRepo,
+        mediaRepo:    mediaRepo,
+        DB:           db,
+    }
 }
 
 func (s *IncidentService) GetTopStatesWithReportCount() ([]map[string]interface{}, error) {

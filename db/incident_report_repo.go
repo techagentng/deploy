@@ -109,6 +109,8 @@ type IncidentReportRepository interface {
 	GetExpoPushToken(userID uint) (string, error)
 	UpdateExpoPushToken(userID uint, token string) error
 	GetTopStatesWithReportCount() ([]map[string]interface{}, error)
+	CreateOrUpdateStateWithLGAs(ctx context.Context, state *models.State, lgas []*string) error
+
 }
 
 type incidentReportRepo struct {
@@ -158,6 +160,45 @@ func (r *incidentReportRepo) GetTopStatesWithReportCount() ([]map[string]interfa
 	return stateCounts, nil
 }
 
+func (r *incidentReportRepo) CreateOrUpdateStateWithLGAs(ctx context.Context, state *models.State, lgas []*string) error {
+    var existingState models.State
+    err := r.DB.WithContext(ctx).Where("state = ?", state.State).First(&existingState).Error
+
+    if errors.Is(err, gorm.ErrRecordNotFound) {
+        if err := r.DB.Create(state).Error; err != nil {
+            return err
+        }
+    } else if err == nil {
+        state.ID = existingState.ID
+        if err := r.DB.Save(state).Error; err != nil {
+            return err
+        }
+    } else {
+        return err
+    }
+
+    // Create LGAs
+    for _, lgaName := range lgas {
+        if lgaName == nil || *lgaName == "" {
+            continue
+        }
+
+        var existingLGA models.LGA
+        err := r.DB.WithContext(ctx).Where("name = ? AND state_id = ?", lgaName, state.ID).First(&existingLGA).Error
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            lga := &models.LGA{
+                ID:      uuid.New(),
+                Name:    lgaName,
+                StateID: state.ID,
+            }
+            if err := r.DB.Create(lga).Error; err != nil {
+                return err
+            }
+        }
+    }
+
+    return nil
+}
 
 // user_repository_impl.go
 func (r *incidentReportRepo) GetExpoPushToken(userID uint) (string, error) {
@@ -1845,22 +1886,24 @@ func (repo *incidentReportRepo) CreateState(state *models.State) error {
     }
 
     // If the state exists, merge LGAs and update other fields
-    // Step 1: Merge LGAs (assuming Lgas is a []string field)
+    // Step 1: Merge LGAs (using []models.LGA and deduplication by Name)
     if len(state.Lgas) > 0 {
-        // Get existing LGAs
-        existingLgas := existingState.Lgas
-        // Create a map to avoid duplicates
-        lgaMap := make(map[string]struct{})
-        for _, lga := range existingLgas {
-            lgaMap[lga] = struct{}{}
+        // Build a map of existing LGA names
+        lgaMap := make(map[string]models.LGA)
+        for _, lga := range existingState.Lgas {
+            if lga.Name != nil {
+                lgaMap[*lga.Name] = lga
+            }
         }
-        // Add new LGAs
+        // Add new LGAs if not present
         for _, lga := range state.Lgas {
-            lgaMap[lga] = struct{}{}
+            if lga.Name != nil {
+                lgaMap[*lga.Name] = lga
+            }
         }
-        // Convert back to slice
-        mergedLgas := make([]string, 0, len(lgaMap))
-        for lga := range lgaMap {
+        // Convert map back to slice
+        mergedLgas := make([]models.LGA, 0, len(lgaMap))
+        for _, lga := range lgaMap {
             mergedLgas = append(mergedLgas, lga)
         }
         existingState.Lgas = mergedLgas
@@ -1960,7 +2003,10 @@ func (repo *incidentReportRepo) FetchStates() ([]models.State, error) {
                 lgaNames[j] = *lga.Name
             }
         }
-        states[i].Lgas = lgaNames
+		states[i].Lgas = make([]models.LGA, len(lgaNames))
+		for j, name := range lgaNames {
+			states[i].Lgas[j] = models.LGA{Name: &name}
+		}
     }
 
     return states, nil
