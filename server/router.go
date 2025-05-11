@@ -88,7 +88,7 @@ func (s *Server) defineRoutes(router *gin.Engine) {
 	authorized.Use(s.Authorize())
 	// Upload endpoint
 	authorized.GET("/logout", s.handleLogout()) //
-	authorized.GET("/incident_reports", s.handleGetAllReport()) 
+	apirouter.GET("/incident_reports", s.handleGetAllReport()) 
 	authorized.GET("/users/online", s.handleGetOnlineUsers())
 	authorized.POST("/user/report/", s.handleIncidentReport())  //
 	authorized.POST("/user/report/media", s.handleUploadMedia())
