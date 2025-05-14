@@ -16,7 +16,7 @@ import (
 
 type IncidentReportService interface {
 	SaveReport(userID uint, lat float64, lng float64, report *models.IncidentReport, reportID string, totalPoints int) (*models.IncidentReport, error)
-	GetAllReports() ([]map[string]interface{}, error)
+	GetAllReports(filter string) ([]map[string]interface{}, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByLGA(lga string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByReportType(reportType string, page int) ([]models.IncidentReport, error)
@@ -183,11 +183,11 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 
 
 // GetAllReports fetches all incident reports without filtering by state
-func (s *IncidentService) GetAllReports() ([]map[string]interface{}, error) {
+// GetAllReports fetches all incident reports, optionally filtered by a string parameter (e.g., state or other criteria)
+func (s *IncidentService) GetAllReports(filter string) ([]map[string]interface{}, error) {
+	// TODO: Update callers to pass the appropriate filter string
 	return s.incidentRepo.GetAllReports()
 }
-
-
 
 
 func (s *IncidentService) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
