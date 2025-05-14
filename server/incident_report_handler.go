@@ -712,7 +712,7 @@ func (s *Server) handleGetAllReport() gin.HandlerFunc {
 		}
 
 		// Just fetch all reports — no state filtering
-		reports, err := s.IncidentReportService.GetAllReports() 
+		reports, err := s.IncidentReportService.GetAllReports("") 
 		if err != nil {
 			log.Printf("Failed to fetch reports: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports"})
