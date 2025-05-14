@@ -182,10 +182,9 @@ func (s *IncidentService) SaveReport(userID uint, lat float64, lng float64, repo
 }
 
 
-// Service function signature
-func (s *IncidentService) GetAllReports(currentUserState string) ([]map[string]interface{}, error) {
-	// Call the repository method to fetch reports, passing the current user state for filtering
-	return s.incidentRepo.GetAllReports(currentUserState)
+// GetAllReports fetches all incident reports without filtering by state
+func (s *IncidentService) GetAllReports() ([]map[string]interface{}, error) {
+	return s.incidentRepo.GetAllReports()
 }
 
 

@@ -704,23 +704,18 @@ func (s *Server) handleGetAllReport() gin.HandlerFunc {
 		}
 
 		log.Printf("currentUser: %v", currentUser)
-		user, ok := currentUser.(*models.User)
+		_, ok := currentUser.(*models.User)
 		if !ok {
-			log.Printf("Failed to assert currentUser type: %T", currentUser) // This will log the type of currentUser
+			log.Printf("Failed to assert currentUser type: %T", currentUser)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user type"})
 			return
 		}
 
-		// If user state is empty, default to "Lagos"
-		stateName := user.StateName
-		if stateName == "" {
-			stateName = "Lagos"
-		}
-
-		// Call the service with the state name (either user's state or default "Lagos")
-		reports, err := s.IncidentReportService.GetAllReports(stateName)
+		// Just fetch all reports — no state filtering
+		reports, err := s.IncidentReportService.GetAllReports("defaultArgument") // Replace "defaultArgument" with the appropriate string value
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			log.Printf("Failed to fetch reports: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports"})
 			return
 		}
 

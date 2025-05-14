@@ -9,7 +9,6 @@ import (
 	"log"
 	"mime/multipart"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,7 +33,7 @@ type IncidentReportRepository interface {
 	UpdateReward(userID uint, reward *models.Reward) error
 	FindUserByID(id uint) (*models.UserResponse, error)
 	GetReportByID(report_id string) (*models.IncidentReport, error)
-	GetAllReports(currentUserState string) ([]map[string]interface{}, error)
+	GetAllReports() ([]map[string]interface{}, error)
 	GetAllReportsByState(state string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByLGA(lga string, page int) ([]models.IncidentReport, error)
 	GetAllReportsByReportType(lga string, page int) ([]models.IncidentReport, error)
@@ -381,12 +380,9 @@ func (i *incidentReportRepo) GetReportByID(report_id string) (*models.IncidentRe
 	return &report, nil
 }
 
-func (repo *incidentReportRepo) GetAllReports(currentUserState string) ([]map[string]interface{}, error) {
+func (repo *incidentReportRepo) GetAllReports() ([]map[string]interface{}, error) {
 	var reports []map[string]interface{}
 
-	log.Printf("Getting all reports for state: %s", currentUserState)
-
-	// First try: filter by user's state
 	err := repo.DB.
 		Table("incident_reports").
 		Select(`
@@ -398,77 +394,35 @@ func (repo *incidentReportRepo) GetAllReports(currentUserState string) ([]map[st
 			incident_reports.is_anonymous
 		`).
 		Joins("JOIN users ON users.id = incident_reports.user_id").
-		Where("users.state_name = ?", currentUserState).
 		Order("incident_reports.created_at DESC").
 		Scan(&reports).Error
 
 	if err != nil {
-		log.Printf("Error querying reports: %v", err)
+		log.Printf("Error fetching all reports: %v", err)
 		return nil, err
 	}
 
-	// Fallback: no matching state reports, get all reports instead
-	if len(reports) == 0 {
-		log.Printf("No reports found for state '%s', falling back to all reports.", currentUserState)
-
-		err = repo.DB.
-			Table("incident_reports").
-			Select(`
-				incident_reports.*, 
-				users.thumb_nail_url AS thumbnail_urls,
-				users.profile_image AS profile_image, 
-				users.state_name AS user_state_name,
-				incident_reports.feed_urls,
-				incident_reports.is_anonymous
-			`).
-			Joins("JOIN users ON users.id = incident_reports.user_id").
-			Order("incident_reports.created_at DESC").
-			Scan(&reports).Error
-
-		if err != nil {
-			log.Printf("Error fetching fallback reports: %v", err)
-			return nil, err
-		}
-	}
-
-	var userStateReports, otherReports []map[string]interface{}
-
+	// Clean up and anonymize as needed
 	for _, report := range reports {
-		// Anonymous check
-		isAnonymous := false
-		if v, ok := report["is_anonymous"].(bool); ok {
-			isAnonymous = v
-		}
-		if isAnonymous {
+		if isAnonymous, ok := report["is_anonymous"].(bool); ok && isAnonymous {
 			report["user_fullname"] = "Anonymous"
 			report["user_username"] = "anonymous"
 			report["profile_image"] = nil
 		}
 
-		// Profile image fallback
 		switch {
 		case report["profile_image"] != nil && report["profile_image"] != "":
-			// keep it
+			// ok
 		case report["thumbnail_urls"] != nil && report["thumbnail_urls"] != "":
 			report["profile_image"] = report["thumbnail_urls"]
 		default:
 			report["profile_image"] = nil
 		}
-
-		// Grouping by state match
-		state, _ := report["user_state_name"].(string)
-		if strings.EqualFold(state, currentUserState) {
-			userStateReports = append(userStateReports, report)
-		} else {
-			otherReports = append(otherReports, report)
-		}
 	}
 
-	finalFeed := append(userStateReports, otherReports...)
-
-	log.Printf("Returning %d incident reports", len(finalFeed))
-	return finalFeed, nil
+	return reports, nil
 }
+
 
 
 func (repo *incidentReportRepo) GetAllReportsByState(state string, page int) ([]models.IncidentReport, error) {
